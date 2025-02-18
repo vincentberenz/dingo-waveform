@@ -10,7 +10,7 @@ from bilby.gw.conversion import (
 )
 
 from dingo_waveform.approximant import Approximant
-from dingo_waveform.domains import Domain, DomainParameters
+from dingo_waveform.domains import DomainParameters
 from dingo_waveform.inspiral_choose_fd_modes import InspiralChooseFDModesParameters
 from dingo_waveform.spins import Spins
 
@@ -95,22 +95,21 @@ class BinaryBlackHoleParameters:
 
     def to_InspiralChooseFDModesParameters(
         self,
-        domain: Domain,
+        domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Optional[Approximant],
     ) -> InspiralChooseFDModesParameters:
-
         spins: Spins = self.get_spins(spin_conversion_phase)
-        domain_params = asdict(domain.get_parameters())
         # adding iota, s1x, ..., s2x, ...
         parameters = asdict(spins)
         # direct mapping from this instance
         for k in ("mass_1", "mass_2", "phase"):
             parameters[k] = getattr(self, k)
         # adding domain related params
+        domain_dict = asdict(domain_params)
         for k in ("delta_t", "f_min", "f_max", "f_ref"):
-            parameters[k] = domain_params[k]
+            parameters[k] = domain_dict[k]
         # other params
         parameters["r"] = self.luminosity_distance
         parameters["lal_params"] = lal_params

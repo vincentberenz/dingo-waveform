@@ -12,7 +12,3 @@ FrequencySeries: TypeAlias = NDArray[Shape["*"], Complex128]
 Mode: TypeAlias = Tuple[int, int]
 
 
-@dataclass
-class PolarizationDict:
-    h_plus: np.ndarray
-    h_cross: np.ndarray

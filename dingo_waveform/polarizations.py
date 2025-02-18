@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Dict
+from dataclasses import dataclass, fields
+from typing import Dict, List
 
 import lal
 import numpy as np
@@ -9,20 +9,21 @@ from dingo_waveform.types import FrequencySeries, Iota, Mode
 
 @dataclass
 class Polarization:
-    h_plus: np.ndarray
-    h_cross: np.ndarray
+    h_plus: FrequencySeries
+    h_cross: FrequencySeries
 
 
 def get_polarizations_from_fd_modes_m(
     hlm_fd: Dict[Mode, FrequencySeries], iota: Iota, phase: float
-):
-    pol_m = {}
-    polarizations = ["h_plus", "h_cross"]
+) -> Dict[int, Polarization]:
+    pol_m: Dict[int, Dict[str, FrequencySeries]] = {}
+    polarizations: List[str] = [f.name for f in fields(Polarization)]
+
+    for (_, m), __ in hlm_fd.items():
+        pol_m[m] = {"h_plus": 0.0, "h_cross": 0.0}  # type: ignore
+        pol_m[-m] = {"h_plus": 0.0, "h_cross": 0.0}  # type: ignore
 
     for (l, m), h in hlm_fd.items():
-        if m not in pol_m:
-            pol_m[m] = {k: 0.0 for k in polarizations}
-            pol_m[-m] = {k: 0.0 for k in polarizations}
 
         # In the L0 frame, we compute the polarizations from the modes using the
         # spherical harmonics below.
@@ -48,4 +49,8 @@ def get_polarizations_from_fd_modes_m(
         pol_m[m]["h_cross"] += 0.5 * 1j * h1 * ylm
         pol_m[-m]["h_cross"] += -0.5 * 1j * h2 * ylmstar
 
-    return pol_m
+    # Convert pol_m to a Dict[int, Polarization]
+    return {
+        m: Polarization(h_plus=pol["h_plus"], h_cross=pol["h_cross"])
+        for m, pol in pol_m.items()
+    }
