@@ -45,6 +45,8 @@ class WaveformParams:
     total_mass_source: Optional[float] = None
     chirp_mass_source: Optional[float] = None
 
+    l_max: Optional[float] = None
+
     def to_binary_black_hole_parameters(
         self, convert_to_SI: bool
     ) -> BinaryBlackHoleParameters:
