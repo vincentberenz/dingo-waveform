@@ -1,3 +1,4 @@
+import logging
 from dataclasses import asdict, dataclass
 from numbers import Number
 from typing import List, Optional, Tuple, Union
@@ -9,11 +10,13 @@ from bilby.gw.conversion import (
     convert_to_lal_binary_black_hole_parameters,
 )
 
-from dingo_waveform.approximant import Approximant
-from dingo_waveform.domains import DomainParameters
-from dingo_waveform.inspiral_choose_fd_modes import InspiralChooseFDModesParameters
-from dingo_waveform.inspiral_choose_td_modes import InspiralChooseTDModesParameters
-from dingo_waveform.spins import Spins
+from .approximant import Approximant
+from .domains import DomainParameters
+from .logging import TableStr, to_table
+from .spins import Spins
+from .waveform_parameters import WaveformParameters
+
+_logger = logging.getLogger(__name__)
 
 
 def _convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
@@ -41,37 +44,49 @@ def _convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
 
 
 @dataclass
-class BinaryBlackHoleParameters:
+class BinaryBlackHoleParameters(TableStr):
     luminosity_distance: float
-    redshift: float
     a_1: float
     a_2: float
-    cos_tilt_1: float
-    cos_tilt_2: float
     phi_jl: float
     phi_12: float
-    phase: float
     tilt_1: float
     tilt_2: float
+    geocent_time: float
+    phase: float
     theta_jn: float
     f_ref: float
-
-    # Mass parameters
-    mass_1: float
-    mass_2: float
-    total_mass: float
     chirp_mass: float
     mass_ratio: float
-    symmetric_mass_ratio: float
+    total_mass: float
+    mass_1: float
+    mass_2: float
 
-    # Source frame mass parameters
-    mass_1_source: float
-    mass_2_source: float
-    total_mass_source: float
-    chirp_mass_source: float
+    @classmethod
+    def from_waveform_parameters(
+        cls, waveform_params: WaveformParameters, convert_to_SI: bool
+    ) -> "BinaryBlackHoleParameters":
+        params = asdict(waveform_params)
+        params = {k: v for k, v in params.items() if v is not None}
+        _logger.debug(
+            "calling convert_to_lal_binary_black_hole_parameters with parameters:\n"
+            f"{to_table(params)}"
+        )
+        converted_params, _ = convert_to_lal_binary_black_hole_parameters(params)
+        _logger.debug(
+            "output of convert_to_lal_binary_black_hole_parameters:\n"
+            f"{to_table(converted_params)}"
+        )
+        if convert_to_SI:
+            _logger.debug("converting to SI units")
+            converted_params["mass_1"] *= lal.MSUN_SI
+            converted_params["mass_2"] *= lal.MSUN_SI
+            converted_params["luminosity_distance"] *= 1e6 * lal.PC_SI
+        instance = cls(**converted_params)
+        _logger.debug(instance.to_table("generated binary black hole parameters"))
+        return instance
 
     def get_spins(self, spin_conversion_phase: Optional[float]) -> Spins:
-
         keys: Tuple[str, ...] = (
             "theta_jn",
             "phi_jl",
@@ -81,46 +96,21 @@ class BinaryBlackHoleParameters:
             "a_1",
             "a_2",
             "mass_1",
-            ",ass_2",
+            "mass_2",
             "f_ref",
             "phase",
         )
         args: List[float] = [getattr(self, k) for k in keys]
         if spin_conversion_phase is not None:
             args[-1] = spin_conversion_phase
+        _logger.debug(
+            "calling bilby_to_lalsimulation_spins with arguments:\n"
+            f"{to_table({k: a for k,a in zip(keys,args)})}"
+        )
         iota_and_cart_spins: List[float] = [
             float(_convert_to_float(value))
-            for value in bilby_to_lalsimulation_spins(args)
+            for value in bilby_to_lalsimulation_spins(*args)
         ]
-        return Spins(*iota_and_cart_spins)
-
-    def to_InspiralChooseFDModesParameters(
-        self,
-        domain_params: DomainParameters,
-        spin_conversion_phase: Optional[float],
-        lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
-    ) -> InspiralChooseFDModesParameters:
-        spins: Spins = self.get_spins(spin_conversion_phase)
-        # adding iota, s1x, ..., s2x, ...
-        parameters = asdict(spins)
-        # direct mapping from this instance
-        for k in ("mass_1", "mass_2", "phase"):
-            parameters[k] = getattr(self, k)
-        # adding domain related params
-        domain_dict = asdict(domain_params)
-        for k in ("delta_t", "f_min", "f_max", "f_ref"):
-            parameters[k] = domain_dict[k]
-        # other params
-        parameters["r"] = self.luminosity_distance
-        parameters["lal_params"] = lal_params
-        parameters["approximant"] = approximant
-        return InspiralChooseFDModesParameters(**parameters)
-
-    def to_InspiralChooseTDModesParameters(
-        self,
-        domain_params: DomainParameters,
-        spin_conversion_phase: Optional[float],
-        lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
-    ) -> InspiralChooseTDModesParameters: ...
+        instance = Spins(*iota_and_cart_spins)
+        _logger.debug("generated spins:\n" f"{to_table(instance)}")
+        return instance

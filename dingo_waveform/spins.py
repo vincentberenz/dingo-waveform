@@ -5,6 +5,7 @@ import lal
 import lalsimulation as LS
 import numpy as np
 
+from .logging import TableStr
 from .types import FrequencySeries, Mode
 
 
@@ -25,7 +26,7 @@ def rotate_y(
 
 
 @dataclass
-class Spins:
+class Spins(TableStr):
     iota: float
     s1x: float
     s1y: float
@@ -125,7 +126,7 @@ class Spins:
 
         return alpha_0, beta_0, gamma_0
 
-    def _convert_J_to_L0_frame(
+    def convert_J_to_L0_frame(
         self,
         hlm_J: Dict[Mode, FrequencySeries],
         m1: float,

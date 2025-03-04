@@ -1,172 +1,29 @@
+import logging
 from copy import deepcopy
-from dataclasses import astuple
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Dict, List, Optional
 
 import lal
-import lalsimulation as LS
 
-import dingo_waveform.wfg_utils as wfg_utils
-from dingo_waveform.approximant import (
+from .approximant import (  # Added missing imports
     Approximant,
     FD_Approximant,
     TD_Approximant,
     get_approximant,
     get_approximant_description,
 )
-from dingo_waveform.domains import Domain, DomainParameters, FrequencyDomain
-from dingo_waveform.inspiral_choose_fd_modes import (
-    InspiralChooseFDModesParameters,
-)
-from dingo_waveform.inspiral_choose_td_modes import (
-    InspiralChooseTDModesParameters,
-)
-from dingo_waveform.lal_params import get_lal_params
-from dingo_waveform.polarizations import (
+from .domains import Domain, FrequencyDomain
+from .inspiral_choose_fd_modes import InspiralChooseFDModesParameters
+from .inspiral_choose_td_modes import InspiralChooseTDModesParameters
+from .lal_params import get_lal_params
+from .polarizations import (
     Polarization,
     get_polarizations_from_fd_modes_m,
+    polarizations_to_table,
 )
-from dingo_waveform.types import FrequencySeries, Iota, Mode
-from dingo_waveform.waveform import WaveformParams
+from .types import FrequencySeries, Iota, Mode
+from .waveform_parameters import WaveformParameters
 
-
-def inspiral_choose_TD_modes(
-    params: BinaryBlackHoleParameters,
-    domain_params: DomainParameters,
-    spin_conversion_phase: Optional[float],
-    lal_params: Optional[lal.Dict],
-) -> Tuple[Dict[Mode, FrequencySeries], Iota]:
-
-    # only approximant supported by this function
-    approximant = TD_Approximant
-
-    # "Converting' to the parameters required for the SimInspiralChooseTDModes
-    # method
-    inspiral_choose_td_modes_params: InspiralChooseTDModesParameters = (
-        bbh_parameters.to_InspiralChooseTDModesParameters(
-            domain_params, spin_conversion_phase, lal_params, approximant
-        )
-    )
-
-    hlm_ll: LS.SphHarmFrequencySeries = LS.SimInspiralChooseTDModes(
-        list(astuple(inspiral_choose_td_modes_params))
-    )
-
-    # Convert linked list of modes into dictionary with keys (l,m)
-    # todo: is the type of data really lal.COMPLEX16FrequencySeries ?
-    hlm_: Dict[Mode, lal.COMPLEX16FrequencySeries] = (
-        wfg_utils.linked_list_modes_to_dict_modes(hlm_ll)
-    )
-
-    # taper the time domain modes in place
-    hlm: Dict[Mode, FrequencySeries] = wfg_utils.taper_td_modes_in_place(hlm_)
-
-    return hlm, inspiral_choose_td_modes_params.iota
-
-
-def inspiral_choose_FD_modes(
-    params: BinaryBlackHoleParameters,
-    domain_params: DomainParameters,
-    spin_conversion_phase: Optional[float],
-    lal_params: Optional[lal.Dict],
-) -> Tuple[Dict[Mode, FrequencySeries], Iota]:
-    """
-    Wrapper over the lal simulation method: SimInspiralChooseFDModes.
-    This method:
-    - generates the binary black holes parameters based on the waveform parameters
-    - calls the SimInspiralChooseFDModes method
-    - returns the corresponding complex frequency series.
-    """
-
-    # The only approximant supported
-    approximant = FD_Approximant
-
-    # "Converting' to the parameters required for the SimInspiralChooseFDModes
-    # method
-    inspiral_choose_fd_modes_params: InspiralChooseFDModesParameters = (
-        bbh_parameters.to_InspiralChooseFDModesParameters(
-            domain_params, spin_conversion_phase, lal_params, approximant
-        )
-    )
-
-    # Calling the lal simulation method
-    hlm_fd___: LS.SphHarmFrequencySeries = LS.SimInspiralChooseFDModes(
-        list(astuple(inspiral_choose_fd_modes_params))
-    )
-
-    # "Converting" to frequency series
-    hlm_fd__: Dict[Mode, lal.COMPLEX16FrequencySeries] = (
-        wfg_utils.linked_list_modes_to_dict_modes(hlm_fd___)
-    )
-    hlm_fd_: Dict[Mode, FrequencySeries] = {
-        k: v.data.data for k, v in hlm_fd__.items()
-    }
-
-    # "Converting" to L0 frame
-    hlm_fd: Dict[Mode, FrequencySeries] = (
-        inspiral_choose_fd_modes_params.convert_J_to_L0_frame(
-            hlm_fd, spin_conversion_phase
-        )
-    )
-
-    return hlm_fd, inspiral_choose_fd_modes_params.iota
-
-
-def generate_hplus_hcross_m(
-    domain: FrequencyDomain,
-    params: BinaryBlackHoleParameters,
-    approximant: Approximant,
-    spin_conversion_phase: Optional[float],
-    lal_params: Optional[lal.Dict],
-    phase: Optional[float],
-) -> Dict[int, Polarization]:
-
-    hlm: Dict[Mode, FrequencySeries]
-    iota: Iota
-
-    # note: so far only the 101 (FD mode) and the 52 (TD modes)
-    # approximants are supported. If supports to other approximant
-    # get implemented, these functions may be useful:
-    # - LS.SimInspiralImplementedFDApproximants
-    # - LS.SimInspiralImplementedTDApproximants
-
-    if approximant == TD_Approximant:
-
-        hlm, iota = inspiral_choose_FD_modes(
-            params,
-            domain.get_parameters(),
-            spin_conversion_phase,
-            lal_params,
-        )
-
-    elif approximant == FD_Approximant:
-
-        hlm, iota = inspiral_choose_TD_modes(
-            params,
-            domain.get_parameters(),
-            spin_conversion_phase,
-            lal_params,
-        )
-
-    else:
-        # the approximant passed as argument is not supported,
-        # raising error.
-        try:
-            desc = f" ({get_approximant_description(approximant)})"
-        except Exception as e:
-            desc = ""
-        raise ValueError(
-            "generate_hplus_hcross_m: only the approximants "
-            f"{TD_Approximant} ({get_approximant_description(TD_Approximant)}) and "
-            f"{FD_Approximant} ({get_approximant_description(FD_Approximant)})"
-            f"are currently supported. {approximant}{desc} not supported)"
-        )
-
-    if phase is None:
-        raise ValueError(
-            "generate_hplus_hcross: the parameter 'phase' should be provided"
-        )
-
-    return get_polarizations_from_fd_modes_m(hlm, iota, phase)
+_logger = logging.getLogger(__name__)
 
 
 class WaveformGenerator:
@@ -218,14 +75,29 @@ class WaveformGenerator:
             By setting spin_conversion_phase != None, we impose the convention to always
             use phase = spin_conversion_phase when computing the cartesian spins.
         """
+        _logger.info(
+            f"creating waveform generator with domain {type(domain)} "
+            f"and approximant {approximant}"
+        )
+
         self._approximant_str = approximant
         self._lal_params: Optional[lal.Dict] = None
         self._approximant: Optional[Approximant] = None
 
         if "SEOBNRv5" not in approximant:
             self._approximant = get_approximant(approximant)
+            # to check: confusing defining self._mode_list
+            # is required. It is used in `generate_hplus_hcross_m`,
+            # but in a way that feels redundant to what is happening here.
+            self._mode_list = mode_list
             if mode_list is not None:
+                logging.debug(
+                    f"waveform generator: generating lal parameters based on mode list {mode_list}"
+                )
                 self._lal_params = get_lal_params(mode_list)
+        else:
+            # todo: what happens then ?
+            ...
 
         self._domain = domain
         self._f_ref = f_ref
@@ -234,8 +106,19 @@ class WaveformGenerator:
         self._spin_conversion_phase = spin_conversion_phase
 
     def generate_hplus_hcross_m(
-        self, parameters: WaveformParams
+        self, parameters: WaveformParameters
     ) -> Dict[int, Polarization]:
+
+        _logger.info(
+            parameters.to_table("generate hplus/hcross m with waveform parameters")
+        )
+
+        required_keys = ("phase",)
+        for rq in required_keys:
+            if getattr(parameters, rq) is None:
+                raise ValueError(
+                    f"generate_hplus_hcross_m: the parameters must specify a value for '{rq}'"
+                )
 
         if not isinstance(self._domain, FrequencyDomain):
             raise ValueError(
@@ -244,42 +127,70 @@ class WaveformGenerator:
             )
 
         if not self._approximant in (FD_Approximant, TD_Approximant):
+            if self._approximant is None:
+                raise ValueError(
+                    "'None' approximant not supported for generate_hplus_hcross_m"
+                )
             try:
-                desc = f" ({get_approximant_description(approximant)})"
+                desc = f" ({get_approximant_description(self._approximant)})"
             except Exception as e:
                 desc = ""
             raise ValueError(
                 "generate_hplus_hcross_m: only the approximants "
                 f"{TD_Approximant} ({get_approximant_description(TD_Approximant)}) and "
                 f"{FD_Approximant} ({get_approximant_description(FD_Approximant)})"
-                f"are currently supported. {approximant}{desc} not supported)"
+                f"are currently supported. {self._approximant}{desc} not supported)"
             )
 
+        waveform_params = deepcopy(parameters)
+        _logger.debug(
+            "waveform parameters: overwritting value of f_ref to {self._f_ref}"
+        )
+        waveform_params.f_ref = self._f_ref
+
         convert_to_SI = True
+        hlm: Dict[Mode, FrequencySeries]
+        iota: Iota
 
-        # "Conversion" to binary black holes parameters
-        params_ = deepcopy(parameters)
-        params_.f_ref = self._f_ref
-        bbh_parameters: BinaryBlackHoleParameters = (
-            params_.to_binary_black_hole_parameters(convert_to_SI)
+        if self._approximant == TD_Approximant:
+            _logger.info(
+                "generating hplus/hcross m using inspiral choose TD modes parameters"
+            )
+            inspiral_choose_td_modes_parameters = (
+                InspiralChooseTDModesParameters.from_waveform_parameters(
+                    waveform_params,
+                    convert_to_SI,
+                    self._domain.get_parameters(),
+                    self._spin_conversion_phase,
+                    self._lal_params,
+                    self._approximant,
+                )
+            )
+            hlm, iota = inspiral_choose_td_modes_parameters.apply()
+
+        elif self._approximant == FD_Approximant:
+            _logger.info(
+                "generating hplus/hcross m using inspiral choose FD modes parameters"
+            )
+            inspiral_choose_fd_modes_parameters = (
+                InspiralChooseFDModesParameters.from_waveform_parameters(
+                    waveform_params,
+                    convert_to_SI,
+                    self._domain.get_parameters(),
+                    self._spin_conversion_phase,
+                    self._lal_params,
+                    self._approximant,
+                )
+            )
+            hlm, iota = inspiral_choose_fd_modes_parameters.apply(
+                self._spin_conversion_phase
+            )
+
+        # type ignore: (we know parameters.phase is not None, checked earlier in this function)
+        pol: Dict[int, Polarization] = get_polarizations_from_fd_modes_m(
+            hlm, iota, parameters.phase  # type: ignore
         )
 
-        # Creating "empty" lal parameters if necessary
-        if self._lal_params is None:
-            lal_params = get_lal_params(mode_list)
-        else:
-            lal_params = self._lal_params
-
-        # generating the polarizations. Calling either
-        # - SimInspiralChooseTDModes (TD approximant) or
-        # - SimInspiralChooseFDModes (FD approximant)
-        pol: Dict[int, Polarization] = generate_hplus_hcross_m(
-            domain,
-            bbh_parameters,
-            self._approximant,
-            self._spin_conversion_phase,
-            lal_params,
-            phase,
-        )
+        _logger.debug(f"generated polarizations:\n{polarizations_to_table(pol)}")
 
         return pol

@@ -3,6 +3,8 @@ from typing import Dict, List
 
 import lal
 import numpy as np
+from rich.console import Console
+from rich.table import Table
 
 from dingo_waveform.types import FrequencySeries, Iota, Mode
 
@@ -54,3 +56,26 @@ def get_polarizations_from_fd_modes_m(
         m: Polarization(h_plus=pol["h_plus"], h_cross=pol["h_cross"])
         for m, pol in pol_m.items()
     }
+
+
+def polarizations_to_table(pol: Dict[int, Polarization]) -> str:
+    console = Console()
+    table = Table(title="Polarizations")
+
+    # Add columns
+    table.add_column("Mode (m)", style="bold")
+    table.add_column("h_plus", style="dim")
+    table.add_column("h_cross", style="dim")
+
+    # Add rows
+    for m, polarization in pol.items():
+
+        h_plus_repr = f"Array({polarization.h_plus.shape})"
+        h_cross_repr = f"Array({polarization.h_cross.shape})"
+        table.add_row(str(m), h_plus_repr, h_cross_repr)
+
+    # Capture the output as a string
+    with console.capture() as capture:
+        console.print(table)
+
+    return capture.get()

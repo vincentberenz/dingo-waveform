@@ -26,7 +26,8 @@ dependencies = [
     "matplotlib",
     "numpy",
     "torch",
-    "nptyping"
+    "nptyping",
+    "rich"
 ]
 
 
