@@ -15,6 +15,19 @@ class Polarization:
     h_cross: FrequencySeries
 
 
+def sum_contributions_m(
+    x_m: Dict[int, Polarization], phase_shift: float = 0.0
+) -> Polarization:
+    """
+    Sum the contributions over m-components, optionally introducing a phase shift.
+    """
+    result = Polarization(h_plus=0.0, h_cross=0.0)  # type: ignore
+    for mode in x_m.keys():
+        result.h_plus += x_m[mode].h_plus * np.exp(-1j * mode * phase_shift)
+        result.h_cross += x_m[mode].h_cross * np.exp(-1j * mode * phase_shift)
+    return result
+
+
 def get_polarizations_from_fd_modes_m(
     hlm_fd: Dict[Mode, FrequencySeries], iota: Iota, phase: float
 ) -> Dict[int, Polarization]:
