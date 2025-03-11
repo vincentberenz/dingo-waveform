@@ -30,7 +30,6 @@ class WaveformParameters(TableStr):
 
     psi: Optional[float] = None
     theta_jn: Optional[float] = None
-    f_ref: Optional[float] = None
 
     # Mass parameters
     mass_1: Optional[float] = None

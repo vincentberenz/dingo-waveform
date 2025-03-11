@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
+import numpy as np
+from nptyping import Float32, NDArray, Shape
+
 
 @dataclass
 class DomainParameters:
@@ -18,6 +21,12 @@ class Domain(ABC):
     def get_parameters(self) -> DomainParameters:
         raise NotImplementedError(
             "Subclasses of Domain must implement the get_parameters method."
+        )
+
+    @abstractmethod
+    def sample_frequencies(self) -> NDArray[Shape["*"], Float32]:
+        raise NotImplementedError(
+            "Subclasses of Domain must implement the sample_frequencies method."
         )
 
 
@@ -41,7 +50,15 @@ class TestDomain(Domain):
         return DomainParameters(self.delta_f, self.f_min, self.f_max, self.delta_t)
 
 
-class FrequencyDomain(TestDomain): ...
+class FrequencyDomain(TestDomain):
+
+    def sample_frequencies(self) -> NDArray[Shape["*"], Float32]:
+        if self.f_max is None or self.delta_f is None:
+            raise ValueError("can not sample frequencies if f_max or delta_f is None")
+        num_bins = int(self.f_max / self.delta_f) + 1
+        return np.linspace(
+            0.0, self.f_max, num=num_bins, endpoint=True, dtype=np.float32
+        )
 
 
 class TimeDomain(TestDomain): ...

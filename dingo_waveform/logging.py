@@ -10,11 +10,11 @@ from rich.table import Table
 
 _TYPE_STYLES = {
     str: Style(color="cyan"),
-    int: Style(color="green"),
-    float: Style(color="yellow"),
+    int: Style(color="yellow"),
+    float: Style(color="green"),
     bool: Style(color="blue"),
     datetime: Style(color="magenta"),
-    np.ndarray: Style(color="purple"),  # New style for numpy arrays
+    np.ndarray: Style(color="purple"),
 }
 
 NONE_STYLE = Style(color="grey50")

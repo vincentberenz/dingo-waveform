@@ -61,12 +61,14 @@ class BinaryBlackHoleParameters(TableStr):
     total_mass: float
     mass_1: float
     mass_2: float
+    l_max: Optional[float] = None
 
     @classmethod
     def from_waveform_parameters(
-        cls, waveform_params: WaveformParameters, convert_to_SI: bool
+        cls, waveform_params: WaveformParameters, f_ref: float, convert_to_SI: bool
     ) -> "BinaryBlackHoleParameters":
         params = asdict(waveform_params)
+        params["f_ref"] = f_ref
         params = {k: v for k, v in params.items() if v is not None}
         _logger.debug(
             "calling convert_to_lal_binary_black_hole_parameters with parameters:\n"
@@ -112,5 +114,7 @@ class BinaryBlackHoleParameters(TableStr):
             for value in bilby_to_lalsimulation_spins(*args)
         ]
         instance = Spins(*iota_and_cart_spins)
-        _logger.debug("generated spins:\n" f"{to_table(instance)}")
+        # type ignore : for some reason I do not understand, instance is not
+        # recognized by mypy as a dataclass type.
+        _logger.debug("generated spins:\n" f"{to_table(instance)}")  # type: ignore
         return instance

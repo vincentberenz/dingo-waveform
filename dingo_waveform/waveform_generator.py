@@ -1,6 +1,6 @@
 import logging
 from copy import deepcopy
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import lal
 
@@ -11,9 +11,11 @@ from .approximant import (  # Added missing imports
     get_approximant,
     get_approximant_description,
 )
-from .domains import Domain, FrequencyDomain
+from .domains import Domain, DomainParameters, FrequencyDomain, TimeDomain
 from .inspiral_choose_fd_modes import InspiralChooseFDModesParameters
 from .inspiral_choose_td_modes import InspiralChooseTDModesParameters
+from .inspiral_fd import InspiralFDParameters
+from .inspiral_td import InspiralTDParameters
 from .lal_params import get_lal_params
 from .polarizations import (
     Polarization,
@@ -38,7 +40,7 @@ class WaveformGenerator:
         f_ref: float,
         f_start: Optional[float] = None,
         mode_list: Optional[List[Mode]] = None,
-        transform=None,
+        transform: Optional[Callable[[Polarization], Polarization]] = None,
         spin_conversion_phase: Optional[float] = None,
     ):
         """
@@ -106,16 +108,18 @@ class WaveformGenerator:
         self._spin_conversion_phase = spin_conversion_phase
 
     def generate_hplus_hcross_m(
-        self, parameters: WaveformParameters
+        self, waveform_parameters: WaveformParameters
     ) -> Dict[int, Polarization]:
 
         _logger.info(
-            parameters.to_table("generate hplus/hcross m with waveform parameters")
+            waveform_parameters.to_table(
+                f"generate hplus/hcross m with waveform parameters (f_ref={self._f_ref})"
+            )
         )
 
         required_keys = ("phase",)
         for rq in required_keys:
-            if getattr(parameters, rq) is None:
+            if getattr(waveform_parameters, rq) is None:
                 raise ValueError(
                     f"generate_hplus_hcross_m: the parameters must specify a value for '{rq}'"
                 )
@@ -142,12 +146,6 @@ class WaveformGenerator:
                 f"are currently supported. {self._approximant}{desc} not supported)"
             )
 
-        waveform_params = deepcopy(parameters)
-        _logger.debug(
-            "waveform parameters: overwritting value of f_ref to {self._f_ref}"
-        )
-        waveform_params.f_ref = self._f_ref
-
         convert_to_SI = True
         hlm: Dict[Mode, FrequencySeries]
         iota: Iota
@@ -158,7 +156,8 @@ class WaveformGenerator:
             )
             inspiral_choose_td_modes_parameters = (
                 InspiralChooseTDModesParameters.from_waveform_parameters(
-                    waveform_params,
+                    waveform_parameters,
+                    self._f_ref,
                     convert_to_SI,
                     self._domain.get_parameters(),
                     self._spin_conversion_phase,
@@ -174,7 +173,8 @@ class WaveformGenerator:
             )
             inspiral_choose_fd_modes_parameters = (
                 InspiralChooseFDModesParameters.from_waveform_parameters(
-                    waveform_params,
+                    waveform_parameters,
+                    self._f_ref,
                     convert_to_SI,
                     self._domain.get_parameters(),
                     self._spin_conversion_phase,
@@ -188,9 +188,67 @@ class WaveformGenerator:
 
         # type ignore: (we know parameters.phase is not None, checked earlier in this function)
         pol: Dict[int, Polarization] = get_polarizations_from_fd_modes_m(
-            hlm, iota, parameters.phase  # type: ignore
+            hlm, iota, waveform_parameters.phase  # type: ignore
         )
 
         _logger.debug(f"generated polarizations:\n{polarizations_to_table(pol)}")
+
+        return pol
+
+    def generate_hplus_hcross(
+        self, waveform_parameters: WaveformParameters
+    ) -> Polarization:
+
+        _logger.info(
+            waveform_parameters.to_table(
+                f"generate polarization hplus/hcross with waveform parameters (f_ref={self._f_ref})"
+            )
+        )
+
+        if not isinstance(self._domain, FrequencyDomain) and not isinstance(
+            self._domain, TimeDomain
+        ):
+            raise ValueError(
+                "generate_hplus_hcross: domain must be an instance of FrequencyDomain or TimeDomain "
+                f"{type(self._domain)} not supported"
+            )
+
+        convert_to_SI = True
+        pol: Polarization
+        domain_params: DomainParameters = self._domain.get_parameters()
+
+        if isinstance(self._domain, FrequencyDomain):
+            inspiral_fd_parameters = InspiralFDParameters.from_waveform_parameters(
+                waveform_parameters,
+                self._f_ref,
+                convert_to_SI,
+                domain_params,
+                self._spin_conversion_phase,
+                self._lal_params,
+                self._approximant,
+            )
+
+            frequency_array = self._domain.sample_frequencies()
+            pol = inspiral_fd_parameters.apply(frequency_array)
+
+        elif isinstance(self._domain, TimeDomain):
+
+            inspiral_td_parameters = InspiralTDParameters.from_waveform_parameters(
+                waveform_parameters,
+                self._f_ref,
+                convert_to_SI,
+                domain_params,
+                self._spin_conversion_phase,
+                self._lal_params,
+                self._approximant,
+            )
+
+            pol = inspiral_td_parameters.apply()
+
+        if self._transform is not None:
+            _logger.debug(
+                f"applying transform {self._transform.__name__} to polarization"
+            )
+            return self._transform(pol)
 
         return pol

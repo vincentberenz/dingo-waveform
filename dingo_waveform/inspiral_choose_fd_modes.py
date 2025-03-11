@@ -43,18 +43,11 @@ class InspiralChooseFDModesParameters(TableStr):
         )
 
     def convert_J_to_L0_frame(
-        self, hlm_J: Dict[Mode, FrequencySeries], spin_conversion_phase: Optional[float]
+        self, hlm_J: Dict[Mode, FrequencySeries]
     ) -> Dict[Mode, FrequencySeries]:
-        _logger.debug(
-            f"converting from J to L0 frame (spin conversion phase: {spin_conversion_phase})"
-        )
-        phase = self.phase
-        if spin_conversion_phase is not None:
-            # Vincent: this is confusing, to double check
-            phase = 0.0
         converted_to_SI = True
         return self.get_spins().convert_J_to_L0_frame(
-            hlm_J, self.mass_1, self.mass_2, converted_to_SI, self.f_ref, phase
+            hlm_J, self.mass_1, self.mass_2, converted_to_SI, self.f_ref, self.phase
         )
 
     @classmethod
@@ -91,6 +84,7 @@ class InspiralChooseFDModesParameters(TableStr):
     def from_waveform_parameters(
         cls,
         waveform_parameters: WaveformParameters,
+        f_ref: float,
         convert_to_SI: bool,
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
@@ -98,7 +92,7 @@ class InspiralChooseFDModesParameters(TableStr):
         approximant: Optional[Approximant],
     ) -> "InspiralChooseFDModesParameters":
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
-            waveform_parameters, convert_to_SI
+            waveform_parameters, f_ref, convert_to_SI
         )
         return cls.from_binary_black_hole_parameters(
             bbh_parameters,
@@ -112,7 +106,7 @@ class InspiralChooseFDModesParameters(TableStr):
         self, spin_conversion_phase: Optional[float]
     ) -> Tuple[Dict[Mode, FrequencySeries], Iota]:
 
-        # It is confusin that "spin_conversion_phase"
+        # It is confusing that "spin_conversion_phase"
         # is needed as argument here.
         # It has already been used to setup the value of
         # "phase" in `from_waveform_parameters` or
@@ -131,8 +125,6 @@ class InspiralChooseFDModesParameters(TableStr):
         }
 
         # "Converting" to L0 frame
-        hlm_fd: Dict[Mode, FrequencySeries] = self.convert_J_to_L0_frame(
-            hlm_fd_, spin_conversion_phase
-        )
+        hlm_fd: Dict[Mode, FrequencySeries] = self.convert_J_to_L0_frame(hlm_fd_)
 
         return hlm_fd, self.iota

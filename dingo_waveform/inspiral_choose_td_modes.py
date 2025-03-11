@@ -51,6 +51,7 @@ class InspiralChooseTDModesParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Optional[Approximant],
+        l_max_default: float = 5.0,
     ) -> "InspiralChooseTDModesParameters":
         spins: Spins = bbh_parameters.get_spins(spin_conversion_phase)
         params = asdict(spins)
@@ -60,7 +61,7 @@ class InspiralChooseTDModesParameters(TableStr):
         params["f_ref"] = bbh_parameters.f_ref
         params["distance"] = bbh_parameters.luminosity_distance
         params["l_max"] = (
-            bbh_parameters.l_max if bbh_parameters.l_max is not None else 0
+            bbh_parameters.l_max if bbh_parameters.l_max is not None else l_max_default
         )
         params["mass_1"] = bbh_parameters.mass_1
         params["mass_2"] = bbh_parameters.mass_2
@@ -76,6 +77,7 @@ class InspiralChooseTDModesParameters(TableStr):
     def from_waveform_parameters(
         cls,
         waveform_params: WaveformParameters,
+        f_ref: float,
         convert_to_SI: bool,
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
@@ -83,7 +85,7 @@ class InspiralChooseTDModesParameters(TableStr):
         approximant: Optional[Approximant],
     ) -> "InspiralChooseTDModesParameters":
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
-            waveform_params, convert_to_SI
+            waveform_params, f_ref, convert_to_SI
         )
         return cls.from_binary_black_hole_parameters(
             bbh_parameters,
