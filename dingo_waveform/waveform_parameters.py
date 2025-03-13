@@ -21,6 +21,8 @@ class WaveformParameters(TableStr):
     phi_12: Optional[float] = None
     tilt_1: Optional[float] = None
     tilt_2: Optional[float] = None
+    dec: Optional[float] = None
+    ra: Optional[float] = None
 
     geocent_time: Optional[float] = None
 

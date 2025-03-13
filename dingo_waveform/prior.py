@@ -2,8 +2,8 @@
 import logging
 import warnings
 from copy import deepcopy
-from dataclasses import asdict, dataclass
-from typing import Any, Dict, Mapping, Set, Union
+from dataclasses import Field, asdict, dataclass, fields, make_dataclass
+from typing import TYPE_CHECKING, Mapping, Optional, Tuple, Type, Union, cast
 
 import numpy as np
 from bilby.core.prior import Cosine, Sine, Uniform
@@ -14,77 +14,7 @@ from bilby.gw.conversion import (
 from bilby.gw.prior import BBHPriorDict
 
 from .logging import TableStr
-
-logging.getLogger("bilby")
-
-
-@dataclass
-class ExtrinsicPriors(TableStr):
-    dec: str = "bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)"
-    ra: str = (
-        'bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")'
-    )
-    geocent_time: str = "bilby.core.prior.Uniform(minimum=-0.1, maximum=0.1)"
-    psi: str = (
-        'bilby.core.prior.Uniform(minimum=0.0, maximum=np.pi, boundary="periodic")'
-    )
-    luminosity_distance: str = "bilby.core.prior.Uniform(minimum=100.0, maximum=6000.0)"
-
-
-@dataclass
-class IntrinsicPriors(TableStr):
-    mass_1: str = "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)"
-    mass_2: str = "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)"
-    mass_ratio: str = (
-        "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)"
-    )
-    chirp_mass: str = (
-        "bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)"
-    )
-    luminosity_distance: float = 1000.0
-    theta_jn: str = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
-    phase: str = (
-        'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
-    )
-    a_1: str = "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)"
-    a_2: str = "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)"
-    tilt_1: str = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
-    tilt_2: str = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
-    phi_12: str = (
-        'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
-    )
-    phi_jl: str = (
-        'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
-    )
-    geocent_time: float = 0.0
-
-
-def build_prior_with_defaults(
-    prior_settings: Union[IntrinsicPriors, Mapping[str, Union[str, float]]],
-) -> BBHPriorDict:
-    """
-    Generate BBHPriorDict based on dictionary of prior settings,
-    allowing for default values.
-
-    Parameters
-    ----------
-    prior_settings: Dict
-        A dictionary containing prior definitions for intrinsic parameters
-        Allowed values for each parameter are:
-            * 'default' to use a default prior
-            * a string for a custom prior, e.g.,
-               "Uniform(minimum=10.0, maximum=80.0, name=None, latex_label=None, unit=None, boundary=None)"
-
-    Depending on the particular prior choices the dimensionality of a
-    parameter sample obtained from the returned GWPriorDict will vary.
-    """
-
-    if isinstance(prior_settings, dict):
-        prior_settings = {
-            k: v for k, v in prior_settings.items() if v is not None and v != "default"
-        }
-        prior_settings = IntrinsicPriors(**prior_settings)
-    return BBHPriorDict(asdict(prior_settings))
+from .waveform_parameters import WaveformParameters
 
 
 class BBHExtrinsicPriorDict(BBHPriorDict):
@@ -97,6 +27,12 @@ class BBHExtrinsicPriorDict(BBHPriorDict):
         * Add support for zenith/azimuth
         * Defaults?
     """
+
+    @classmethod
+    def from_extrinsic_priors(
+        cls, extrinsic_priors: "ExtrinsicPriors"
+    ) -> "BBHExtrinsicPriorDict":
+        return cls(asdict(extrinsic_priors))
 
     def default_conversion_function(self, sample):
         out_sample = fill_from_fixed_priors(sample, self)
@@ -169,33 +105,164 @@ class BBHExtrinsicPriorDict(BBHPriorDict):
         return mean, std
 
 
-# TODO: Add latex labels, names
+@dataclass
+class ExtrinsicPriors(TableStr):
+    dec: Union[str, float] = (
+        "bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)"
+    )
+    ra: Union[str, float] = (
+        'bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")'
+    )
+    geocent_time: Union[str, float] = (
+        "bilby.core.prior.Uniform(minimum=-0.1, maximum=0.1)"
+    )
+    psi: Union[str, float] = (
+        'bilby.core.prior.Uniform(minimum=0.0, maximum=np.pi, boundary="periodic")'
+    )
+    luminosity_distance: Union[str, float] = (
+        "bilby.core.prior.Uniform(minimum=100.0, maximum=6000.0)"
+    )
+
+    def sample(self) -> WaveformParameters:
+        # type ignore:
+        # I could not find how to specify this mixin could be superclass
+        # only for dataclass. (I tried to use Protocol, but no success)
+        bbh_prior_dict = BBHExtrinsicPriorDict(asdict(self))  # type: ignore
+        sample_dict = bbh_prior_dict.sample()
+        return WaveformParameters(**sample_dict)
 
 
-default_extrinsic_dict = {
-    "dec": "bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)",
-    "ra": 'bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")',
-    "geocent_time": "bilby.core.prior.Uniform(minimum=-0.1, maximum=0.1)",
-    "psi": 'bilby.core.prior.Uniform(minimum=0.0, maximum=np.pi, boundary="periodic")',
-    "luminosity_distance": "bilby.core.prior.Uniform(minimum=100.0, maximum=6000.0)",
-}
+@dataclass
+class IntrinsicPriors(TableStr):
+    mass_1: Union[str, float] = (
+        "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)"
+    )
+    mass_2: Union[str, float] = (
+        "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)"
+    )
+    mass_ratio: Union[str, float] = (
+        "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)"
+    )
+    chirp_mass: Union[str, float] = (
+        "bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)"
+    )
+    luminosity_distance: float = 1000.0
+    theta_jn: Union[str, float] = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
+    phase: Union[str, float] = (
+        'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
+    )
+    a_1: Union[str, float] = "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)"
+    a_2: Union[str, float] = "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)"
+    tilt_1: Union[str, float] = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
+    tilt_2: Union[str, float] = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
+    phi_12: Union[str, float] = (
+        'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
+    )
+    phi_jl: Union[str, float] = (
+        'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
+    )
+    geocent_time: float = 0.0
 
-default_intrinsic_dict = {
-    "mass_1": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
-    "mass_2": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
-    "mass_ratio": "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)",
-    "chirp_mass": "bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)",
-    "luminosity_distance": 1000.0,
-    "theta_jn": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
-    "phase": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
-    "a_1": "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)",
-    "a_2": "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)",
-    "tilt_1": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
-    "tilt_2": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
-    "phi_12": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
-    "phi_jl": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
-    "geocent_time": 0.0,
-}
+    def sample(self) -> WaveformParameters:
+        # type ignore:
+        # I could not find how to specify this mixin could be superclass
+        # only for dataclass. (I tried to use Protocol, but no success)
+        bbh_prior_dict = BBHPriorDict(asdict(self))  # type: ignore
+        sample_dict = bbh_prior_dict.sample()
+        return WaveformParameters(**sample_dict)
+
+
+def _create_priors_dataclass() -> Type:
+    # Get fields from both classes
+    extrinsic_fields = list(fields(ExtrinsicPriors))
+    intrinsic_fields = list(fields(IntrinsicPriors))
+    # luminosity_distance and geocent_time are both intrinsic and extrinsic priors.
+    # We use here the default value as an extrinsic prior.
+    all_fields_ = extrinsic_fields + [
+        f
+        for f in intrinsic_fields
+        if f.name not in [f_.name for f_ in extrinsic_fields]
+    ]
+    all_fields = [(f.name, f.type, f.default) for f in all_fields_]
+
+    class _PriorSampling:
+        def sample(self) -> WaveformParameters:
+            intrinsic_wf: WaveformParameters = IntrinsicPriors().sample()
+            extrinsic_wf: WaveformParameters = ExtrinsicPriors().sample()
+            intrinsic_dict = asdict(intrinsic_wf)
+            extrinsic_dict = asdict(extrinsic_wf)
+            priors_dict = intrinsic_dict
+            for k, v in extrinsic_dict.items():
+                if v is not None:
+                    priors_dict[k] = v
+            return WaveformParameters(**priors_dict)
+
+    return make_dataclass("Priors", all_fields, bases=(TableStr, _PriorSampling))
+
+
+# if TYPE_CHECKING:
+
+#    @dataclass
+#    class Priors:
+#        def sample(self) -> WaveformParameters: ...
+
+# else:
+
+# Priors is a dataclass that have the combined fields of IntrinsicPriors and ExtrinsicPriors.
+# It also inherit from _SamplablePriorMixin
+Priors = _create_priors_dataclass()
+
+
+def prior_split(
+    waveform_parameters: WaveformParameters,
+    intrinsic_luminosity_distance: Optional[float] = 100.0,
+    intrinsic_geocent_time: Optional[float] = 0.0,
+) -> Tuple[WaveformParameters, WaveformParameters]:
+    intrinsic_keys = list(fields(IntrinsicPriors))
+    extrinsic_keys = list(fields(ExtrinsicPriors))
+    waveform_dict = asdict(waveform_parameters)
+    intrinsic_dict = {k: v for k, v in waveform_dict.items() if k in intrinsic_keys}
+    extrinsic_dict = {k: v for k, v in waveform_dict.items() if k in extrinsic_keys}
+    if intrinsic_luminosity_distance is not None:
+        intrinsic_dict["luminosity_distance"] = intrinsic_luminosity_distance
+    if intrinsic_geocent_time is not None:
+        intrinsic_dict["geocent_time"] = intrinsic_geocent_time
+    return WaveformParameters(**intrinsic_dict), WaveformParameters(**extrinsic_dict)
+
+
+def build_prior_with_defaults(
+    prior_settings: Union[IntrinsicPriors, Mapping[str, Union[str, float]]],
+) -> BBHPriorDict:
+    """
+    Generate BBHPriorDict based on dictionary of prior settings,
+    allowing for default values.
+
+    Parameters
+    ----------
+    prior_settings: Dict
+        A dictionary containing prior definitions for intrinsic parameters
+        Allowed values for each parameter are:
+            * 'default' to use a default prior
+            * a string for a custom prior, e.g.,
+               "Uniform(minimum=10.0, maximum=80.0, name=None, latex_label=None, unit=None, boundary=None)"
+
+    Depending on the particular prior choices the dimensionality of a
+    parameter sample obtained from the returned GWPriorDict will vary.
+    """
+    prior_settings_: IntrinsicPriors
+    if isinstance(prior_settings, dict):
+        prior_settings = {
+            k: v for k, v in prior_settings.items() if v is not None and v != "default"
+        }
+        prior_settings_ = IntrinsicPriors(**prior_settings)
+    else:
+        prior_settings_ = cast(IntrinsicPriors, prior_settings)
+    return BBHPriorDict(asdict(prior_settings_))
+
+
+default_extrinsic_dict = asdict(ExtrinsicPriors())
+default_intrinsic_dict = asdict(IntrinsicPriors())
+
 
 default_inference_parameters = [
     "chirp_mass",
@@ -214,60 +281,3 @@ default_inference_parameters = [
     "dec",
     "psi",
 ]
-
-
-def build_prior_with_defaults(prior_settings: Dict[str, str]):
-    """
-    Generate BBHPriorDict based on dictionary of prior settings,
-    allowing for default values.
-
-    Parameters
-    ----------
-    prior_settings: Dict
-        A dictionary containing prior definitions for intrinsic parameters
-        Allowed values for each parameter are:
-            * 'default' to use a default prior
-            * a string for a custom prior, e.g.,
-               "Uniform(minimum=10.0, maximum=80.0, name=None, latex_label=None, unit=None, boundary=None)"
-
-    Depending on the particular prior choices the dimensionality of a
-    parameter sample obtained from the returned GWPriorDict will vary.
-    """
-
-    full_prior_settings = deepcopy(prior_settings)
-    for k, v in prior_settings.items():
-        if v == "default":
-            full_prior_settings[k] = default_intrinsic_dict[k]
-
-    return BBHPriorDict(full_prior_settings)
-
-
-def split_off_extrinsic_parameters(theta):
-    """
-    Split theta into intrinsic and extrinsic parameters.
-
-    Parameters
-    ----------
-    theta: dict
-        BBH parameters. Includes intrinsic parameters to be passed to waveform
-        generator, and extrinsic parameters for detector projection.
-
-    Returns
-    -------
-    theta_intrinsic: dict
-        BBH intrinsic parameters.
-    theta_extrinsic: dict
-        BBH extrinsic parameters.
-    """
-    extrinsic_parameters = ["geocent_time", "luminosity_distance", "ra", "dec", "psi"]
-    theta_intrinsic = {}
-    theta_extrinsic = {}
-    for k, v in theta.items():
-        if k in extrinsic_parameters:
-            theta_extrinsic[k] = v
-        else:
-            theta_intrinsic[k] = v
-    # set fiducial values for time and distance
-    theta_intrinsic["geocent_time"] = 0
-    theta_intrinsic["luminosity_distance"] = 100
-    return theta_intrinsic, theta_extrinsic
