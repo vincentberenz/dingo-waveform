@@ -3,7 +3,18 @@ import logging
 import warnings
 from copy import deepcopy
 from dataclasses import Field, asdict, dataclass, fields, make_dataclass
-from typing import TYPE_CHECKING, Mapping, Optional, Tuple, Type, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import numpy as np
 from bilby.core.prior import Cosine, Sine, Uniform
@@ -28,12 +39,6 @@ class BBHExtrinsicPriorDict(BBHPriorDict):
         * Defaults?
     """
 
-    @classmethod
-    def from_extrinsic_priors(
-        cls, extrinsic_priors: "ExtrinsicPriors"
-    ) -> "BBHExtrinsicPriorDict":
-        return cls(asdict(extrinsic_priors))
-
     def default_conversion_function(self, sample):
         out_sample = fill_from_fixed_priors(sample, self)
         out_sample, _ = convert_to_lal_binary_black_hole_parameters(out_sample)
@@ -47,7 +52,9 @@ class BBHExtrinsicPriorDict(BBHPriorDict):
 
         return out_sample
 
-    def mean_std(self, keys=([]), sample_size=50000, force_numerical=False):
+    def mean_std(
+        self, keys=([]), sample_size=50000, force_numerical=False
+    ) -> Tuple[Dict[str, float], Dict[str, float]]:
         """
         Calculate the mean and standard deviation over the prior.
 
@@ -123,13 +130,20 @@ class ExtrinsicPriors(TableStr):
         "bilby.core.prior.Uniform(minimum=100.0, maximum=6000.0)"
     )
 
-    def sample(self) -> WaveformParameters:
+    def mean_std(self, keys=([]), sample_size=50000, force_numerical=False):
+        bbh_prior_dict = BBHExtrinsicPriorDict(asdict(self))  # type: ignore
+        return bbh_prior_dict.mean_std(
+            keys=keys, sample_size=sample_size, force_numerical=force_numerical
+        )
+
+    def sample(self, nb_samples: int = 1) -> List[WaveformParameters]:
         # type ignore:
         # I could not find how to specify this mixin could be superclass
         # only for dataclass. (I tried to use Protocol, but no success)
         bbh_prior_dict = BBHExtrinsicPriorDict(asdict(self))  # type: ignore
-        sample_dict = bbh_prior_dict.sample()
-        return WaveformParameters(**sample_dict)
+        return [
+            WaveformParameters(**bbh_prior_dict.sample()) for _ in range(nb_samples)
+        ]
 
 
 @dataclass
@@ -163,13 +177,14 @@ class IntrinsicPriors(TableStr):
     )
     geocent_time: float = 0.0
 
-    def sample(self) -> WaveformParameters:
+    def sample(self, nb_samples: int = 1) -> List[WaveformParameters]:
         # type ignore:
         # I could not find how to specify this mixin could be superclass
         # only for dataclass. (I tried to use Protocol, but no success)
         bbh_prior_dict = BBHPriorDict(asdict(self))  # type: ignore
-        sample_dict = bbh_prior_dict.sample()
-        return WaveformParameters(**sample_dict)
+        return [
+            WaveformParameters(**bbh_prior_dict.sample()) for _ in range(nb_samples)
+        ]
 
 
 def _create_priors_dataclass() -> Type:
@@ -185,17 +200,69 @@ def _create_priors_dataclass() -> Type:
     ]
     all_fields = [(f.name, f.type, f.default) for f in all_fields_]
 
+    # will be used in the _PriorSampling._get_prior method right below
+    _PriorType = TypeVar("_PriorType", IntrinsicPriors, ExtrinsicPriors)
+
     class _PriorSampling:
-        def sample(self) -> WaveformParameters:
-            intrinsic_wf: WaveformParameters = IntrinsicPriors().sample()
-            extrinsic_wf: WaveformParameters = ExtrinsicPriors().sample()
-            intrinsic_dict = asdict(intrinsic_wf)
-            extrinsic_dict = asdict(extrinsic_wf)
-            priors_dict = intrinsic_dict
-            for k, v in extrinsic_dict.items():
-                if v is not None:
-                    priors_dict[k] = v
-            return WaveformParameters(**priors_dict)
+
+        # We are creating the Priors dataclass. The class we are constructing
+        # will be inherating from _PriorSampling. This is a convenient way
+        # to add methods to the Priors datacalss we are constructing.
+
+        def _get_prior(self, target_type: Type[_PriorType]) -> _PriorType:
+            # type ignore:
+            # we know only the dataclass Priors will be a sublass of _PriorSampling
+            # (i.e. asdict will be supported)
+            d_ = asdict(self)  # type: ignore
+            d = {
+                k: v
+                for k, v in d_.items()
+                if k in [f.name for f in fields(target_type)]
+            }
+            return target_type(**d)
+
+        def get_intrinsic_priors(self) -> IntrinsicPriors:
+            """
+            Returns
+            -------
+            The instance of IntrinsicPriors corresponding to this
+            instance of Priors.
+            """
+            return self._get_prior(IntrinsicPriors)
+
+        def get_extrinsic_priors(self) -> ExtrinsicPriors:
+            """
+            Returns
+            -------
+            The instance of ExtrinsicPriors corresponding to this
+            instance of Priors.
+            """
+            return self._get_prior(ExtrinsicPriors)
+
+        def sample(self, nb_samples: int = 1) -> List[WaveformParameters]:
+            """
+            Returns
+            -------
+            An instance of waveform parameters generating by sampling
+            this instance of Priors.
+            """
+            ip = self.get_intrinsic_priors()
+            ep = self.get_extrinsic_priors()
+            intrinsic_wfs: List[WaveformParameters] = ip.sample(nb_samples)
+            extrinsic_wfs: List[WaveformParameters] = ep.sample(nb_samples)
+
+            def _get_wf(
+                intrinsic_wf: WaveformParameters, extrinsic_wf: WaveformParameters
+            ) -> WaveformParameters:
+                intrinsic_dict = asdict(intrinsic_wf)
+                extrinsic_dict = asdict(extrinsic_wf)
+                priors_dict = intrinsic_dict
+                for k, v in extrinsic_dict.items():
+                    if v is not None:
+                        priors_dict[k] = v
+                return WaveformParameters(**priors_dict)
+
+            return [_get_wf(iw, ew) for iw, ew in zip(intrinsic_wfs, extrinsic_wfs)]
 
     return make_dataclass("Priors", all_fields, bases=(TableStr, _PriorSampling))
 
@@ -209,7 +276,7 @@ def _create_priors_dataclass() -> Type:
 # else:
 
 # Priors is a dataclass that have the combined fields of IntrinsicPriors and ExtrinsicPriors.
-# It also inherit from _SamplablePriorMixin
+# It also has the 'sample' method which returns a list of WaveformParameters.
 Priors = _create_priors_dataclass()
 
 
@@ -218,8 +285,8 @@ def prior_split(
     intrinsic_luminosity_distance: Optional[float] = 100.0,
     intrinsic_geocent_time: Optional[float] = 0.0,
 ) -> Tuple[WaveformParameters, WaveformParameters]:
-    intrinsic_keys = list(fields(IntrinsicPriors))
-    extrinsic_keys = list(fields(ExtrinsicPriors))
+    intrinsic_keys = [f.name for f in fields(IntrinsicPriors)]
+    extrinsic_keys = [f.name for f in fields(ExtrinsicPriors)]
     waveform_dict = asdict(waveform_parameters)
     intrinsic_dict = {k: v for k, v in waveform_dict.items() if k in intrinsic_keys}
     extrinsic_dict = {k: v for k, v in waveform_dict.items() if k in extrinsic_keys}
