@@ -6,9 +6,9 @@ import numpy as np
 from nptyping import Complex128, NDArray, Shape
 
 Iota = NewType("Iota", float)
+F_ref = NewType("F_ref", float)
 
 # numpy array of shape (n,) and dtype complex 128
 FrequencySeries: TypeAlias = NDArray[Shape["*"], Complex128]
-Mode: TypeAlias = Tuple[int, int]
-
-
+Mode = NewType("Mode", int)
+Modes: TypeAlias = Tuple[Mode, Mode]

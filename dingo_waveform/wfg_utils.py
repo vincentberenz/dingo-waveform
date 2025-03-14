@@ -1,9 +1,16 @@
+from typing import Dict
+
 import lal
 import lalsimulation as LS
 import numpy as np
 
+from .domains import FrequencyDomain
+from .types import FrequencySeries, Modes
 
-def linked_list_modes_to_dict_modes(hlm_ll):
+
+def linked_list_modes_to_dict_modes(
+    hlm_ll: LS.SphHarmFrequencySeries,
+) -> Dict[Modes, lal.COMPLEX16FrequencySeries]:
     """Convert linked list of modes into dictionary with keys (l,m)."""
     hlm_dict = {}
 
@@ -50,7 +57,9 @@ def get_tapering_window_for_complex_time_series(h, tapering_flag: int = 1):
     return window
 
 
-def taper_td_modes_in_place(hlm_td, tapering_flag: int = 1):
+def taper_td_modes_in_place(
+    hlm_td: Dict[Modes, lal.COMPLEX16FrequencySeries], tapering_flag: int = 1
+) -> None:
     """
     Taper the time domain modes in place.
 
@@ -70,7 +79,10 @@ def taper_td_modes_in_place(hlm_td, tapering_flag: int = 1):
         h.data.data *= window
 
 
-def td_modes_to_fd_modes(hlm_td, domain):
+def td_modes_to_fd_modes(
+    hlm_td: Dict[Modes, lal.COMPLEX16FrequencySeries],
+    domain: FrequencyDomain,
+) -> Dict[Modes, FrequencySeries]:
     """
     Transform dict of td modes to dict of fd modes via FFT. The td modes are expected
     to be tapered.
@@ -89,17 +101,30 @@ def td_modes_to_fd_modes(hlm_td, domain):
         Dictionary with (l,m) keys and numpy arrays with the corresponding modes as
         values.
     """
-    hlm_fd = {}
+    hlm_fd: Dict[Modes, FrequencySeries] = {}
 
-    delta_f = domain.delta_f
-    delta_t = 0.5 / domain.f_max
-    f_nyquist = domain.f_max  # use f_max as f_nyquist
+    domain_params = domain.get_parameters()
+
+    if domain_params.delta_f is None:
+        raise ValueError(
+            "td_modes_to_fd_modes: frequency domain delta_f should not be None"
+        )
+
+    if domain_params.f_max is None:
+        raise ValueError(
+            "td_modes_to_fd_modes: frequency domain f_max should not be None"
+        )
+
+    delta_f = domain_params.delta_f
+    delta_t = 0.5 / domain_params.f_max
+    f_nyquist = domain_params.f_max  # use f_max as f_nyquist
     n = round(f_nyquist / delta_f)
     if (n & (n - 1)) != 0:
         raise NotImplementedError("f_nyquist not a power of two of delta_f.")
     chirplen = int(2 * f_nyquist / delta_f)
     # sample frequencies, -f_max,...,-f_min,...0,...,f_min,...,f_max
-    freqs = np.concatenate((-domain()[::-1], domain()[1:]), axis=0)
+    sample_frequencies = domain.sample_frequencies()
+    freqs = np.concatenate((-sample_frequencies[::-1], sample_frequencies[1:]), axis=0)
     # For even chirplength, we get chirplen + 1 output frequencies. However, the f_max
     # and -f_max bins are redundant, so we have chirplen unique bins.
     assert len(freqs) == chirplen + 1

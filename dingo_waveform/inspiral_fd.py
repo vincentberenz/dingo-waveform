@@ -1,8 +1,8 @@
 import logging
 from copy import deepcopy
-from dataclasses import asdict, astuple, dataclass
+from dataclasses import asdict, astuple, dataclass, fields
 from math import isclose
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 import lal
 import lalsimulation as LS
@@ -50,6 +50,30 @@ class InspiralFDParameters(TableStr):
         return Spins(
             self.iota, self.s1x, self.s1y, self.s1z, self.s2x, self.s2y, self.s2z
         )
+
+    def to_tuple(self) -> Tuple[Union[float, Optional[lal.Dict]]]:
+        """
+        Returns
+        -------
+
+        This instance casted to a tuple. It differs from:
+
+        ```
+        p = InspiralFDParameters()
+        t = astuple(p)
+        ```
+
+        In the case above, t contains deep copies of fields, which is not
+        supported by instances of lal.Dict; i.e. if lal_params is not None
+        `astuple(p)` will raise a runtime error. But in the following case:
+
+        ```
+        t = p.to_tuple()
+        ```
+
+        t will contain a reference to lal_params.
+        """
+        return tuple(getattr(self, f.name) for f in fields(self))
 
     @classmethod
     def from_binary_black_hole_parameters(
@@ -124,7 +148,11 @@ class InspiralFDParameters(TableStr):
         LS.SimInspiralWaveformParamsInsertPhenomXPHMThresholdMband(lal_params, 0)
         params: "InspiralFDParameters" = deepcopy(self)
         params.lal_params = lal_params
-        arguments = list(astuple(params))
+        # arguments = list(astuple(params))
+        #  The above would not always work, because lal.Dict can not be deep copied.
+        #  (a RuntimeError is raised).
+        #  So we do instead:
+        arguments = list(params.to_tuple())
         hp, hc = LS.SimInspiralFD(*arguments)
         if max(np.max(np.abs(hp.data.data)), np.max(np.abs(hc.data.data))) <= threshold:
             return hp, hc, True

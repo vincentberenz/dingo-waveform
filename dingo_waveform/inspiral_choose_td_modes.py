@@ -8,12 +8,13 @@ import lalsimulation as LS
 from . import wfg_utils
 from .approximant import Approximant, TD_Approximant
 from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import DomainParameters
+from .domains import DomainParameters, FrequencyDomain
 from .lal_params import lal
 from .logging import TableStr
 from .spins import Spins
-from .types import FrequencySeries, Iota, Mode
+from .types import FrequencySeries, Iota, Mode, Modes
 from .waveform_parameters import WaveformParameters
+from .wfg_utils import td_modes_to_fd_modes
 
 _logger = logging.getLogger(__name__)
 
@@ -95,24 +96,28 @@ class InspiralChooseTDModesParameters(TableStr):
             approximant,
         )
 
-    def apply(self) -> Tuple[Dict[Mode, FrequencySeries], Iota]:
+    def apply(
+        self, domain: FrequencyDomain
+    ) -> Tuple[Dict[Modes, FrequencySeries], Iota]:
 
         _logger.debug(
             "calling LS.SimInspiralChooseTDModes with arguments:"
             f"{', '.join(astuple(self))}"
         )
 
-        hlm_ll: LS.SphHarmFrequencySeries = LS.SimInspiralChooseTDModes(
+        hlm__: LS.SphHarmFrequencySeries = LS.SimInspiralChooseTDModes(
             list(astuple(self))
         )
 
         # Convert linked list of modes into dictionary with keys (l,m)
         # todo: is the type of data really lal.COMPLEX16FrequencySeries ?
-        hlm_: Dict[Mode, lal.COMPLEX16FrequencySeries] = (
-            wfg_utils.linked_list_modes_to_dict_modes(hlm_ll)
+        hlm_: Dict[Modes, lal.COMPLEX16FrequencySeries] = (
+            wfg_utils.linked_list_modes_to_dict_modes(hlm__)
         )
 
         # taper the time domain modes in place
-        hlm: Dict[Mode, FrequencySeries] = wfg_utils.taper_td_modes_in_place(hlm_)
+        wfg_utils.taper_td_modes_in_place(hlm_)
+
+        hlm: Dict[Modes, FrequencySeries] = td_modes_to_fd_modes(hlm_, domain)
 
         return hlm, self.iota

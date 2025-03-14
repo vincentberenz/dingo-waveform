@@ -6,7 +6,7 @@ import lalsimulation as LS
 import numpy as np
 
 from .logging import TableStr
-from .types import FrequencySeries, Mode
+from .types import FrequencySeries, Mode, Modes
 
 
 def rotate_z(
@@ -159,33 +159,22 @@ class Spins(TableStr):
 
     def convert_J_to_L0_frame(
         self,
-        hlm_J: Dict[Mode, FrequencySeries],
+        hlm_J: Dict[Modes, FrequencySeries],
         m1: float,
         m2: float,
         converted_to_SI: bool,
         f_ref: float,
         phase: float,
-    ) -> Dict[Mode, FrequencySeries]:
+    ) -> Dict[Modes, FrequencySeries]:
 
         alpha_0, beta_0, gamma_0 = self.get_JL0_euler_angles(
             m1, m2, converted_to_SI, f_ref, phase
         )
 
-        print()
-        print("convert J  to L0 frame")
-        print("m1", m1)
-        print("m2", m2)
-        print("converted to SI", converted_to_SI)
-        print("f_ref", f_ref)
-        print("phase", phase)
-        print("alpha_0", alpha_0)
-        print("beta_0", beta_0)
-        print("gamma_0", gamma_0)
-        print()
-
-        hlm_L0 = {}
+        hlm_L0: Dict[Modes, FrequencySeries] = {}
         for (l, m), hlm in hlm_J.items():
-            for mp in range(-l, l + 1):
+            for mp_ in range(-l, l + 1):
+                mp = Mode(mp_)
                 wigner_D = (
                     np.exp(1j * m * alpha_0)
                     * np.exp(1j * mp * gamma_0)

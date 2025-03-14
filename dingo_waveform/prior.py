@@ -160,7 +160,7 @@ class IntrinsicPriors(TableStr):
     chirp_mass: Union[str, float] = (
         "bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)"
     )
-    luminosity_distance: float = 1000.0
+    luminosity_distance: Union[str, float] = 1000.0
     theta_jn: Union[str, float] = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
     phase: Union[str, float] = (
         'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
@@ -175,7 +175,7 @@ class IntrinsicPriors(TableStr):
     phi_jl: Union[str, float] = (
         'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
     )
-    geocent_time: float = 0.0
+    geocent_time: Union[str, float] = 0.0
 
     def sample(self, nb_samples: int = 1) -> List[WaveformParameters]:
         # type ignore:

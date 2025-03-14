@@ -3,10 +3,10 @@ from typing import List
 import lal
 import lalsimulation as LS
 
-from dingo_waveform.types import Mode
+from dingo_waveform.types import Modes
 
 
-def get_lal_params(mode_list: List[Mode]) -> lal.Dict:
+def get_lal_params(mode_list: List[Modes]) -> lal.Dict:
     lal_params = lal.CreateDict()
     ma = LS.SimInspiralCreateModeArray()
     for ell, m in mode_list:

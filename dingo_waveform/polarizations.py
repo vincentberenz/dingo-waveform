@@ -6,7 +6,7 @@ import numpy as np
 from rich.console import Console
 from rich.table import Table
 
-from dingo_waveform.types import FrequencySeries, Iota, Mode
+from dingo_waveform.types import FrequencySeries, Iota, Mode, Modes
 
 
 @dataclass
@@ -29,9 +29,9 @@ def sum_contributions_m(
 
 
 def get_polarizations_from_fd_modes_m(
-    hlm_fd: Dict[Mode, FrequencySeries], iota: Iota, phase: float
-) -> Dict[int, Polarization]:
-    pol_m: Dict[int, Dict[str, FrequencySeries]] = {}
+    hlm_fd: Dict[Modes, FrequencySeries], iota: Iota, phase: float
+) -> Dict[Mode, Polarization]:
+    pol_m: Dict[Mode, Dict[str, FrequencySeries]] = {}
     polarizations: List[str] = [f.name for f in fields(Polarization)]
 
     for (_, m), __ in hlm_fd.items():
@@ -60,9 +60,9 @@ def get_polarizations_from_fd_modes_m(
         #   https://lscsoft.docs.ligo.org/lalsuite/lalsimulation/
         #   _l_a_l_sim_inspiral_8c_source.html#l04801
         pol_m[m]["h_plus"] += 0.5 * h1 * ylm
-        pol_m[-m]["h_plus"] += 0.5 * h2 * ylmstar
+        pol_m[Mode(-m)]["h_plus"] += 0.5 * h2 * ylmstar
         pol_m[m]["h_cross"] += 0.5 * 1j * h1 * ylm
-        pol_m[-m]["h_cross"] += -0.5 * 1j * h2 * ylmstar
+        pol_m[Mode(-m)]["h_cross"] += -0.5 * 1j * h2 * ylmstar
 
     # Convert pol_m to a Dict[int, Polarization]
     return {
@@ -71,7 +71,7 @@ def get_polarizations_from_fd_modes_m(
     }
 
 
-def polarizations_to_table(pol: Dict[int, Polarization]) -> str:
+def polarizations_to_table(pol: Dict[Mode, Polarization]) -> str:
     console = Console()
     table = Table(title="Polarizations")
 

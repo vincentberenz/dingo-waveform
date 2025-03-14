@@ -28,6 +28,7 @@ dependencies = [
     "torch",
     "nptyping",
     "rich"
+    "scipy-stubs[scipy]"
 ]
 
 

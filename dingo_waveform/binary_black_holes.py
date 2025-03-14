@@ -52,7 +52,6 @@ class BinaryBlackHoleParameters(TableStr):
     phi_12: float
     tilt_1: float
     tilt_2: float
-    geocent_time: float
     phase: float
     theta_jn: float
     f_ref: float
@@ -61,7 +60,12 @@ class BinaryBlackHoleParameters(TableStr):
     total_mass: float
     mass_1: float
     mass_2: float
+    geocent_time: Optional[float] = None
     l_max: Optional[float] = None
+    chi_1: Optional[float] = None
+    chi_2: Optional[float] = None
+    cos_tilt_1: Optional[float] = None
+    cos_tilt_2: Optional[float] = None
 
     @classmethod
     def from_waveform_parameters(

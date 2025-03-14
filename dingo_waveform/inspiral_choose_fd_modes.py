@@ -11,7 +11,7 @@ from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import DomainParameters
 from .logging import TableStr
 from .spins import Spins
-from .types import FrequencySeries, Iota, Mode
+from .types import FrequencySeries, Iota, Mode, Modes
 from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
@@ -43,8 +43,8 @@ class InspiralChooseFDModesParameters(TableStr):
         )
 
     def convert_J_to_L0_frame(
-        self, hlm_J: Dict[Mode, FrequencySeries]
-    ) -> Dict[Mode, FrequencySeries]:
+        self, hlm_J: Dict[Modes, FrequencySeries]
+    ) -> Dict[Modes, FrequencySeries]:
         converted_to_SI = True
         return self.get_spins().convert_J_to_L0_frame(
             hlm_J, self.mass_1, self.mass_2, converted_to_SI, self.f_ref, self.phase
@@ -102,29 +102,21 @@ class InspiralChooseFDModesParameters(TableStr):
             approximant,
         )
 
-    def apply(
-        self, spin_conversion_phase: Optional[float]
-    ) -> Tuple[Dict[Mode, FrequencySeries], Iota]:
-
-        # It is confusing that "spin_conversion_phase"
-        # is needed as argument here.
-        # It has already been used to setup the value of
-        # "phase" in `from_waveform_parameters` or
-        # `from_binary_black_hole_parameters`.
+    def apply(self) -> Tuple[Dict[Modes, FrequencySeries], Iota]:
 
         # Calling the lal simulation method
         arguments = list(astuple(self))
         hlm_fd___: LS.SphHarmFrequencySeries = LS.SimInspiralChooseFDModes(*arguments)
 
         # "Converting" to frequency series
-        hlm_fd__: Dict[Mode, lal.COMPLEX16FrequencySeries] = (
+        hlm_fd__: Dict[Modes, lal.COMPLEX16FrequencySeries] = (
             wfg_utils.linked_list_modes_to_dict_modes(hlm_fd___)
         )
-        hlm_fd_: Dict[Mode, FrequencySeries] = {
+        hlm_fd_: Dict[Modes, FrequencySeries] = {
             k: v.data.data for k, v in hlm_fd__.items()
         }
 
         # "Converting" to L0 frame
-        hlm_fd: Dict[Mode, FrequencySeries] = self.convert_J_to_L0_frame(hlm_fd_)
+        hlm_fd: Dict[Modes, FrequencySeries] = self.convert_J_to_L0_frame(hlm_fd_)
 
         return hlm_fd, self.iota

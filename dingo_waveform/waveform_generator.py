@@ -22,7 +22,7 @@ from .polarizations import (
     get_polarizations_from_fd_modes_m,
     polarizations_to_table,
 )
-from .types import FrequencySeries, Iota, Mode
+from .types import FrequencySeries, Iota, Mode, Modes
 from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class WaveformGenerator:
         domain: Domain,
         f_ref: float,
         f_start: Optional[float] = None,
-        mode_list: Optional[List[Mode]] = None,
+        mode_list: Optional[List[Modes]] = None,
         transform: Optional[Callable[[Polarization], Polarization]] = None,
         spin_conversion_phase: Optional[float] = None,
     ):
@@ -109,7 +109,7 @@ class WaveformGenerator:
 
     def generate_hplus_hcross_m(
         self, waveform_parameters: WaveformParameters
-    ) -> Dict[int, Polarization]:
+    ) -> Dict[Mode, Polarization]:
 
         _logger.info(
             waveform_parameters.to_table(
@@ -147,7 +147,7 @@ class WaveformGenerator:
             )
 
         convert_to_SI = True
-        hlm: Dict[Mode, FrequencySeries]
+        hlm: Dict[Modes, FrequencySeries]
         iota: Iota
 
         if self._approximant == TD_Approximant:
@@ -165,7 +165,7 @@ class WaveformGenerator:
                     self._approximant,
                 )
             )
-            hlm, iota = inspiral_choose_td_modes_parameters.apply()
+            hlm, iota = inspiral_choose_td_modes_parameters.apply(self._domain)
 
         elif self._approximant == FD_Approximant:
             _logger.info(
@@ -182,12 +182,10 @@ class WaveformGenerator:
                     self._approximant,
                 )
             )
-            hlm, iota = inspiral_choose_fd_modes_parameters.apply(
-                self._spin_conversion_phase
-            )
+            hlm, iota = inspiral_choose_fd_modes_parameters.apply()
 
         # type ignore: (we know parameters.phase is not None, checked earlier in this function)
-        pol: Dict[int, Polarization] = get_polarizations_from_fd_modes_m(
+        pol: Dict[Mode, Polarization] = get_polarizations_from_fd_modes_m(
             hlm, iota, waveform_parameters.phase  # type: ignore
         )
 

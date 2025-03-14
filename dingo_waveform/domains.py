@@ -60,5 +60,12 @@ class FrequencyDomain(TestDomain):
             0.0, self.f_max, num=num_bins, endpoint=True, dtype=np.float32
         )
 
+    def __len__(self):
+        """Number of frequency bins in the domain [0, f_max]"""
+        return int(self.f_max / self.delta_f) + 1
+
+    def frequency_mask(self):
+        return self.sample_frequencies() >= self.f_min
+
 
 class TimeDomain(TestDomain): ...
