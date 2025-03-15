@@ -4,8 +4,16 @@ import numpy as np
 from bilby.gw.detector import PowerSpectralDensity
 from scipy.interpolate import interp1d
 
+from dingo_waveform.domains import FrequencyDomain
+from dingo_waveform.polarizations import Polarization
 
-def get_mismatch(a, b, domain, asd_file: Optional[str] = None) -> float:
+
+def get_mismatch(
+    a: Polarization,
+    b: Polarization,
+    domain: FrequencyDomain,
+    asd_file: Optional[str] = None,
+) -> float:
     """
     Mistmatch is 1 - overlap, where overlap is defined by
     inner(a, b) / sqrt(inner(a, a) * inner(b, b)).
@@ -28,10 +36,10 @@ def get_mismatch(a, b, domain, asd_file: Optional[str] = None) -> float:
         asd_interp = interp1d(
             psd.frequency_array, psd.asd_array, bounds_error=False, fill_value=np.inf
         )
-        asd_array = asd_interp(domain.sample_frequencies)
+        asd_array = asd_interp(domain.sample_frequencies())
         a = a / asd_array
         b = b / asd_array
-    min_idx = domain.min_idx
+    min_idx = domain.min_idx()
     inner_ab = np.sum((a.conj() * b)[..., min_idx:], axis=-1).real
     inner_aa = np.sum((a.conj() * a)[..., min_idx:], axis=-1).real
     inner_bb = np.sum((b.conj() * b)[..., min_idx:], axis=-1).real

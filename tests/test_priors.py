@@ -17,20 +17,20 @@ from dingo_waveform.prior import (
 def test_sample_and_split() -> None:
 
     extrinsic_priors = ExtrinsicPriors(geocent_time=0.05, psi=np.pi / 2)
-    waveform_parameters = extrinsic_priors.sample()[0]
+    waveform_parameters = extrinsic_priors.sample()
 
     assert waveform_parameters.geocent_time == 0.05
     assert waveform_parameters.psi == np.pi / 2
 
     intrinsic_priors = IntrinsicPriors(mass_2=20.0, tilt_1=1.0)
-    waveform_parameters = intrinsic_priors.sample()[0]
+    waveform_parameters = intrinsic_priors.sample()
 
     assert waveform_parameters.mass_2 == 20.0
     assert waveform_parameters.tilt_1 == 1.0
 
     priors = Priors(phi_12=0.1, dec=0.2)
 
-    waveform_parameters = priors.sample()[0]
+    waveform_parameters = priors.sample()
 
     assert waveform_parameters.phi_12 == 0.1
     assert waveform_parameters.dec == 0.2
@@ -53,7 +53,7 @@ def test_prior_constraint():
 
     # same test using IntrinsicPriors as a wrapper over BBHPriorDict
     ip = IntrinsicPriors(**d)
-    waveform_params = ip.sample(1000)
+    waveform_params = ip.samples(1000)
     assert all([wp.mass_1 > wp.mass_2 for wp in waveform_params])
 
 

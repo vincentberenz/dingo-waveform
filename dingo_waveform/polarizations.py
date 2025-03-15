@@ -16,7 +16,7 @@ class Polarization:
 
 
 def sum_contributions_m(
-    x_m: Dict[int, Polarization], phase_shift: float = 0.0
+    x_m: Dict[Mode, Polarization], phase_shift: float = 0.0
 ) -> Polarization:
     """
     Sum the contributions over m-components, optionally introducing a phase shift.

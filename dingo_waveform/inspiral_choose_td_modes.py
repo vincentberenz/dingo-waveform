@@ -1,5 +1,5 @@
 import logging
-from dataclasses import asdict, astuple, dataclass
+from dataclasses import InitVar, asdict, astuple, dataclass
 from typing import Dict, Optional, Tuple
 
 import lal
@@ -25,7 +25,6 @@ class InspiralChooseTDModesParameters(TableStr):
     delta_t: float
     mass_1: float
     mass_2: float
-    iota: Iota
     s1x: float
     s1y: float
     s1z: float
@@ -36,13 +35,17 @@ class InspiralChooseTDModesParameters(TableStr):
     f_ref: float
     distance: float
     lal_params: Optional[lal.Dict]
-    l_max: float
+    l_max: int
     approximant: Optional[Approximant]
+    iota: InitVar[float] = 0
 
-    def get_spins(self) -> Spins:
-        return Spins(
-            self.iota, self.s1x, self.s1y, self.s1z, self.s2x, self.s2y, self.s2z
-        )
+    def __post_init__(self, iota):
+        # iota is required (used by self.apply) but is not an argument
+        # for LS.SimInspiralChooseTDModes, and therefore should be 'excluded'
+        # from the 'astuple' method.
+        # Defining it as 'InitVar' and setting it up in '__post_init__' allow
+        # for this.
+        self.iota = iota
 
     @classmethod
     def from_binary_black_hole_parameters(
@@ -52,7 +55,7 @@ class InspiralChooseTDModesParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Optional[Approximant],
-        l_max_default: float = 5.0,
+        l_max_default: int = 5,
     ) -> "InspiralChooseTDModesParameters":
         spins: Spins = bbh_parameters.get_spins(spin_conversion_phase)
         params = asdict(spins)
@@ -102,11 +105,13 @@ class InspiralChooseTDModesParameters(TableStr):
 
         _logger.debug(
             "calling LS.SimInspiralChooseTDModes with arguments:"
-            f"{', '.join(astuple(self))}"
+            f"{', '.join([str(v) for v in astuple(self)])}"
         )
 
+        # Note: because self.iota is an "InitVar", it is excluded
+        #   from the 'astuple' function.
         hlm__: LS.SphHarmFrequencySeries = LS.SimInspiralChooseTDModes(
-            list(astuple(self))
+            *list(astuple(self))
         )
 
         # Convert linked list of modes into dictionary with keys (l,m)

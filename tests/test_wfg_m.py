@@ -12,15 +12,20 @@ which needs to be accounted for in postprocessing. The tests below all use
 wfg.spin_conversion_phase = 0.0.
 """
 
+from dataclasses import asdict
 from typing import Dict, Union
 
 import numpy as np
 import pytest
 from matplotlib import pyplot as plt
 
-from dingo_waveform.polarizations import sum_contributions_m
+from dingo_waveform.domains import FrequencyDomain
+from dingo_waveform.gwutils import get_mismatch
+from dingo_waveform.polarizations import Polarization, sum_contributions_m
 from dingo_waveform.prior import IntrinsicPriors
+from dingo_waveform.types import Mode
 from dingo_waveform.waveform_generator import WaveformGenerator
+from dingo_waveform.waveform_parameters import WaveformParameters
 
 
 # @pytest.fixture(params=["IMRPhenomXPHM", "SEOBNRv4PHM", "SEOBNRv5PHM", "SEOBNRv5HM"])
@@ -28,6 +33,15 @@ from dingo_waveform.waveform_generator import WaveformGenerator
 @pytest.fixture(params=["IMRPhenomXPHM", "SEOBNRv4PHM"])
 def approximant(request):
     return request.param
+
+
+@pytest.fixture
+def uniform_fd_domain() -> FrequencyDomain:
+    return FrequencyDomain(
+        delta_f=0.125,
+        f_min=10.0,
+        f_max=2048.0,
+    )
 
 
 @pytest.fixture
@@ -130,25 +144,32 @@ approximant_list = ["IMRPhenomXPHM", "SEOBNRv4PHM"]
 
 
 @pytest.mark.parametrize("approximant", approximant_list)
-def test_generate_hplus_hcross_m(intrinsic_prior, wfg, num_evaluations, tolerances):
+def test_generate_hplus_hcross_m(
+    intrinsic_prior, wfg, num_evaluations, tolerances
+) -> None:
     mismatches = []
     for idx in range(num_evaluations):
-        p = intrinsic_prior.sample()
+        p: WaveformParameters = intrinsic_prior.sample()
         phase_shift = np.random.uniform(high=2 * np.pi)
 
-        pol_m = wfg.generate_hplus_hcross_m(p)
-        pol = sum_contributions_m(pol_m, phase_shift=phase_shift)
-        pol_ref = wfg.generate_hplus_hcross({**p, "phase": p["phase"] + phase_shift})
+        pol_m: Dict[Mode, Polarization] = wfg.generate_hplus_hcross_m(p)
+        pol: Polarization = sum_contributions_m(pol_m, phase_shift=phase_shift)
+        if p.phase is None:
+            raise RuntimeError(
+                "test_generate_hplus_hcross_m requires a non None phase parameter"
+            )
+        p.phase += phase_shift
+        pol_ref: Polarization = wfg.generate_hplus_hcross(p)
 
         mismatches.append(
             [
                 get_mismatch(
-                    pol[pol_name],
-                    pol_ref[pol_name],
-                    wfg.domain,
+                    asdict(pol)[pol_name],
+                    asdict(pol_ref)[pol_name],
+                    wfg._domain,
                     asd_file="aLIGO_ZERO_DET_high_P_asd.txt",
                 )
-                for pol_name in pol
+                for pol_name in ("h_plus", "h_cross")
             ]
         )
 

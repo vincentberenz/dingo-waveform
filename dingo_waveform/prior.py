@@ -136,7 +136,10 @@ class ExtrinsicPriors(TableStr):
             keys=keys, sample_size=sample_size, force_numerical=force_numerical
         )
 
-    def sample(self, nb_samples: int = 1) -> List[WaveformParameters]:
+    def sample(self) -> WaveformParameters:
+        return self.samples(1)[0]
+
+    def samples(self, nb_samples) -> List[WaveformParameters]:
         # type ignore:
         # I could not find how to specify this mixin could be superclass
         # only for dataclass. (I tried to use Protocol, but no success)
@@ -177,7 +180,10 @@ class IntrinsicPriors(TableStr):
     )
     geocent_time: Union[str, float] = 0.0
 
-    def sample(self, nb_samples: int = 1) -> List[WaveformParameters]:
+    def sample(self) -> WaveformParameters:
+        return self.samples(1)[0]
+
+    def samples(self, nb_samples: int) -> List[WaveformParameters]:
         # type ignore:
         # I could not find how to specify this mixin could be superclass
         # only for dataclass. (I tried to use Protocol, but no success)
@@ -239,7 +245,10 @@ def _create_priors_dataclass() -> Type:
             """
             return self._get_prior(ExtrinsicPriors)
 
-        def sample(self, nb_samples: int = 1) -> List[WaveformParameters]:
+        def sample(self) -> WaveformParameters:
+            return self.samples(1)[0]
+
+        def samples(self, nb_samples: int) -> List[WaveformParameters]:
             """
             Returns
             -------
@@ -248,8 +257,8 @@ def _create_priors_dataclass() -> Type:
             """
             ip = self.get_intrinsic_priors()
             ep = self.get_extrinsic_priors()
-            intrinsic_wfs: List[WaveformParameters] = ip.sample(nb_samples)
-            extrinsic_wfs: List[WaveformParameters] = ep.sample(nb_samples)
+            intrinsic_wfs: List[WaveformParameters] = ip.samples(nb_samples)
+            extrinsic_wfs: List[WaveformParameters] = ep.samples(nb_samples)
 
             def _get_wf(
                 intrinsic_wf: WaveformParameters, extrinsic_wf: WaveformParameters

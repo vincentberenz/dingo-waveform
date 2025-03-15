@@ -153,7 +153,7 @@ def td_modes_to_fd_modes(
         # apply FFT
         lal.COMPLEX16TimeFreqFFT(h_fd, h_td, lal_fft_plan)
         assert np.abs(h_fd.deltaF - delta_f) < 1e-10
-        assert np.abs(h_fd.f0 + domain.f_max) < 1e-6
+        assert np.abs(h_fd.f0 + domain_params.f_max) < 1e-6
 
         # time shift
         dt = (
