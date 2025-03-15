@@ -27,8 +27,9 @@ dependencies = [
     "numpy",
     "torch",
     "nptyping",
-    "rich"
-    "scipy-stubs[scipy]"
+    "rich",
+    "scipy-stubs[scipy]",
+    "multipledispatch"
 ]
 
 
