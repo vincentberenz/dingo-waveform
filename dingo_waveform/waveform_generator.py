@@ -227,6 +227,7 @@ class WaveformGenerator:
             )
 
             frequency_array = self._domain.sample_frequencies()
+
             pol = inspiral_fd_parameters.apply(frequency_array)
 
         elif isinstance(self._domain, TimeDomain):

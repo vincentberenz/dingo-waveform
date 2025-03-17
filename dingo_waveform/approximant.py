@@ -4,8 +4,8 @@ import lalsimulation as LS
 
 Approximant = NewType("Approximant", int)
 
-TD_Approximant = Approximant(52)
-FD_Approximant = Approximant(101)
+TD_Approximant = Approximant(52)  # 'SEOBNRv4PHM'
+FD_Approximant = Approximant(101)  # 'IMRPhenomXPHM'
 
 
 def get_approximant(approximant: str) -> Approximant:

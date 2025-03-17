@@ -39,37 +39,6 @@ class Spins(TableStr):
         self, m1: float, m2: float, converted_to_SI: bool, f_ref: float, phase: float
     ) -> Tuple[float, float, float]:
 
-        from dataclasses import asdict
-
-        print("")
-        print("get JL0 euler angles")
-        print(
-            "phase", phase
-        )  # issue is here ! it is 0 for me ! 2.31 is the value of the phase in the waveform parameters
-        # unclear !
-        # print("spin conversion phase", spin_conversion_phase)
-        print("m1", m1)
-        print("m2", m2)
-        for k, v in asdict(self).items():
-            print(k, v)
-        print("f_ref", f_ref)
-        print("converted to SI", converted_to_SI)
-
-        # ground truth
-        # get_JL0_euler_angles
-        # phase 2.3133395191342094
-        # spin conversion phase 0.0
-        # m1 1.2565859519276645e+32
-        # m2 4.40037876286311e+31
-        # chi1x -0.055470980343691426
-        # chi1y -0.6755013274624259
-        # chi1z -0.6045964607982675
-        # chi2x 0.1314543246986317
-        # chi2y 0.11526461124169105
-        # chi2z -0.1524358474024755
-        # iota 0.6179131357160138
-        # f_ref 20.0
-
         if converted_to_SI:
             m1 = m1 / lal.MSUN_SI
             m2 = m2 / lal.MSUN_SI

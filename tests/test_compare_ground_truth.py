@@ -226,7 +226,7 @@ def test_IMRPhenomXPHM_approximant() -> None:
         approximant, domain, f_ref, f_start, spin_conversion_phase=spin_conversion_phase
     )
 
-    pol_m: Dict[int, Polarization] = wfg.generate_hplus_hcross_m(waveform_parameters)
+    pol_m: Dict[Mode, Polarization] = wfg.generate_hplus_hcross_m(waveform_parameters)
     pol: Polarization = sum_contributions_m(pol_m, phase_shift)
     # type ignore: we know phase is not None
     waveform_parameters.phase += phase_shift  # type: ignore

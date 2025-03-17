@@ -1,36 +1,21 @@
 import numpy as np
 import pytest
 import torch
-from dingo.gw.domains import FrequencyDomain, TimeDomain, build_domain
-from dingo.gw.gwutils import get_window_factor
+
+from dingo_waveform.domains import DomainParameters, FrequencyDomain, build_domain
+from dingo_waveform.gwutils import get_tukey_window_factor
+
+# from dingo.gw.domains import FrequencyDomain, TimeDomain, build_domain
+# from dingo.gw.gwutils import get_window_factor
 
 
-@pytest.fixture
-def uniform_FD_params():
-    f_min = 20.0
-    f_max = 4096.0
-    delta_f = 1.0 / 4.0
-    return {"f_min": f_min, "f_max": f_max, "delta_f": delta_f}
+_uniform_FD_params = {"f_min": 20.0, "f_max": 4096.0, "delta_f": 1.0 / 4.0}
+
+_window_factor_args = {"f_s": 4096, "T": 8.0, "roll_off": 0.4}
 
 
-@pytest.fixture
-def window_setup():
-    type = "tukey"
-    f_s = 4096
-    T = 8.0
-    roll_off = 0.4
-    window_kwargs = {
-        "type": type,
-        "f_s": f_s,
-        "T": T,
-        "roll_off": roll_off,
-    }
-    window_factor = get_window_factor(window_kwargs)
-    return window_kwargs, window_factor
-
-
-def test_uniform_FD(uniform_FD_params):
-    p = uniform_FD_params
+def test_uniform_FD() -> None:
+    p = _uniform_FD_params
     domain = FrequencyDomain(**p)
     n = int(p["f_max"] / p["delta_f"]) + 1
     frequencies_expected = np.linspace(0, p["f_max"], n)
@@ -38,25 +23,27 @@ def test_uniform_FD(uniform_FD_params):
     assert np.linalg.norm(frequencies - frequencies_expected) < 1e-15
 
 
-def test_uniform_FD_mask(uniform_FD_params):
-    p = uniform_FD_params
+def test_uniform_FD_mask() -> None:
+    p = _uniform_FD_params
     domain = FrequencyDomain(**p)
     mask = domain.frequency_mask
     n_masked = int((p["f_max"] - p["f_min"]) / p["delta_f"]) + 1
     frequencies_expected_masked = np.linspace(p["f_min"], p["f_max"], n_masked)
-    frequencies_masked = domain()[mask]
+    frequencies = domain()
+    frequencies_masked = frequencies[mask]
     assert np.linalg.norm(frequencies_masked - frequencies_expected_masked) < 1e-15
 
 
-def test_FD_domain_dict(uniform_FD_params):
-    p = uniform_FD_params
+def test_FD_domain_dict() -> None:
+    p = _uniform_FD_params
     domain = FrequencyDomain(**p)
-    domain2 = build_domain(domain.domain_dict)
+    domain_parameters = domain.get_parameters()
+    domain2 = build_domain(domain_parameters)
     assert domain.__dict__ == domain2.__dict__
 
 
-def test_FD_update_data(uniform_FD_params):
-    p = uniform_FD_params
+def test_FD_update_data() -> None:
+    p = _uniform_FD_params
     domain = FrequencyDomain(**p)
     n = int(p["f_max"] / p["delta_f"]) + 1
     nt = int((p["f_max"] - p["f_min"]) / p["delta_f"]) + 1
@@ -82,8 +69,8 @@ def test_FD_update_data(uniform_FD_params):
     )
 
 
-def test_FD_set_new_range(uniform_FD_params):
-    p = uniform_FD_params
+def test_FD_set_new_range() -> None:
+    p = _uniform_FD_params
     domain = FrequencyDomain(**p)
     # test that ValueErrors are raised for infeasible inputs
     with pytest.raises(ValueError):
@@ -114,8 +101,8 @@ def test_FD_set_new_range(uniform_FD_params):
     )
 
 
-def test_FD_time_translation(uniform_FD_params):
-    p = uniform_FD_params
+def test_FD_time_translation() -> None:
+    p = _uniform_FD_params
     domain = FrequencyDomain(**p)
     # test normal time translation
     dt = 1e-3
@@ -131,8 +118,8 @@ def test_FD_time_translation(uniform_FD_params):
     assert not np.allclose(a, domain.time_translate_data(a_dt, -1.01 * dt))
 
 
-def test_FD_time_translation_torch(uniform_FD_params):
-    p = uniform_FD_params
+def test_FD_time_translation_torch() -> None:
+    p = _uniform_FD_params
     domain = FrequencyDomain(**p)
     batch_size = 5
     num_detectors = 2
@@ -160,8 +147,8 @@ def test_FD_time_translation_torch(uniform_FD_params):
     assert torch.allclose(result[..., 2, :], torch.tensor(constant_value))
 
 
-def test_FD_caching(uniform_FD_params):
-    p = uniform_FD_params
+def test_FD_caching() -> None:
+    p = _uniform_FD_params
     domain = FrequencyDomain(**p)
     domain_ref = FrequencyDomain(**p)
 
@@ -176,10 +163,10 @@ def test_FD_caching(uniform_FD_params):
     assert len(domain()) < len(domain_ref())
 
 
-def test_FD_window_factor(uniform_FD_params, window_setup):
-    p = uniform_FD_params
+def test_FD_window_factor():
+    p = _uniform_FD_params
     domain = FrequencyDomain(**p)
-    _, window_factor = window_setup
+    window_factor = get_tukey_window_factor(**_window_factor_args)
     assert window_factor == 0.9374713897717841
     # check that window_factor is initially None
     assert domain.window_factor is None
