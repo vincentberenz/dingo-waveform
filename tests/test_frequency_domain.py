@@ -39,7 +39,11 @@ def test_FD_domain_dict() -> None:
     domain = FrequencyDomain(**p)
     domain_parameters = domain.get_parameters()
     domain2 = build_domain(domain_parameters)
-    assert domain.__dict__ == domain2.__dict__
+    d1 = domain.__dict__
+    d2 = domain2.__dict__
+    assert set(d1.keys()) == set(d2.keys())
+    for k in d1.keys():
+        assert d1[k] == d2[k]
 
 
 def test_FD_update_data() -> None:
@@ -88,6 +92,7 @@ def test_FD_set_new_range() -> None:
     n = int(f_max_new / p["delta_f"]) + 1
     domain.set_new_range(f_min_new, f_max_new)
     assert n == len(domain) == len(domain())
+    new_linespace = np.linspace(0, f_max_new, n)
     assert np.all(domain() == np.linspace(0, f_max_new, n))
     mask = np.ones(n)
     mask[: round(f_min_new / p["delta_f"])] = 0.0
@@ -157,7 +162,7 @@ def test_FD_caching() -> None:
     # does not update the cached properties
     domain._f_max = 50
     assert np.all(domain() == domain_ref())
-    domain._reset_caches()
+    domain.f_max = 50
     # after clearing the cache, the __call__ method should return the correct
     # result
     assert len(domain()) < len(domain_ref())
