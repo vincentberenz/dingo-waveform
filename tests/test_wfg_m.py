@@ -13,7 +13,7 @@ wfg.spin_conversion_phase = 0.0.
 """
 
 from dataclasses import asdict
-from typing import Dict, Union
+from typing import Dict, List, Union
 
 import numpy as np
 import pytest
@@ -147,7 +147,7 @@ approximant_list = ["IMRPhenomXPHM", "SEOBNRv4PHM"]
 def test_generate_hplus_hcross_m(
     intrinsic_prior, wfg, num_evaluations, tolerances
 ) -> None:
-    mismatches = []
+    mismatches: List[List[float]] = []
     for idx in range(num_evaluations):
         p: WaveformParameters = intrinsic_prior.sample()
         phase_shift = np.random.uniform(high=2 * np.pi)
@@ -173,22 +173,7 @@ def test_generate_hplus_hcross_m(
             ]
         )
 
-        debug = False
-        if debug:
-            maxval = max(mismatches[-1])
-            idx = mismatches[-1].index(maxval)
-            p = list(pol.keys())[idx]
-            plt.figure(figsize=(10, 7))
-            plt.plot(wfg.domain.sample_frequencies, pol[p], label="reconstructed")
-            plt.plot(wfg.domain.sample_frequencies, pol_ref[p], label="ref")
-            plt.plot(wfg.domain.sample_frequencies, pol_ref[p] - pol[p], label="diff")
-            plt.legend()
-            plt.xscale("log")
-            plt.xlim((5, 128))
-            plt.title(f"{p}, mismatch={maxval}")
-            plt.show()
+    mismatches_ = np.array(mismatches)
 
-    mismatches = np.array(mismatches)
-
-    assert np.max(mismatches) < tolerances[0]
-    assert np.median(mismatches) < tolerances[1]
+    assert np.max(mismatches_) < tolerances[0]
+    assert np.median(mismatches_) < tolerances[1]

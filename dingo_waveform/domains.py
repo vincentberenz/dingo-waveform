@@ -1,3 +1,10 @@
+"""
+This module defines various domain classes for data processing, including
+the base class `Domain` and its subclasses `FrequencyDomain` and `TimeDomain`.
+It also provides utility functions for building domain instances and managing
+frequency sampling.
+"""
+
 import importlib
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
@@ -27,6 +34,14 @@ class Domain(ABC):
 
     @abstractmethod
     def get_parameters(self) -> DomainParameters:
+        """
+        Get the parameters of the domain.
+
+        Returns
+        -------
+        DomainParameters
+            The parameters of the domain.
+        """
         raise NotImplementedError(
             "Subclasses of Domain must implement the get_parameters method."
         )
@@ -34,23 +49,52 @@ class Domain(ABC):
     @classmethod
     @abstractmethod
     def from_parameters(cls, domain_parameters: DomainParameters) -> "Domain":
+        """
+        Create a domain instance from given parameters.
+
+        Parameters
+        ----------
+        domain_parameters
+            The parameters to create the domain.
+
+        Returns
+        -------
+        Domain
+            A corresponding instance of the domain.
+        """
         raise NotImplementedError(
             "Subclasses of Domain must implement the from_parameters class method."
         )
 
     @abstractmethod
     def __len__(self) -> int:
-        """Return the number of bins or points in the domain."""
+        """
+        Return the number of bins or points in the domain.
+
+        Returns
+        -------
+        int
+            The number of bins or points in the domain.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def __call__(self, *args, **kwargs) -> np.ndarray:
-        """Generate array of bins in the domain."""
+        """
+        Generate array of bins in the domain.
+
+        Returns
+        -------
+        np.ndarray
+            Array of bins in the domain.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def update(self, *args) -> None:
-        """Update domain parameters."""
+        """
+        Update domain parameters.
+        """
         raise NotImplementedError(
             "Subclasses of Domain must implement the update method"
         )
@@ -62,25 +106,33 @@ class Domain(ABC):
         """
         Translate data in time domain by dt seconds.
 
-        Args:
-            data: Input data array/tensor
-            dt: Time shift amount
+        Parameters
+        ----------
+        data
+            Input data array/tensor.
+        dt
+            Time shift amount.
 
-        Returns:
-            Translated data
+        Returns
+        -------
+        Translated data.
         """
         raise NotImplementedError
 
     @property
     @abstractmethod
     def noise_std(self) -> float:
-        """Standard deviation of the whitened noise distribution."""
+        """
+        Standard deviation of the noise distribution.
+        """
         raise NotImplementedError
 
     @property
     @abstractmethod
     def sampling_rate(self) -> float:
-        """Sampling rate of the data in Hz."""
+        """
+        Sampling rate of the data.
+        """
         raise NotImplementedError
 
     @property
@@ -110,8 +162,17 @@ class Domain(ABC):
 
 def build_domain(domain_parameters: Union[DomainParameters, Dict]) -> Domain:
     """
-    Building an instance of domain based on an instance of DomainParameters,
+    Build an instance of domain based on an instance of DomainParameters,
     or a corresponding dictionary.
+
+    Parameters
+    ----------
+    domain_parameters
+        The parameters to create the domain.
+
+    Returns
+    -------
+    An instance of the domain.
     """
 
     # if as dict as been passed as argument, 'casting' is to an instance of
@@ -135,6 +196,7 @@ def build_domain(domain_parameters: Union[DomainParameters, Dict]) -> Domain:
     # But legacy code may just have used the class name (e.g. FrequencyDomain).
     # Reconstructing the import path.
     if not "." in domain_parameters.type:
+        # i.e. dingo_waveform.domains.<DomainClassName>
         domain_parameters.type = f"{_module_import_path}.{domain_parameters.type}"
 
     # returning the class, module and class name from the import path,
@@ -168,14 +230,20 @@ def build_domain(domain_parameters: Union[DomainParameters, Dict]) -> Domain:
         instance = class_.from_parameters(domain_parameters)
     except Exception as e:
         raise RuntimeError(
-            f"Constructing domain. Failed to construct {class_name} from arguments {repr(args)}. {type(e)}: {e}"
+            f"Constructing domain. Failed to construct {class_name} from arguments {repr(asdict(domain_parameters))}. {type(e)}: {e}"
         )
 
     return instance
 
 
 class _CachedSampleFrequencies:
-    """Helper class for managing frequency sampling."""
+    # Will be used in the class FrequencyDomain.
+    # It will maintain cached values of sample frequencies, so that
+    # they do not get computed everytime they are accessed.
+    # The FrequencyDomains's attribute instance of _CachedSampleFrequency
+    # will be rebuilt everytime f_min, f_max or delta_f is changed, so
+    # that the cache get cleared and the sample frequencies get computed
+    # again if needed.
 
     def __init__(self, f_min: float, f_max: float, delta_f: float) -> None:
         # Vincent: f_min does not seem to be used here in the original code ?
@@ -189,6 +257,18 @@ class _CachedSampleFrequencies:
         return self._len
 
     def __eq__(self, other) -> bool:
+        """
+        Check if two _CachedSampleFrequencies instances are equal.
+
+        Parameters
+        ----------
+        other
+            The other instance to compare.
+
+        Returns
+        -------
+        True if the instances are equal, False otherwise.
+        """
         if not isinstance(other, _CachedSampleFrequencies):
             return False
         if any(
@@ -202,33 +282,36 @@ class _CachedSampleFrequencies:
 
     @cached_property
     def _len(self) -> int:
+        """
+        Return the number of frequency samples.
+        """
         return int(self._f_max / self._delta_f) + 1
 
     @cached_property
     def sample_frequencies(self) -> np.ndarray:
+        """
+        Return the sample frequencies.
+        """
         return np.linspace(
             0.0, self._f_max, num=self._len, endpoint=True, dtype=np.float32
         )
 
     @cached_property
     def sample_frequencies_torch(self) -> torch.Tensor:
+        """Create PyTorch tensor version of frequencies."""
         return torch.linspace(0.0, self._f_max, steps=self._len, dtype=torch.float32)
 
     @cached_property
     def sample_frequency_torch_cuda(self) -> torch.Tensor:
+        """
+        Create CUDA version of frequency tensor.
+        """
         return self.sample_frequencies_torch.to("cuda")
 
     @cached_property
     def frequency_mask(self) -> np.ndarray:
         """Create mask for frequencies above f_min."""
         return self.sample_frequencies >= self._f_min
-
-    @cached_property
-    def sample_frequencies_torch(self) -> torch.Tensor:
-        """Create PyTorch tensor version of frequencies."""
-        return torch.linspace(
-            self._f_min, self._f_max, steps=len(self), dtype=torch.float32
-        )
 
     @cached_property
     def sample_frequencies_torch_cuda(self) -> torch.Tensor:
@@ -239,7 +322,8 @@ class _CachedSampleFrequencies:
 # decorator to be used in the FrequencyDomain, for managing
 # cached sample frequencies. This will decorate the setters for
 # the properties f_min, f_max and delta_f. When the value of any
-# of these properties change,
+# of these properties change, the attribute '_cached_sample_frequencies'
+# is rebuilt, so that the sample frequencies get recomputed if needed.
 def _reinit_cached_sample_frequencies(func):
     @wraps(func)
     def wrapper(self, value):
@@ -269,7 +353,20 @@ class FrequencyDomain(Domain):
         delta_f: float,
         window_factor: Optional[float] = None,
     ) -> None:
+        """
+        Initialize a FrequencyDomain instance.
 
+        Parameters
+        ----------
+        f_min
+            Minimum frequency in Hz.
+        f_max
+            Maximum frequency in Hz.
+        delta_f
+            Frequency spacing in Hz.
+        window_factor
+            Window factor for noise calculations.
+        """
         self._f_min = f_min
         self._f_max = f_max
         self._delta_f = delta_f
@@ -280,6 +377,15 @@ class FrequencyDomain(Domain):
         )
 
     def get_parameters(self) -> DomainParameters:
+        """
+        Get the parameters of the frequency domain.
+
+        Returns
+        -------
+        DomainParameters
+            The parameters of the frequency domain.
+            Note: delta_t is computed as `0.5 / f_max`.
+        """
         d = DomainParameters(
             f_max=self._f_max,
             f_min=self._f_min,
@@ -293,6 +399,19 @@ class FrequencyDomain(Domain):
 
     @classmethod
     def from_parameters(cls, domain_parameters: DomainParameters) -> "FrequencyDomain":
+        """
+        Create a FrequencyDomain instance from given parameters.
+
+        Parameters
+        ----------
+        domain_parameters
+            The parameters to create the frequency domain.
+
+        Returns
+        -------
+        FrequencyDomain
+            An instance of the frequency domain.
+        """
         for attr in ("f_min", "f_max", "delta_f"):
             if getattr(domain_parameters, attr) is None:
                 raise ValueError(
@@ -313,18 +432,28 @@ class FrequencyDomain(Domain):
         """
         Update the domain range while maintaining constraints.
 
-        Args:
-            f_min: New minimum frequency (None to keep current value)
-            f_max: New maximum frequency (None to keep current value)
+        Parameters
+        ----------
+        f_min
+            New minimum frequency (None to keep current value).
+        f_max
+            New maximum frequency (None to keep current value).
+        delta_f
+            New frequency spacing (None to keep current value).
 
-        Raises:
-            ValueError: If updated values violate domain constraints
+        Raises
+        ------
+        ValueError
+            If updated values violate domain constraints.
         """
+        # note:
         if delta_f is not None and delta_f != self._delta_f:
             raise ValueError(
                 "FrequencyDomain.set_new_range: can not change the value delta_f when "
                 f"setting a new range. Current value: {self._delta_f}, argument: {delta_f}"
             )
+        # note: this will clean up the sample frequency cache, so this function does not
+        #  need to be directly decorated with @_reinit_cached_sample_frequencies
         self.set_new_range(f_min, f_max)
 
     def set_new_range(
@@ -333,6 +462,24 @@ class FrequencyDomain(Domain):
         f_max: Optional[float] = None,
         delta_f: Optional[float] = None,
     ) -> None:
+        """
+        Set a new range for the frequency domain.
+
+        Parameters
+        ----------
+        f_min
+            New minimum frequency.
+        f_max
+            New maximum frequency.
+        delta_f
+            New frequency spacing.
+
+        Raises
+        ------
+        ValueError
+            If the new range is not contained within the current range or if
+            f_min is not lower than f_max.
+        """
         if f_min and f_min < self._f_min:
             raise ValueError(
                 f"frequency domain new range: new f_min ({f_min}) should be higher than current "
@@ -367,12 +514,16 @@ class FrequencyDomain(Domain):
         """
         Time translate frequency-domain data by dt seconds.
 
-        Args:
-            data: Input data array/tensor
-            dt: Time shift amount
+        Parameters
+        ----------
+        data
+            Input data array/tensor.
+        dt
+            Time shift amount.
 
-        Returns:
-            Translated data
+        Returns
+        -------
+        Translated data.
         """
         f = self._get_sample_frequencies_astype(data)
 
@@ -408,11 +559,26 @@ class FrequencyDomain(Domain):
 
     @property
     def window_factor(self):
+        """
+        Get the window factor for noise calculations.
+
+        Returns
+        -------
+        float
+            The window factor.
+        """
         return self._window_factor
 
     @window_factor.setter
     def window_factor(self, value: float):
-        """Set self._window_factor and clear cache of self.noise_std."""
+        """
+        Set the window factor for noise calculations.
+
+        Parameters
+        ----------
+        value
+            The new window factor.
+        """
         self._window_factor = value
 
     @property
@@ -423,7 +589,17 @@ class FrequencyDomain(Domain):
 
         To have noise that comes from a multivariate *unit* normal distribution,
         you must divide by this factor. In practice, this means dividing the
-        whitened waveforms by this.
+        waveforms by this.
+
+        Returns
+        -------
+        float
+            The standard deviation of the whitened noise distribution.
+
+        Raises
+        ------
+        ValueError
+            If window factor is not set.
         """
         if self._window_factor is None:
             raise ValueError("Window factor needs to be set for noise_std")
@@ -432,49 +608,70 @@ class FrequencyDomain(Domain):
     @property
     @override
     def f_max(self) -> float:
-        """Return the maximum frequency in Hz."""
+        """Return the maximum frequency."""
         return self._f_max
 
     @f_max.setter
     @_reinit_cached_sample_frequencies
     def f_max(self, value: float) -> None:
-        """Set the maximum frequency."""
+        """
+        Set the maximum frequency.
+
+        Parameters
+        ----------
+        value
+            The new maximum frequency.
+        """
         self._f_max = float(value)
 
     @property
     @override
     def f_min(self) -> float:
-        """Return the minimum frequency in Hz."""
+        """Return the minimum frequency."""
         return self._f_min
 
     @f_min.setter
     @_reinit_cached_sample_frequencies
     def f_min(self, value: float) -> None:
-        """Set the minimum frequency."""
+        """
+        Set the minimum frequency.
+
+        Parameters
+        ----------
+        value
+            The new minimum frequency.
+        """
         self._f_min = float(value)
 
     @property
     @override
     def delta_f(self) -> float:
-        """Return the frequency spacing in Hz."""
+        """Return the frequency spacing."""
         return self._delta_f
 
     @delta_f.setter
     @_reinit_cached_sample_frequencies
     def delta_f(self, value: float) -> None:
-        """Set the frequency spacing."""
+        """
+        Set the frequency spacing.
+
+        Parameters
+        ----------
+        value
+            The new frequency spacing.
+        """
         self._delta_f = float(value)
 
     @property
     @override
     def duration(self) -> float:
-        """Return the duration in seconds."""
+        """Return the duration."""
         return 1.0 / self.delta_f
 
     @property
     @override
     def sampling_rate(self) -> float:
-        """Return the sampling rate in Hz."""
+        """Return the sampling rate."""
         return 2.0 * self.f_max
 
     @override
@@ -483,15 +680,38 @@ class FrequencyDomain(Domain):
         return self.sample_frequencies()
 
     def sample_frequencies(self) -> np.ndarray:
-        """Return the sample frequencies."""
+        """
+        Return the sample frequencies.
+
+        Returns
+        -------
+        np.ndarray
+            Array of sample frequencies.
+        """
         return self._cached_sample_frequencies.sample_frequencies
 
     @property
     def sample_frequencies_torch(self) -> torch.Tensor:
+        """
+        Return the sample frequencies as a PyTorch tensor.
+
+        Returns
+        -------
+        torch.Tensor
+            Tensor of sample frequencies.
+        """
         return self._cached_sample_frequencies.sample_frequencies_torch
 
     @property
     def sample_frequencies_torch_cuda(self) -> torch.Tensor:
+        """
+        Return the sample frequencies as a CUDA tensor.
+
+        Returns
+        -------
+        torch.Tensor
+            CUDA tensor of sample frequencies.
+        """
         return self._cached_sample_frequencies.sample_frequencies_torch_cuda
 
     def _get_sample_frequencies_astype(
@@ -500,11 +720,20 @@ class FrequencyDomain(Domain):
         """
         Return a 1D frequency array compatible with the last index of data array.
 
-        Args:
-            data: Input data array/tensor
+        Parameters
+        ----------
+        data
+            Input data array/tensor.
 
-        Returns:
-            Frequency array compatible with data
+        Returns
+        -------
+        Union[np.ndarray, torch.Tensor]
+            Frequency array compatible with data.
+
+        Raises
+        ------
+        TypeError
+            If data type is invalid or incompatible with domain.
         """
         f: Union[np.ndarray, torch.Tensor]
         if isinstance(data, np.ndarray):
@@ -529,17 +758,43 @@ class FrequencyDomain(Domain):
 
     @property
     def frequency_mask(self) -> np.ndarray:
-        """Return mask which selects frequency bins greater than or equal to the starting frequency."""
+        """
+        Return mask which selects frequency bins greater than or equal to the starting frequency.
+
+        Returns
+        -------
+        np.ndarray
+            Mask array for frequencies.
+        """
         return self._cached_sample_frequencies.frequency_mask
 
     @property
     def frequency_mask_length(self) -> int:
-        """Return number of samples in the subdomain domain[frequency_mask]."""
+        """
+        Return number of samples in the subdomain domain[frequency_mask].
+
+        Returns
+        -------
+        int
+            Number of samples in the subdomain.
+        """
         mask = self.frequency_mask
         return len(np.flatnonzero(np.asarray(mask)))
 
     def __getitem__(self, idx):
-        """Return slice of uniform frequency grid."""
+        """
+        Return slice of uniform frequency grid.
+
+        Parameters
+        ----------
+        idx
+            Index or slice to retrieve.
+
+        Returns
+        -------
+        np.ndarray
+            Slice of frequency grid.
+        """
         return self._cached_sample_frequencies.sample_frequencies[idx]
 
     def update_data(
@@ -548,13 +803,19 @@ class FrequencyDomain(Domain):
         """
         Adjust data to be compatible with the domain.
 
-        Args:
-            data: Data array
-            axis: Which data axis to apply the adjustment along
-            low_value: Value to set below f_min
+        Parameters
+        ----------
+        data
+            Data array.
+        axis
+            Which data axis to apply the adjustment along.
+        low_value
+            Value to set below f_min.
 
-        Returns:
-            Adjusted data array
+        Returns
+        -------
+        np.ndarray
+            Adjusted data array.
         """
         sl = [slice(None)] * data.ndim
         # First truncate beyond f_max
@@ -571,15 +832,22 @@ class FrequencyDomain(Domain):
         """
         Add frequency-dependent phase to complex data (NumPy implementation).
 
-        Args:
-            data: Complex-valued frequency series
-            phase: Phase array to apply
+        Parameters
+        ----------
+        data
+            Complex-valued frequency series.
+        phase
+            Phase array to apply.
 
-        Returns:
-            Data with applied phase shift
+        Returns
+        -------
+        np.ndarray
+            Data with applied phase shift.
 
-        Raises:
-            TypeError: If data is not complex
+        Raises
+        ------
+        TypeError
+            If data is not complex.
         """
         if not np.iscomplexobj(data):
             raise TypeError("Numpy data must be complex array")
@@ -592,12 +860,17 @@ class FrequencyDomain(Domain):
         """
         Add frequency-dependent phase to complex data (PyTorch implementation).
 
-        Args:
-            data: Complex-valued frequency series
-            phase: Phase tensor to apply
+        Parameters
+        ----------
+        data
+            Complex-valued frequency series.
+        phase
+            Phase tensor to apply.
 
-        Returns:
-            Data with applied phase shift
+        Returns
+        -------
+        torch.Tensor
+            Data with applied phase shift.
         """
         if torch.is_complex(data):
             while phase.dim() < data.dim():
@@ -626,9 +899,21 @@ class TimeDomain(Domain):
     The time bins are assumed to be uniform between [0, duration]
     with spacing 1 / sampling_rate.
     window_factor is used to compute noise_std().
+
+    UNDER CONSTRUCTION.
     """
 
     def __init__(self, time_duration: float, sampling_rate: float):
+        """
+        Initialize a TimeDomain instance.
+
+        Parameters
+        ----------
+        time_duration
+            Duration of the time domain in seconds.
+        sampling_rate
+            Sampling rate in Hz.
+        """
         self._time_duration = time_duration
         self._sampling_rate = sampling_rate
 
@@ -638,12 +923,26 @@ class TimeDomain(Domain):
 
     @lru_cache()
     def __len__(self):
-        """Number of time bins given duration and sampling rate"""
+        """
+        Number of time bins given duration and sampling rate.
+
+        Returns
+        -------
+        int
+            Number of time bins.
+        """
         return int(self._time_duration * self._sampling_rate)
 
     @lru_cache()
     def __call__(self) -> np.ndarray:
-        """Array of uniform times at which data is sampled"""
+        """
+        Array of uniform times at which data is sampled.
+
+        Returns
+        -------
+        np.ndarray
+            Array of uniform times.
+        """
         num_bins = self.__len__()
         return np.linspace(
             0.0,
@@ -655,16 +954,32 @@ class TimeDomain(Domain):
 
     @property
     def delta_t(self) -> float:
-        """The size of the time bins"""
+        """
+        The size of the time bins.
+
+        Returns
+        -------
+        float
+            Size of the time bins.
+        """
         return 1.0 / self._sampling_rate
 
     @delta_t.setter
     def delta_t(self, delta_t: float):
+        """
+        Set the size of the time bins.
+
+        Parameters
+        ----------
+        delta_t
+            The new size of the time bins.
+        """
         self._sampling_rate = 1.0 / delta_t
 
     @property
     def noise_std(self) -> float:
-        """Standard deviation of the whitened noise distribution.
+        """
+        Standard deviation of the whitened noise distribution.
 
         To have noise that comes from a multivariate *unit* normal
         distribution, you must divide by this factor. In practice, this means
@@ -672,6 +987,11 @@ class TimeDomain(Domain):
 
         In the continuum limit in time domain, the standard deviation of white
         noise would at each point go to infinity, hence the delta_t factor.
+
+        Returns
+        -------
+        float
+            Standard deviation of the whitened noise distribution.
         """
         return 1.0 / np.sqrt(2.0 * self.delta_t)
 
@@ -680,13 +1000,26 @@ class TimeDomain(Domain):
 
     @property
     def f_max(self) -> float:
-        """The maximum frequency [Hz] is typically set to half the sampling
-        rate."""
+        """
+        The maximum frequency [Hz] is typically set to half the sampling rate.
+
+        Returns
+        -------
+        float
+            Maximum frequency in Hz.
+        """
         return self._sampling_rate / 2.0
 
     @property
     def duration(self) -> float:
-        """Waveform duration in seconds."""
+        """
+        Waveform duration in seconds.
+
+        Returns
+        -------
+        float
+            Duration of the waveform.
+        """
         return self._time_duration
 
     @property
@@ -709,44 +1042,3 @@ class TimeDomain(Domain):
             "time_duration": self._time_duration,
             "sampling_rate": self._sampling_rate,
         }
-
-
-class PCADomain(Domain):
-    """TODO"""
-
-    # Not super important right now
-    # FIXME: Should this be defined for FD or TD bases or both?
-    # Nrb instead of Nf
-
-    @property
-    def noise_std(self) -> float:
-        """Standard deviation of the whitened noise distribution.
-
-        To have noise that comes from a multivariate *unit* normal
-        distribution, you must divide by this factor. In practice, this means
-        dividing the whitened waveforms by this.
-
-        In the continuum limit in time domain, the standard deviation of white
-        noise would at each point go to infinity, hence the delta_t factor.
-        """
-        # FIXME
-        return np.sqrt(self.window_factor) / np.sqrt(4.0 * self.delta_f)
-
-
-def build_domain_from_model_metadata(model_metadata) -> Domain:
-    """
-    Instantiate a domain class from settings of model.
-
-    Parameters
-    ----------
-    model_metadata: dict
-        model metadata containing information to build the domain
-        typically obtained from the model.metadata attribute
-
-    Returns
-    -------
-    A Domain instance of the correct type.
-    """
-    raise NotImplementedError(
-        "build_domain_from_model_metadata still needs to be refactored"
-    )

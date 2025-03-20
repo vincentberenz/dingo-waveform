@@ -1,3 +1,8 @@
+"""
+This module defines InspiralChooseFDModesParameters, a wrapper over
+lalsimulation.SimInspiralChooseFDModes.
+"""
+
 import logging
 from dataclasses import asdict, astuple, dataclass
 from typing import Dict, Optional, Tuple
@@ -19,6 +24,15 @@ _logger = logging.getLogger(__name__)
 
 @dataclass
 class InspiralChooseFDModesParameters(TableStr):
+    """
+    Dataclass which attributes will be the arguments passed to
+    LS.SimInspiralChooseFDModes.
+    """
+
+    # Order matters !
+    # The list of arguments will be generated via the 'astuple' dataclass
+    # function which will 'cast' an instance of InspiralChooseFDModeParameters
+    # to a tuple, which value order will be based on the order below.
     mass_1: float
     mass_2: float
     s1x: float
@@ -38,6 +52,12 @@ class InspiralChooseFDModesParameters(TableStr):
     approximant: Approximant
 
     def get_spins(self) -> Spins:
+        """
+        Returns the spins.
+
+        Returns:
+            Spins: The spins of the system.
+        """
         return Spins(
             self.iota, self.s1x, self.s1y, self.s1z, self.s2x, self.s2y, self.s2z
         )
@@ -45,6 +65,15 @@ class InspiralChooseFDModesParameters(TableStr):
     def convert_J_to_L0_frame(
         self, hlm_J: Dict[Modes, FrequencySeries]
     ) -> Dict[Modes, FrequencySeries]:
+        """
+        Converts the given frequency series to the L0 frame.
+
+        Parameters:
+            hlm_J: The frequency series in the J frame.
+
+        Returns:
+            Dict[Modes, FrequencySeries]: The frequency series in the L0 frame.
+        """
         converted_to_SI = True
         return self.get_spins().convert_J_to_L0_frame(
             hlm_J, self.mass_1, self.mass_2, converted_to_SI, self.f_ref, self.phase
@@ -59,6 +88,19 @@ class InspiralChooseFDModesParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Optional[Approximant],
     ) -> "InspiralChooseFDModesParameters":
+        """
+        Creates an instance from binary black hole parameters.
+
+        Parameters:
+            bbh_parameters: The binary black hole parameters.
+            domain_params: The domain parameters.
+            spin_conversion_phase: The phase for spin conversion.
+            lal_params: The LAL parameters.
+            approximant: The approximant.
+
+        Returns:
+            InspiralChooseFDModesParameters: The created instance.
+        """
         spins: Spins = bbh_parameters.get_spins(spin_conversion_phase)
         # adding iota, s1x, ..., s2x, ...
         parameters = asdict(spins)
@@ -91,6 +133,21 @@ class InspiralChooseFDModesParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Optional[Approximant],
     ) -> "InspiralChooseFDModesParameters":
+        """
+        Creates an instance from waveform parameters.
+
+        Parameters:
+            waveform_parameters: The waveform parameters.
+            f_ref: The reference frequency.
+            convert_to_SI: Whether to convert to SI units.
+            domain_params: The domain parameters.
+            spin_conversion_phase: The phase for spin conversion.
+            lal_params: The LAL parameters.
+            approximant: The approximant.
+
+        Returns:
+            InspiralChooseFDModesParameters: The created instance.
+        """
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
             waveform_parameters, f_ref, convert_to_SI
         )
@@ -103,7 +160,12 @@ class InspiralChooseFDModesParameters(TableStr):
         )
 
     def apply(self) -> Tuple[Dict[Modes, FrequencySeries], Iota]:
+        """
+        Applies the LAL simulation method and converts the result to the L0 frame.
 
+        Returns:
+            Tuple[Dict[Modes, FrequencySeries], Iota]: The frequency series in the L0 frame and the iota.
+        """
         # Calling the lal simulation method
         arguments = list(astuple(self))
         hlm_fd___: LS.SphHarmFrequencySeries = LS.SimInspiralChooseFDModes(*arguments)

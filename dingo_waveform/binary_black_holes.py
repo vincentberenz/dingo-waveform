@@ -1,3 +1,7 @@
+"""
+The module defines BinaryBlackHoleParameters: A dataclass that represents the parameters of a binary black hole.
+"""
+
 import logging
 from dataclasses import asdict, dataclass
 from numbers import Number
@@ -71,28 +75,74 @@ class BinaryBlackHoleParameters(TableStr):
     def from_waveform_parameters(
         cls, waveform_params: WaveformParameters, f_ref: float, convert_to_SI: bool
     ) -> "BinaryBlackHoleParameters":
+        """
+        Create a BinaryBlackHoleParameters instance from WaveformParameters.
+
+        Parameters
+        ----------
+        waveform_params:
+            The waveform parameters to convert.
+        f_ref:
+            The reference frequency.
+        convert_to_SI:
+            Whether to convert to SI units.
+
+        Returns
+        -------
+        A BinaryBlackHoleParameters instance.
+        """
+        # Convert the waveform parameters to a dictionary
         params = asdict(waveform_params)
+
+        # Add the reference frequency to the parameters
         params["f_ref"] = f_ref
+
+        # Filter out any parameters that are None
         params = {k: v for k, v in params.items() if v is not None}
+
+        # Log the parameters being passed to the conversion function
         _logger.debug(
             "calling convert_to_lal_binary_black_hole_parameters with parameters:\n"
             f"{to_table(params)}"
         )
+
+        # Convert the parameters to LAL binary black hole parameters
         converted_params, _ = convert_to_lal_binary_black_hole_parameters(params)
+
+        # Log the converted parameters
         _logger.debug(
             "output of convert_to_lal_binary_black_hole_parameters:\n"
             f"{to_table(converted_params)}"
         )
+
+        # If conversion to SI units is required, perform the conversion
         if convert_to_SI:
             _logger.debug("converting to SI units")
             converted_params["mass_1"] *= lal.MSUN_SI
             converted_params["mass_2"] *= lal.MSUN_SI
             converted_params["luminosity_distance"] *= 1e6 * lal.PC_SI
         instance = cls(**converted_params)
+
+        # Log the generated binary black hole parameters
         _logger.debug(instance.to_table("generated binary black hole parameters"))
+
         return instance
 
     def get_spins(self, spin_conversion_phase: Optional[float]) -> Spins:
+        """
+        Calculate the spins from the binary black hole parameters.
+
+        Parameters
+        ----------
+        spin_conversion_phase:
+            The phase for spin conversion. If provided, it will override the
+            phase value from the binary black hole parameters.
+
+        Returns
+        -------
+        The spins as a Spins instance.
+        """
+        # Define the keys for the parameters needed to calculate spins.
         keys: Tuple[str, ...] = (
             "theta_jn",
             "phi_jl",
@@ -106,19 +156,31 @@ class BinaryBlackHoleParameters(TableStr):
             "f_ref",
             "phase",
         )
+
+        # Extract the values of the parameters from the instance using the keys.
         args: List[float] = [getattr(self, k) for k in keys]
+
+        # If a specific spin conversion phase is provided, use it instead of the default phase.
         if spin_conversion_phase is not None:
             args[-1] = spin_conversion_phase
+
+        # Log the parameters being passed to the spin conversion function for debugging.
         _logger.debug(
             "calling bilby_to_lalsimulation_spins with arguments:\n"
             f"{to_table({k: a for k,a in zip(keys,args)})}"
         )
+
+        # Convert the parameters to the iota and Cartesian spin components using the external function.
         iota_and_cart_spins: List[float] = [
             float(_convert_to_float(value))
             for value in bilby_to_lalsimulation_spins(*args)
         ]
+
+        # Create a Spins instance from the calculated iota and Cartesian spin components.
         instance = Spins(*iota_and_cart_spins)
         # type ignore : for some reason I do not understand, instance is not
         # recognized by mypy as a dataclass type.
         _logger.debug("generated spins:\n" f"{to_table(instance)}")  # type: ignore
+
+        # Return the Spins instance containing the calculated spin values.
         return instance

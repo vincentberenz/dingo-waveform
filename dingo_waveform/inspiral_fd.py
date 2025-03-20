@@ -1,3 +1,8 @@
+"""
+This module defines InspiralFDParameters, a wrapper over
+lalsimulation.SimInspiralFD.
+"""
+
 import logging
 from copy import deepcopy
 from dataclasses import asdict, astuple, dataclass, fields
@@ -25,6 +30,12 @@ _logger = logging.getLogger(__name__)
 
 @dataclass
 class InspiralFDParameters(TableStr):
+    """Dataclass for storing parameters for
+    lal simulation's SimInspiralFD function.
+    """
+
+    # Order matters ! The arguments to SimInspiralFD will
+    # be these attributes, in the order they are defined here:
     mass_1: float
     mass_2: float
     s1x: float
@@ -47,6 +58,13 @@ class InspiralFDParameters(TableStr):
     approximant: Approximant
 
     def get_spins(self) -> Spins:
+        """
+        Get the spins of the binary black hole system.
+
+        Returns
+        -------
+        The spins of the binary black hole system.
+        """
         return Spins(
             self.iota, self.s1x, self.s1y, self.s1z, self.s2x, self.s2y, self.s2z
         )
@@ -71,7 +89,7 @@ class InspiralFDParameters(TableStr):
         t = p.to_tuple()
         ```
 
-        t will contain a reference to lal_params.
+        t will contain a reference to lal_params and no error will be raised.
         """
         return tuple(getattr(self, f.name) for f in fields(self))
 
@@ -84,6 +102,26 @@ class InspiralFDParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Optional[Approximant],
     ) -> "InspiralFDParameters":
+        """
+        Create an instance from binary black hole parameters.
+
+        Parameters
+        ----------
+        bbh_parameters :
+            The binary black hole parameters.
+        domain_params :
+            The domain parameters.
+        spin_conversion_phase :
+            The phase for spin conversion.
+        lal_params :
+            The LAL parameters.
+        approximant :
+            The approximant.
+
+        Returns
+        -------
+        The created instance.
+        """
         # InspiralFDParameters are the same as InspiralChooseFDModesParameters,
         # but with extra ecc attributes all set to zero.
         inspiral_choose_fd_modes_parameters = (
@@ -114,6 +152,30 @@ class InspiralFDParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Optional[Approximant],
     ) -> "InspiralFDParameters":
+        """
+        Create an instance from waveform parameters.
+
+        Parameters
+        ----------
+        waveform_parameters :
+            The waveform parameters.
+        f_ref :
+            The reference frequency.
+        convert_to_SI :
+            Whether to convert to SI units.
+        domain_params :
+            The domain parameters.
+        spin_conversion_phase :
+            The phase for spin conversion.
+        lal_params :
+            The LAL parameters.
+        approximant :
+            The approximant.
+
+        Returns
+        -------
+        The created instance.
+        """
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
             waveform_parameters, f_ref, convert_to_SI
         )
@@ -131,14 +193,13 @@ class InspiralFDParameters(TableStr):
         hc: lal.COMPLEX16FrequencySeries,
         threshold: float,
     ) -> Tuple[lal.COMPLEX16FrequencySeries, lal.COMPLEX16FrequencySeries, bool]:
-        """
-        Returns either the hp and hc as passed as argument (if no numerical unstability)
-        or the 'fixed' hp and hc (calling SimInspiralWaveformParamsInsertPhenomXHMThresholdMband and
-        SimInspiralWaveformParamsInsertPhenomXPHMThresholdMband).
-        Also returns a boolean, which is:
-        - True if the returned value are numerically stable
-        - False if this failed and the values are still not numerically stable
-        """
+        # Returns either the hp and hc as passed as argument (if no numerical unstability)
+        # or the 'fixed' hp and hc (calling SimInspiralWaveformParamsInsertPhenomXHMThresholdMband and
+        # SimInspiralWaveformParamsInsertPhenomXPHMThresholdMband).
+        # Also returns a boolean, which is:
+        # - True if the returned value are numerically stable
+        # - False if this failed and the values are still not numerically stable
+
         if max(np.max(np.abs(hp.data.data)), np.max(np.abs(hc.data.data))) <= threshold:
             return hp, hc, True
         lal_params = (
@@ -167,7 +228,42 @@ class InspiralFDParameters(TableStr):
         stability_threshold: float = 1e-20,
         delta_f_tolerance: float = 1e-6,
     ) -> Polarization:
+        """
+        Apply the LAL simulation method and convert the result to the frequency domain.
 
+        Parameters
+        ----------
+        frequency_array :
+            The frequency array to apply the transformation.
+        auto_turn_off_multibanding :
+            Whether to automatically turn off multibanding if numerical instability is detected.
+            Multibanding is a technique used to optimize waveform generation by reducing computational
+            cost. However, it can sometimes lead to numerical instability, especially when the waveform
+            amplitudes exceed a certain threshold. If this parameter is set to True, the method will
+            attempt to turn off multibanding to regain stability.
+        raise_error_on_numerical_unstability :
+            Whether to raise an error if numerical instability is detected. If set to True, a RuntimeError
+            will be raised when numerical instability is detected and cannot be resolved by turning off
+            multibanding.
+        stability_threshold :
+            The numerical stability threshold. This value is used to determine if the waveform amplitudes
+            are stable. If the maximum amplitude exceeds this threshold, the waveform is considered unstable.
+        delta_f_tolerance :
+            The tolerance for delta_f consistency. This ensures that the frequency resolution of the
+            generated waveform matches the expected resolution within this tolerance.
+
+        Returns
+        -------
+        The polarization in the frequency domain.
+
+        Raises
+        ------
+        RuntimeError
+            If raise_error_on_numerical_unstability is True and numerical instability is detected
+            even after attempting to turn off multibanding.
+        ValueError
+            If the waveform delta_f is inconsistent with the domain's delta_f.
+        """
         hp: lal.COMPLEX16FrequencySeries
         hc: lal.COMPLEX16FrequencySeries
 

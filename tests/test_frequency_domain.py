@@ -144,12 +144,20 @@ def test_FD_time_translation_torch() -> None:
     result = domain.time_translate_data(data, -dt)
     assert result.dtype == torch.float32
     assert result.shape == data.shape
-    assert torch.allclose(result[..., 0, :], torch.tensor(1.0), atol=1e-4)
-    # Tolerance of 1e-2 is required in the imaginary part, likely because we are
-    # checking that it *vanishes*. This is a consequence of single-precision floats.
-    # TODO: Is there a way to improve on this?
-    assert torch.allclose(result[..., 1, :], torch.tensor(0.0), atol=1e-2)
-    assert torch.allclose(result[..., 2, :], torch.tensor(constant_value))
+    if isinstance(result, torch.Tensor):
+        assert torch.allclose(result[..., 0, :], torch.tensor(1.0), atol=1e-4)
+        # Tolerance of 1e-2 is required in the imaginary part, likely because we are
+        # checking that it *vanishes*. This is a consequence of single-precision floats.
+        # TODO: Is there a way to improve on this?
+        assert torch.allclose(result[..., 1, :], torch.tensor(0.0), atol=1e-2)
+        assert torch.allclose(result[..., 2, :], torch.tensor(constant_value))
+    else:
+        assert np.allclose(result[..., 0, :], torch.tensor(1.0), atol=1e-4)
+        # Tolerance of 1e-2 is required in the imaginary part, likely because we are
+        # checking that it *vanishes*. This is a consequence of single-precision floats.
+        # TODO: Is there a way to improve on this?
+        assert np.allclose(result[..., 1, :], torch.tensor(0.0), atol=1e-2)
+        assert np.allclose(result[..., 2, :], torch.tensor(constant_value))
 
 
 def test_FD_caching() -> None:

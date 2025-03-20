@@ -7,7 +7,7 @@ from scipy.interpolate import interp1d
 from scipy.signal.windows import tukey
 
 from dingo_waveform.domains import FrequencyDomain
-from dingo_waveform.polarizations import Polarization
+from dingo_waveform.types import FrequencySeries
 
 
 def get_tukey_window_factor(T: float, f_s: int, roll_off: float):
@@ -19,8 +19,8 @@ def get_tukey_window_factor(T: float, f_s: int, roll_off: float):
 
 
 def get_mismatch(
-    a: Polarization,
-    b: Polarization,
+    a: FrequencySeries,
+    b: FrequencySeries,
     domain: FrequencyDomain,
     asd_file: Optional[str] = None,
 ) -> float:
@@ -38,6 +38,7 @@ def get_mismatch(
 
     Returns
     -------
+    The mismatch score
 
     """
     if asd_file is not None:
@@ -46,7 +47,7 @@ def get_mismatch(
         asd_interp = interp1d(
             psd.frequency_array, psd.asd_array, bounds_error=False, fill_value=np.inf
         )
-        asd_array = asd_interp(domain.sample_frequencies())
+        asd_array = asd_interp(domain())
         a = a / asd_array
         b = b / asd_array
     min_idx = domain.min_idx

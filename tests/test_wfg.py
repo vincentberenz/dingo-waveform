@@ -5,8 +5,8 @@ import pytest
 import torch
 import torch.distributions
 
-from dingo_waveform.approximant import Approximant, get_approximant
-from dingo_waveform.domains import DomainParameters, FrequencyDomain, TestDomain
+from dingo_waveform.approximant import Approximant
+from dingo_waveform.domains import DomainParameters, FrequencyDomain
 from dingo_waveform.types import F_ref
 from dingo_waveform.waveform_generator import WaveformGenerator
 from dingo_waveform.waveform_parameters import WaveformParameters
@@ -71,7 +71,7 @@ def test_waveform_generator_FD(uniform_fd_domain, wf_parameters):
     wf_dict = wf_gen.generate_hplus_hcross(parameters)
 
     assert len(wf_dict.h_plus) == len(domain)
-    assert domain.sample_frequencies()[domain.frequency_mask()][0] == domain._f_min
+    assert domain()[domain.frequency_mask][0] == domain._f_min
 
 
 def test_waveform_generator_FD_f_max_failure(precessing_spin_wf_parameters):
