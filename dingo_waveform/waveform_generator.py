@@ -1,5 +1,4 @@
 import logging
-from copy import deepcopy
 from typing import Callable, Dict, List, Optional
 
 import lal
@@ -46,23 +45,23 @@ class WaveformGenerator:
         """
         Parameters
         ----------
-        approximant : str
+        approximant
             Waveform "approximant" string understood by lalsimulation
             This is defines which waveform model is used.
-        domain : Domain
+        domain
             Domain object that specifies on which physical domain the
             waveform polarizations will be generated, e.g. Fourier
             domain, time domain.
-        f_ref : float
+        f_ref
             Reference frequency for the waveforms
-        f_start : float
+        f_start
             Starting frequency for waveform generation. This is optional, and if not
             included, the starting frequency will be set to f_min. This exists so that
             EOB waveforms can be generated starting from a lower frequency than f_min.
-        mode_list : List[Tuple]
+        mode_list
             A list of waveform (ell, m) modes to include when generating
             the polarizations.
-        spin_conversion_phase : float = None
+        spin_conversion_phase
             Value for phiRef when computing cartesian spins from bilby spins via
             bilby_to_lalsimulation_spins. The common convention is to use the value of
             the phase parameter here, which is also used in the spherical harmonics
@@ -77,6 +76,7 @@ class WaveformGenerator:
             By setting spin_conversion_phase != None, we impose the convention to always
             use phase = spin_conversion_phase when computing the cartesian spins.
         """
+
         _logger.info(
             f"creating waveform generator with domain {type(domain)} "
             f"and approximant {approximant}"
@@ -98,7 +98,7 @@ class WaveformGenerator:
                 )
                 self._lal_params = get_lal_params(mode_list)
         else:
-            # todo: what happens then ?
+            # todo: is there something to do here ?
             ...
 
         self._domain = domain
@@ -110,13 +110,28 @@ class WaveformGenerator:
     def generate_hplus_hcross_m(
         self, waveform_parameters: WaveformParameters
     ) -> Dict[Mode, Polarization]:
+        """
+        Generate hplus and hcross polarizations for given waveform parameters.
 
+        Parameters
+        ----------
+        waveform_parameters
+            The waveform parameters used to generate the polarizations.
+
+        Returns
+        -------
+        Dict[Mode, Polarization]
+            A dictionary mapping modes to their corresponding polarizations.
+        """
+
+        # printing in the log the waveform parameters
         _logger.info(
             waveform_parameters.to_table(
                 f"generate hplus/hcross m with waveform parameters (f_ref={self._f_ref})"
             )
         )
 
+        # ensuring the phase field of the waveform parameters is not None
         required_keys = ("phase",)
         for rq in required_keys:
             if getattr(waveform_parameters, rq) is None:
@@ -124,12 +139,14 @@ class WaveformGenerator:
                     f"generate_hplus_hcross_m: the parameters must specify a value for '{rq}'"
                 )
 
+        # for now, only frequency domains are supported
         if not isinstance(self._domain, FrequencyDomain):
             raise ValueError(
                 "waveform generator generate_hplus_hcross_m: only "
                 f"FrequencyDomain is supported (not {type(self._domain)})"
             )
 
+        # only FD_Approximant (IMRPhenomXPHM) and TD_Approximant (SEOBNRv4PHM) are supported
         if not self._approximant in (FD_Approximant, TD_Approximant):
             if self._approximant is None:
                 raise ValueError(
@@ -150,6 +167,7 @@ class WaveformGenerator:
         hlm: Dict[Modes, FrequencySeries]
         iota: Iota
 
+        # For TD approximant, we apply the SimInspiralChooseTDModes function
         if self._approximant == TD_Approximant:
             _logger.info(
                 "generating hplus/hcross m using inspiral choose TD modes parameters"
@@ -167,6 +185,7 @@ class WaveformGenerator:
             )
             hlm, iota = inspiral_choose_td_modes_parameters.apply(self._domain)
 
+        # For the FD approximant, we apply the SimInspiralChooseFDModes function
         elif self._approximant == FD_Approximant:
             _logger.info(
                 "generating hplus/hcross m using inspiral choose FD modes parameters"
@@ -189,20 +208,38 @@ class WaveformGenerator:
             hlm, iota, waveform_parameters.phase  # type: ignore
         )
 
+        # logging the generated polarizations as a nice looking table.
         _logger.debug(f"generated polarizations:\n{polarizations_to_table(pol)}")
 
         return pol
+    
 
     def generate_hplus_hcross(
         self, waveform_parameters: WaveformParameters
     ) -> Polarization:
+        """
+        Generate hplus and hcross polarizations for given waveform parameters.
 
+        Parameters
+        ----------
+        waveform_parameters
+            The waveform parameters used to generate the polarizations.
+
+        Returns
+        -------
+        Polarization
+            The generated polarization.
+        """
+
+        # logging the waveform parameters as a nice looking table
         _logger.info(
             waveform_parameters.to_table(
                 f"generate polarization hplus/hcross with waveform parameters (f_ref={self._f_ref})"
             )
         )
 
+        # For now only frequency and time domains are supported
+        # TODO: I do not think TimeDomain has been finalized and would work
         if not isinstance(self._domain, FrequencyDomain) and not isinstance(
             self._domain, TimeDomain
         ):
@@ -215,6 +252,7 @@ class WaveformGenerator:
         pol: Polarization
         domain_params: DomainParameters = self._domain.get_parameters()
 
+        # for frequency domain, we call the SimInspiralFD function
         if isinstance(self._domain, FrequencyDomain):
             inspiral_fd_parameters = InspiralFDParameters.from_waveform_parameters(
                 waveform_parameters,
@@ -230,6 +268,8 @@ class WaveformGenerator:
 
             pol = inspiral_fd_parameters.apply(frequency_array)
 
+        # for the time domain, we call the SimInspiralTD function
+        # TODO: does it work ? also in the original dingo repo
         elif isinstance(self._domain, TimeDomain):
 
             inspiral_td_parameters = InspiralTDParameters.from_waveform_parameters(

@@ -1,7 +1,3 @@
-"""
-The module defines BinaryBlackHoleParameters: A dataclass that represents the parameters of a binary black hole.
-"""
-
 import logging
 from dataclasses import asdict, dataclass
 from numbers import Number

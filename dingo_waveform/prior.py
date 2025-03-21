@@ -1,7 +1,3 @@
-# Silence INFO and WARNING messages from bilby
-import logging
-import warnings
-from copy import deepcopy
 from dataclasses import Field, asdict, dataclass, fields, make_dataclass
 from typing import (
     TYPE_CHECKING,
@@ -38,8 +34,9 @@ class BBHExtrinsicPriorDict(BBHPriorDict):
         * Add support for zenith/azimuth
         * Defaults?
     """
-
     def default_conversion_function(self, sample):
+        # Convert sample to LAL binary black hole parameters.
+        
         out_sample = fill_from_fixed_priors(sample, self)
         out_sample, _ = convert_to_lal_binary_black_hole_parameters(out_sample)
 
@@ -53,28 +50,30 @@ class BBHExtrinsicPriorDict(BBHPriorDict):
         return out_sample
 
     def mean_std(
-        self, keys=([]), sample_size=50000, force_numerical=False
+        self, keys: List[str], sample_size=50000, force_numerical=False
     ) -> Tuple[Dict[str, float], Dict[str, float]]:
         """
         Calculate the mean and standard deviation over the prior.
 
         Parameters
         ----------
-        keys: list(str)
+        keys
             A list of desired parameter names
-        sample_size: int
+        sample_size
             For nonanalytic priors, number of samples to use to estimate the
             result.
-        force_numerical: bool (False)
+        force_numerical
             Whether to force a numerical estimation of result, even when
             analytic results are available (useful for testing)
 
-        Returns dictionaries for the means and standard deviations.
+        Returns
+        -------
+        The mean and standard deviation dictionaries.
 
         TODO: Fix for constrained priors. Shouldn't be an issue for extrinsic parameters.
         """
-        mean = {}
-        std = {}
+        mean: Dict[str, float] = {}
+        std: Dict[str, float] = {}
 
         if not force_numerical:
             # First try to calculate analytically (works for standard priors)
@@ -130,16 +129,53 @@ class ExtrinsicPriors(TableStr):
         "bilby.core.prior.Uniform(minimum=100.0, maximum=6000.0)"
     )
 
-    def mean_std(self, keys=([]), sample_size=50000, force_numerical=False):
+    def mean_std(self, keys: List[str], sample_size=50000, force_numerical=False):
+        """
+        Calculate the mean and standard deviation over the prior.
+
+        Parameters
+        ----------
+        keys
+            A list of desired parameter names
+        sample_size
+            For nonanalytic priors, number of samples to use to estimate the
+            result.
+        force_numerical
+            Whether to force a numerical estimation of result, even when
+            analytic results are available (useful for testing)
+
+        Returns
+        -------
+        The mean and standard deviation dictionaries.
+        """
         bbh_prior_dict = BBHExtrinsicPriorDict(asdict(self))  # type: ignore
         return bbh_prior_dict.mean_std(
-            keys=keys, sample_size=sample_size, force_numerical=force_numerical
+            keys, sample_size=sample_size, force_numerical=force_numerical
         )
 
     def sample(self) -> WaveformParameters:
+        """
+        Generate a single sample of waveform parameters.
+
+        Returns
+        -------
+        A single sample of waveform parameters.
+        """
         return self.samples(1)[0]
 
     def samples(self, nb_samples) -> List[WaveformParameters]:
+        """
+        Generate multiple samples of waveform parameters.
+
+        Parameters
+        ----------
+        nb_samples
+            The number of samples to generate.
+
+        Returns
+        -------
+        A list of waveform parameters samples.
+        """
         # type ignore:
         # I could not find how to specify this mixin could be superclass
         # only for dataclass. (I tried to use Protocol, but no success)
@@ -181,9 +217,28 @@ class IntrinsicPriors(TableStr):
     geocent_time: Union[str, float] = 0.0
 
     def sample(self) -> WaveformParameters:
+        """
+        Generate a single sample of waveform parameters.
+
+        Returns
+        -------
+        A single sample of waveform parameters.
+        """
         return self.samples(1)[0]
 
     def samples(self, nb_samples: int) -> List[WaveformParameters]:
+        """
+        Generate multiple samples of waveform parameters.
+
+        Parameters
+        ----------
+        nb_samples
+            The number of samples to generate.
+
+        Returns
+        -------
+        A list of waveform parameters samples.
+        """
         # type ignore:
         # I could not find how to specify this mixin could be superclass
         # only for dataclass. (I tried to use Protocol, but no success)
@@ -194,9 +249,14 @@ class IntrinsicPriors(TableStr):
 
 
 def _create_priors_dataclass() -> Type:
+    # Create a dataclass combining fields from IntrinsicPriors and ExtrinsicPriors.
+    # It is called when this module is imported first, so that the class 'Priors'
+    # gets part of the user API.
+
     # Get fields from both classes
     extrinsic_fields = list(fields(ExtrinsicPriors))
     intrinsic_fields = list(fields(IntrinsicPriors))
+
     # luminosity_distance and geocent_time are both intrinsic and extrinsic priors.
     # We use here the default value as an extrinsic prior.
     all_fields_ = extrinsic_fields + [
@@ -213,12 +273,17 @@ def _create_priors_dataclass() -> Type:
 
         # We are creating the Priors dataclass. The class we are constructing
         # will be inherating from _PriorSampling. This is a convenient way
-        # to add methods to the Priors datacalss we are constructing.
+        # to add methods to the Priors dataclass we are constructing.
 
+        # _PriorType will be either ExtrinsicPriors or IntrinsicPriors.
+        # Using the TypeVar _PriorType indicate to mypy that if the target type
+        # is ExtrinsicPriors, then the return type is an instance of ExtrinsicPriors
+        # (same for IntrinsicPriors).
         def _get_prior(self, target_type: Type[_PriorType]) -> _PriorType:
+
             # type ignore:
-            # we know only the dataclass Priors will be a sublass of _PriorSampling
-            # (i.e. asdict will be supported)
+            # we know that 'self' will be an instance of Prior, which is a dataclass
+            # (i.e. asdict will be supported). mypy does not detect this.
             d_ = asdict(self)  # type: ignore
             d = {
                 k: v
@@ -229,6 +294,8 @@ def _create_priors_dataclass() -> Type:
 
         def get_intrinsic_priors(self) -> IntrinsicPriors:
             """
+            Get the intrinsic priors.
+
             Returns
             -------
             The instance of IntrinsicPriors corresponding to this
@@ -238,6 +305,8 @@ def _create_priors_dataclass() -> Type:
 
         def get_extrinsic_priors(self) -> ExtrinsicPriors:
             """
+            Get the extrinsic priors.
+
             Returns
             -------
             The instance of ExtrinsicPriors corresponding to this
@@ -246,14 +315,27 @@ def _create_priors_dataclass() -> Type:
             return self._get_prior(ExtrinsicPriors)
 
         def sample(self) -> WaveformParameters:
+            """
+            Generate a single sample of waveform parameters.
+
+            Returns
+            -------
+            A single sample of waveform parameters.
+            """
             return self.samples(1)[0]
 
         def samples(self, nb_samples: int) -> List[WaveformParameters]:
             """
+            Generate multiple samples of waveform parameters.
+
+            Parameters
+            ----------
+            nb_samples
+                The number of samples to generate.
+
             Returns
             -------
-            An instance of waveform parameters generating by sampling
-            this instance of Priors.
+            A list of waveform parameters samples.
             """
             ip = self.get_intrinsic_priors()
             ep = self.get_extrinsic_priors()
@@ -262,7 +344,21 @@ def _create_priors_dataclass() -> Type:
 
             def _get_wf(
                 intrinsic_wf: WaveformParameters, extrinsic_wf: WaveformParameters
-            ) -> WaveformParameters:
+            ):
+                """
+                Combine intrinsic and extrinsic waveform parameters.
+
+                Parameters
+                ----------
+                intrinsic_wf
+                    The intrinsic waveform parameters.
+                extrinsic_wf
+                    The extrinsic waveform parameters.
+
+                Returns
+                -------
+                The combined waveform parameters.
+                """
                 intrinsic_dict = asdict(intrinsic_wf)
                 extrinsic_dict = asdict(extrinsic_wf)
                 priors_dict = intrinsic_dict
@@ -273,19 +369,18 @@ def _create_priors_dataclass() -> Type:
 
             return [_get_wf(iw, ew) for iw, ew in zip(intrinsic_wfs, extrinsic_wfs)]
 
+    # this 'constructs' the dataclass 'Priors'.
+    # This class will be called 'Priors' (first argument), it will have the fields
+    # 'all_fields' (combined fiels of extrinsic and intrinsic priors) and will 
+    # inheritate from TableStr (for table representation) and _PriorSample (for the
+    # methods 'sample' and 'samples')
     return make_dataclass("Priors", all_fields, bases=(TableStr, _PriorSampling))
 
 
-# if TYPE_CHECKING:
-
-#    @dataclass
-#    class Priors:
-#        def sample(self) -> WaveformParameters: ...
-
-# else:
-
 # Priors is a dataclass that have the combined fields of IntrinsicPriors and ExtrinsicPriors.
 # It also has the 'sample' method which returns a list of WaveformParameters.
+# Once created here (which happens when this module is imported), user can create instances of
+# Priors.
 Priors = _create_priors_dataclass()
 
 
@@ -294,6 +389,22 @@ def prior_split(
     intrinsic_luminosity_distance: Optional[float] = 100.0,
     intrinsic_geocent_time: Optional[float] = 0.0,
 ) -> Tuple[WaveformParameters, WaveformParameters]:
+    """
+    Split waveform parameters into intrinsic and extrinsic components.
+
+    Parameters
+    ----------
+    waveform_parameters
+        The waveform parameters to split.
+    intrinsic_luminosity_distance
+        The intrinsic luminosity distance.
+    intrinsic_geocent_time
+        The intrinsic geocent time.
+
+    Returns
+    -------
+    The intrinsic and extrinsic waveform parameters.
+    """
     intrinsic_keys = [f.name for f in fields(IntrinsicPriors)]
     extrinsic_keys = [f.name for f in fields(ExtrinsicPriors)]
     waveform_dict = asdict(waveform_parameters)
@@ -315,15 +426,16 @@ def build_prior_with_defaults(
 
     Parameters
     ----------
-    prior_settings: Dict
+    prior_settings
         A dictionary containing prior definitions for intrinsic parameters
         Allowed values for each parameter are:
             * 'default' to use a default prior
             * a string for a custom prior, e.g.,
                "Uniform(minimum=10.0, maximum=80.0, name=None, latex_label=None, unit=None, boundary=None)"
 
-    Depending on the particular prior choices the dimensionality of a
-    parameter sample obtained from the returned GWPriorDict will vary.
+    Returns
+    -------
+    The BBHPriorDict with the specified prior settings.
     """
     prior_settings_: IntrinsicPriors
     if isinstance(prior_settings, dict):
@@ -337,8 +449,18 @@ def build_prior_with_defaults(
 
 
 default_extrinsic_dict = asdict(ExtrinsicPriors())
-default_intrinsic_dict = asdict(IntrinsicPriors())
+"""
+Default extrinsic priors dictionary.
 
+This dictionary contains the default prior settings for extrinsic parameters.
+"""
+
+default_intrinsic_dict = asdict(IntrinsicPriors())
+"""
+Default intrinsic priors dictionary.
+
+This dictionary contains the default prior settings for intrinsic parameters.
+"""
 
 default_inference_parameters = [
     "chirp_mass",
@@ -357,3 +479,8 @@ default_inference_parameters = [
     "dec",
     "psi",
 ]
+"""
+Default inference parameters list.
+
+This list contains the default parameters to be inferred during the analysis.
+"""

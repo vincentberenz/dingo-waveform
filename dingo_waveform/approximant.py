@@ -1,7 +1,3 @@
-"""
-This module defines a custom type for Approximant and provides functions to work with it.
-"""
-
 from typing import NewType
 
 import lalsimulation as LS

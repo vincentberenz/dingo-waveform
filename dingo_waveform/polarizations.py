@@ -11,6 +11,16 @@ from dingo_waveform.types import FrequencySeries, Iota, Mode, Modes
 
 @dataclass
 class Polarization:
+    """
+    A dataclass representing the polarizations of gravitational waves.
+
+    Parameters
+    ----------
+    h_plus : 
+        The plus polarization component of the gravitational wave.
+    h_cross : 
+        The cross polarization component of the gravitational wave.
+    """
     h_plus: FrequencySeries
     h_cross: FrequencySeries
 
@@ -20,6 +30,17 @@ def sum_contributions_m(
 ) -> Polarization:
     """
     Sum the contributions over m-components, optionally introducing a phase shift.
+
+    Parameters
+    ----------
+    x_m
+        Dictionary mapping modes to their corresponding Polarization objects.
+    phase_shift
+        Optional phase shift to apply to each mode.
+
+    Returns
+    -------
+    The resulting Polarization after summing contributions with the phase shift applied.
     """
     result = Polarization(h_plus=0.0, h_cross=0.0)  # type: ignore
     for mode in x_m.keys():
@@ -31,6 +52,22 @@ def sum_contributions_m(
 def get_polarizations_from_fd_modes_m(
     hlm_fd: Dict[Modes, FrequencySeries], iota: Iota, phase: float
 ) -> Dict[Mode, Polarization]:
+    """
+    Compute polarizations from frequency domain modes.
+
+    Parameters
+    ----------
+    hlm_fd
+        Dictionary of frequency domain modes.
+    iota
+        Inclination angle.
+    phase
+        Phase angle.
+
+    Returns
+    -------
+    Dictionary mapping modes to their corresponding Polarization objects.
+    """
     pol_m: Dict[Mode, Dict[str, FrequencySeries]] = {}
     polarizations: List[str] = [f.name for f in fields(Polarization)]
 
@@ -72,6 +109,18 @@ def get_polarizations_from_fd_modes_m(
 
 
 def polarizations_to_table(pol: Dict[Mode, Polarization]) -> str:
+    """
+    Convert polarizations to a formatted table string.
+
+    Parameters
+    ----------
+    pol
+        Dictionary mapping modes to their corresponding Polarization objects.
+
+    Returns
+    -------
+    A string representing the polarizations as a formatted table.
+    """
     console = Console()
     table = Table(title="Polarizations")
 

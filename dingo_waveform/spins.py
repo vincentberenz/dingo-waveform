@@ -12,6 +12,24 @@ from .types import FrequencySeries, Mode, Modes
 def rotate_z(
     angle: float, vx: float, vy: float, vz: float
 ) -> Tuple[float, float, float]:
+    """
+    Rotate a vector around the z-axis.
+
+    Parameters
+    ----------
+    angle
+        The angle to rotate by.
+    vx
+        The x component of the vector.
+    vy
+        The y component of the vector.
+    vz
+        The z component of the vector.
+
+    Returns
+    -------
+    The rotated vector components.
+    """
     vx_new = vx * np.cos(angle) - vy * np.sin(angle)
     vy_new = vx * np.sin(angle) + vy * np.cos(angle)
     return vx_new, vy_new, vz
@@ -20,6 +38,24 @@ def rotate_z(
 def rotate_y(
     angle: float, vx: float, vy: float, vz: float
 ) -> Tuple[float, float, float]:
+    """
+    Rotate a vector around the y-axis.
+
+    Parameters
+    ----------
+    angle
+        The angle to rotate by.
+    vx
+        The x component of the vector.
+    vy
+        The y component of the vector.
+    vz
+        The z component of the vector.
+
+    Returns
+    -------
+    The rotated vector components.
+    """
     vx_new = vx * np.cos(angle) + vz * np.sin(angle)
     vz_new = -vx * np.sin(angle) + vz * np.cos(angle)
     return vx_new, vy, vz_new
@@ -38,7 +74,26 @@ class Spins(TableStr):
     def get_JL0_euler_angles(
         self, m1: float, m2: float, converted_to_SI: bool, f_ref: float, phase: float
     ) -> Tuple[float, float, float]:
+        """
+        Calculate the Euler angles for the transformation from the J frame to the L0 frame.
 
+        Parameters
+        ----------
+        m1
+            Mass of the first object.
+        m2
+            Mass of the second object.
+        converted_to_SI
+            Whether the masses are converted to SI units.
+        f_ref
+            Reference frequency.
+        phase
+            Phase of the waveform.
+
+        Returns
+        -------
+        The Euler angles (alpha_0, beta_0, gamma_0).
+        """
         if converted_to_SI:
             m1 = m1 / lal.MSUN_SI
             m2 = m2 / lal.MSUN_SI
@@ -135,7 +190,28 @@ class Spins(TableStr):
         f_ref: float,
         phase: float,
     ) -> Dict[Modes, FrequencySeries]:
+        """
+        Convert waveform modes from the J frame to the L0 frame.
 
+        Parameters
+        ----------
+        hlm_J
+            Waveform modes in the J frame.
+        m1
+            Mass of the first object.
+        m2
+            Mass of the second object.
+        converted_to_SI
+            Whether the masses are converted to SI units.
+        f_ref
+            Reference frequency.
+        phase
+            Phase of the waveform.
+
+        Returns
+        -------
+        Waveform modes in the L0 frame.
+        """
         alpha_0, beta_0, gamma_0 = self.get_JL0_euler_angles(
             m1, m2, converted_to_SI, f_ref, phase
         )

@@ -1,8 +1,3 @@
-"""
-This module defines InspiralChooseTDModesParameters, a wrapper over
-lalsimulation.SimInspiralChooseTDModes.
-"""
-
 import logging
 from dataclasses import InitVar, asdict, astuple, dataclass
 from typing import Dict, Optional, Tuple

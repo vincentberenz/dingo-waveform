@@ -1,10 +1,3 @@
-"""
-This module defines various domain classes for data processing, including
-the base class `Domain` and its subclasses `FrequencyDomain` and `TimeDomain`.
-It also provides utility functions for building domain instances and managing
-frequency sampling.
-"""
-
 import importlib
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass

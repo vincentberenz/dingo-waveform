@@ -8,6 +8,11 @@ from .logging import TableStr
 
 @dataclass
 class WaveformParameters(TableStr):
+    """
+    Configuration dataclass for generating waveforms.
+    """
+
+    # TODO: Is this the exhaustive liste of possible fields ?
     luminosity_distance: Optional[float] = None
     redshift: Optional[float] = None
     comoving_distance: Optional[float] = None

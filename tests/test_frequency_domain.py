@@ -5,10 +5,6 @@ import torch
 from dingo_waveform.domains import DomainParameters, FrequencyDomain, build_domain
 from dingo_waveform.gwutils import get_tukey_window_factor
 
-# from dingo.gw.domains import FrequencyDomain, TimeDomain, build_domain
-# from dingo.gw.gwutils import get_window_factor
-
-
 _uniform_FD_params = {"f_min": 20.0, "f_max": 4096.0, "delta_f": 1.0 / 4.0}
 
 _window_factor_args = {"f_s": 4096, "T": 8.0, "roll_off": 0.4}

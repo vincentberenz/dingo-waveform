@@ -1,8 +1,3 @@
-"""
-This module defines InspiralFDParameters, a wrapper over
-lalsimulation.SimInspiralFD.
-"""
-
 import logging
 from copy import deepcopy
 from dataclasses import asdict, astuple, dataclass, fields

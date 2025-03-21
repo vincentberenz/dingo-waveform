@@ -1,8 +1,3 @@
-"""
-This module defines InspiralTDParameters, a wrapper over
-lalsimulation.SimInspiralTD.
-"""
-
 import logging
 from dataclasses import asdict, astuple, dataclass
 from typing import Dict, Optional, Tuple
