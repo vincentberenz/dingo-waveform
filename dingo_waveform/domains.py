@@ -9,6 +9,8 @@ import torch
 from multipledispatch import dispatch
 from typing_extensions import override
 
+from .imports import import_entity
+
 _module_import_path = "dingo_waveform.domains"
 
 
@@ -192,28 +194,9 @@ def build_domain(domain_parameters: Union[DomainParameters, Dict]) -> Domain:
         # i.e. dingo_waveform.domains.<DomainClassName>
         domain_parameters.type = f"{_module_import_path}.{domain_parameters.type}"
 
-    # returning the class, module and class name from the import path,
-    # e.g. dingo_waveform.domains.FrequencyDomain ->
-    #   FrequencyDomain (the class)
-    #   dingo_waveform.domains (the module)
-    #   "FrequencyDomain" (the class as str)
-    def _get_class(import_path: str) -> Tuple[Type, str, str]:
-        module_name, class_name = import_path.rsplit(".", 1)
-        module = importlib.import_module(module_name)
-        return getattr(module, class_name), module_name, class_name
-
     # importing the class to build
-    try:
-        class_, module_name, class_name = _get_class(domain_parameters.type)
-    except ImportError as e:
-        raise ImportError(
-            f"Constructing domain: failed to import '{domain_parameters.type}': {e}"
-        )
-    except AttributeError as e:
-        raise AttributeError(
-            f"Constructing domain: could not import'{domain_parameters.type}'. "
-            f"Could import module '{module_name}', but not {class_name}. Error: {e}"
-        )
+    class_, _, class_name = import_entity(domain_parameters.type)
+
     if not issubclass(class_, Domain):
         raise ValueError(
             f"Constructing domain: could import '{domain_parameters.type}', but this is not a subclass of 'Domain'"

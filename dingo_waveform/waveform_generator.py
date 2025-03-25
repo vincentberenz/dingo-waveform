@@ -1,5 +1,6 @@
 import logging
-from typing import Callable, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional, Union, cast
 
 import lal
 
@@ -11,6 +12,7 @@ from .approximant import (  # Added missing imports
     get_approximant_description,
 )
 from .domains import Domain, DomainParameters, FrequencyDomain, TimeDomain
+from .imports import check_function_signature, import_entity
 from .inspiral_choose_fd_modes import InspiralChooseFDModesParameters
 from .inspiral_choose_td_modes import InspiralChooseTDModesParameters
 from .inspiral_fd import InspiralFDParameters
@@ -25,6 +27,7 @@ from .types import FrequencySeries, Iota, Mode, Modes
 from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
+
 
 
 class WaveformGenerator:
@@ -291,3 +294,61 @@ class WaveformGenerator:
             return self._transform(pol)
 
         return pol
+
+
+@dataclass
+class WaveformGeneratorParameters:
+    approximant: Union[str, Approximant]
+    f_ref: float
+    f_start: Optional[float]
+    mode_list: Optional[List[Modes]] = None,
+    transform: Optional[Union[Callable[[Polarization], Polarization],str]] = None,
+    spin_conversion_phase: Optional[float] = None,
+
+
+
+
+def build_waveform_generator(
+        parameters: Union[WaveformGeneratorParameters, Dict], 
+        domain: Domain
+    )->WaveformGenerator:
+    
+    # if as dict as been passed as argument, 'casting' is to an instance of
+    # WaveformGeneratorParameters
+    if not isinstance(parameters, WaveformGeneratorParameters):
+        try:
+            domain_parameters = WaveformGeneratorParameters(**parameters)
+        except Exception as e:
+            raise ValueError(
+                f"Constructing domain: failed to construct from dictionary {repr(domain_parameters)}. {type(e)}: {e}"
+            )
+    parameters = cast(WaveformGeneratorParameters, parameters)
+
+    # if transform is not None and is a string, we expect it to be an import path
+    # to a transform function. We import it here.
+    transform: Optional[Callable[[Polarization], Polarization]]
+    if parameters.transform is not None:
+        if type(parameters.transform)==str:
+            transform, _, _ = import_entity(parameters.transform)
+            if not check_function_signature(fn, [Polarization], Polarization):
+                raise TypeError(
+                    "waveform generator transform function should take an instance of Polarization as argument "
+                    f"and return an instance of polarization. The function {fn.__name__} has a different signature."
+                )
+    else: 
+        transform = None
+    
+    approximant: str
+    if type(parameters.approximant) != str:
+        # type ignore: mypy fails to see the check right above
+        approximant = get_approximant_description(parameters.approximant)  # type: ignore
+    else:
+        approximant = parameters.approximant 
+    
+    return WaveformGenerator(
+        approximant, domain, parameters.f_ref, 
+        f_start = parameters.f_start,
+        mode_list = parameters.mode_list,
+        transform = transform,
+        spin_conversion_phase = parameters.spin_conversion_phase
+    )
