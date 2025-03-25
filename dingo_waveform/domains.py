@@ -1,8 +1,7 @@
-import importlib
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from functools import cached_property, lru_cache, wraps
-from typing import Any, Callable, Dict, Mapping, Optional, Tuple, Type, Union, cast
+from typing import Dict, Optional, Union, cast
 
 import numpy as np
 import torch
@@ -177,13 +176,16 @@ def build_domain(domain_parameters: Union[DomainParameters, Dict]) -> Domain:
             domain_parameters = DomainParameters(**domain_parameters)
         except Exception as e:
             raise ValueError(
-                f"Constructing domain: failed to construct from dictionary {repr(domain_parameters)}. {type(e)}: {e}"
-            )
+                "Constructing domain: failed to construct from dictionary "
+                f"{repr(domain_parameters)}. {type(e)}: {e}"
+            ) from e
     domain_parameters = cast(DomainParameters, domain_parameters)
 
     if domain_parameters.type is None:
         raise ValueError(
-            f"Constructing domain. Can not construct from {repr(asdict(domain_parameters))}: 'type' should not be None."
+            "Constructing domain. Can not construct from "
+            f"{repr(asdict(domain_parameters))}: "
+            "'type' should not be None."
         )
 
     # type should be the import path of the domain class to construct
@@ -199,15 +201,17 @@ def build_domain(domain_parameters: Union[DomainParameters, Dict]) -> Domain:
 
     if not issubclass(class_, Domain):
         raise ValueError(
-            f"Constructing domain: could import '{domain_parameters.type}', but this is not a subclass of 'Domain'"
+            f"Constructing domain: could import '{domain_parameters.type}', "
+            "but this is not a subclass of 'Domain'"
         )
 
     try:
         instance = class_.from_parameters(domain_parameters)
     except Exception as e:
         raise RuntimeError(
-            f"Constructing domain. Failed to construct {class_name} from arguments {repr(asdict(domain_parameters))}. {type(e)}: {e}"
-        )
+            f"Constructing domain. Failed to construct {class_name} "
+            f"from arguments {repr(asdict(domain_parameters))}. {type(e)}: {e}"
+        ) from e
 
     return instance
 
@@ -275,7 +279,10 @@ class _CachedSampleFrequencies:
     @cached_property
     def sample_frequencies_torch(self) -> torch.Tensor:
         """Create PyTorch tensor version of frequencies."""
-        return torch.linspace(0.0, self._f_max, steps=self._len, dtype=torch.float32)
+        return torch.linspace(
+            0.0, self._f_max, 
+            steps=self._len, dtype=torch.float32
+        )
 
     @cached_property
     def sample_frequency_torch_cuda(self) -> torch.Tensor:
@@ -374,7 +381,9 @@ class FrequencyDomain(Domain):
         return d
 
     @classmethod
-    def from_parameters(cls, domain_parameters: DomainParameters) -> "FrequencyDomain":
+    def from_parameters(
+        cls, domain_parameters: DomainParameters
+    ) -> "FrequencyDomain":
         """
         Create a FrequencyDomain instance from given parameters.
 
@@ -391,11 +400,13 @@ class FrequencyDomain(Domain):
         for attr in ("f_min", "f_max", "delta_f"):
             if getattr(domain_parameters, attr) is None:
                 raise ValueError(
-                    f"Can not construct FrequencyDomain from {repr(asdict(domain_parameters))}: {attr} should not be None"
+                    "Can not construct FrequencyDomain from "
+                    f"{repr(asdict(domain_parameters))}: {attr} should not be None"
                 )
         # type ignore: we know f_min, f_max and delta_f are not None (from the test just above)
         return cls(
-            domain_parameters.f_min, domain_parameters.f_max, domain_parameters.delta_f  # type: ignore
+            domain_parameters.f_min, domain_parameters.f_max,
+            domain_parameters.delta_f  # type: ignore
         )
 
     @override
@@ -425,8 +436,10 @@ class FrequencyDomain(Domain):
         # note:
         if delta_f is not None and delta_f != self._delta_f:
             raise ValueError(
-                "FrequencyDomain.set_new_range: can not change the value delta_f when "
-                f"setting a new range. Current value: {self._delta_f}, argument: {delta_f}"
+                "FrequencyDomain.set_new_range: "
+                "can not change the value delta_f when "
+                "setting a new range. "
+                f"Current value: {self._delta_f}, argument: {delta_f}"
             )
         # note: this will clean up the sample frequency cache, so this function does not
         #  need to be directly decorated with @_reinit_cached_sample_frequencies

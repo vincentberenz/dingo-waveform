@@ -32,14 +32,14 @@ dependencies = [
     "multipledispatch"
 ]
 
-[tool.setuptools]
-package-data = {
-    "" = ["py.typed"]
-}
+#[tool.setuptools]
+#package-data = {
+#    "" = ["py.typed"]
+#}
 
-[tool.setuptools.packages.find]
-include = ["dingo_waveform"]
-namespaces = false
+#[tool.setuptools.packages.find]
+#include = ["dingo_waveform"]
+#namespaces = false
 
 [project.optional-dependencies]
 dev = [

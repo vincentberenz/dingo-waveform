@@ -3,22 +3,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from .dataset import Compression
 from .domains import DomainParameters
 from .prior import IntrinsicPriors
 from .waveform_generator import WaveformGeneratorParameters
 
 
-@dataclass
-class DatasetParameters:
-    domain: DomainParameters
-    waveform_generator: WaveformGeneratorParameters
-    intrinsic_priors: IntrinsicPriors
-    num_samples: int = 1000
-    compression: Optional[Compression] = None
 
-    @classmethod
-    def from_file()
 
 @dataclass
 class DatasetArgs:
@@ -27,13 +17,14 @@ class DatasetArgs:
     outfile: Path
 
 
-
 def _parse_args():
 
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Generate a waveform dataset based on a settings file."
+    parser = (
+        argparse.ArgumentParser(
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description="Generate a waveform dataset based on a settings file.",
         ),
+    )
     parser.add_argument(
         "--settings_file",
         type=str,
@@ -55,14 +46,10 @@ def _parse_args():
 
     settings_file = Path(parser.setting_files)
     if not settings_file.is_file():
-        raise FileNotFoundError(f"Can not generate waveform from file {settings_file}: file not found")
+        raise FileNotFoundError(
+            f"Can not generate waveform from file {settings_file}: file not found"
+        )
 
     outfile = Path.cwd() / parser.out_file
 
-
-    return DatasetArgs(
-        settings_file, parser.num_processes, parser.out_file, outfile
-    )
-
-
-
+    return DatasetArgs(settings_file, parser.num_processes, parser.out_file, outfile)
