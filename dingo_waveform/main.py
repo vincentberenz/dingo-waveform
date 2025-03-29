@@ -8,6 +8,13 @@ from .prior import IntrinsicPriors
 from .waveform_generator import WaveformGeneratorParameters
 
 
+@dataclass
+class DatasetParameters:
+    domain: DomainParameters
+    waveform_generator: WaveformGeneratorParameters
+    intrinsic_priors: IntrinsicPriors
+    num_samples: int = 1000
+    compression: Optional[Compression] = None
 
 
 @dataclass

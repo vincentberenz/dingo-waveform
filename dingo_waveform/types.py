@@ -29,3 +29,6 @@ Modes: TypeAlias = Tuple[Mode, Mode]
 """
 Tuple of two modes.
 """
+
+class WaveformGenerationError(Exception):
+    ...

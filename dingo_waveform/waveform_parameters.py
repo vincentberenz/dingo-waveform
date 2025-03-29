@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 import lal
 
@@ -53,3 +53,8 @@ class WaveformParameters(TableStr):
     chirp_mass_source: Optional[float] = None
 
     l_max: Optional[float] = None
+
+    # new interface and SEOBNRv5 specific parameters
+    postadiabatic: Optional[Any] = None
+    postadiabatic_type: Optional[Any] = None
+    lmax_nyquist: int = 2

@@ -6,7 +6,7 @@ import lal
 import lalsimulation as LS
 
 from . import wfg_utils
-from .approximant import Approximant
+from .approximant import Approximant, get_approximant
 from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import DomainParameters
 from .logging import TableStr
@@ -44,7 +44,7 @@ class InspiralChooseFDModesParameters(TableStr):
     r: float
     iota: Iota
     lal_params: Optional[lal.Dict]
-    approximant: Approximant
+    approximant: int
 
     def get_spins(self) -> Spins:
         """
@@ -81,7 +81,7 @@ class InspiralChooseFDModesParameters(TableStr):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
+        approximant: Approximant,
     ) -> "InspiralChooseFDModesParameters":
         """
         Creates an instance from binary black hole parameters.
@@ -110,7 +110,7 @@ class InspiralChooseFDModesParameters(TableStr):
         parameters["f_ref"] = bbh_parameters.f_ref
         parameters["r"] = bbh_parameters.luminosity_distance
         parameters["lal_params"] = lal_params
-        parameters["approximant"] = approximant
+        parameters["approximant"] = get_approximant(approximant)
         instance = cls(**parameters)
         _logger.debug(
             instance.to_table("generated inspiral choose fd modes parameters")
@@ -126,7 +126,7 @@ class InspiralChooseFDModesParameters(TableStr):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
+        approximant: Approximant,
     ) -> "InspiralChooseFDModesParameters":
         """
         Creates an instance from waveform parameters.

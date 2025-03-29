@@ -37,7 +37,7 @@ class WaveformGenerator:
 
     def __init__(
         self,
-        approximant: str,
+        approximant: Approximant,
         domain: Domain,
         f_ref: float,
         f_start: Optional[float] = None,
@@ -85,12 +85,10 @@ class WaveformGenerator:
             f"and approximant {approximant}"
         )
 
-        self._approximant_str = approximant
+        self._approximant = approximant
         self._lal_params: Optional[lal.Dict] = None
-        self._approximant: Optional[Approximant] = None
 
         if "SEOBNRv5" not in approximant:
-            self._approximant = get_approximant(approximant)
             # to check: confusing defining self._mode_list
             # is required. It is used in `generate_hplus_hcross_m`,
             # but in a way that feels redundant to what is happening here.
@@ -156,13 +154,13 @@ class WaveformGenerator:
                     "'None' approximant not supported for generate_hplus_hcross_m"
                 )
             try:
-                desc = f" ({get_approximant_description(self._approximant)})"
+                desc = f" ({self._approximant})"
             except Exception as e:
                 desc = ""
             raise ValueError(
                 "generate_hplus_hcross_m: only the approximants "
-                f"{TD_Approximant} ({get_approximant_description(TD_Approximant)}) and "
-                f"{FD_Approximant} ({get_approximant_description(FD_Approximant)})"
+                f"{TD_Approximant} ({TD_Approximant}) and "
+                f"{FD_Approximant} ({FD_Approximant})"
                 f"are currently supported. {self._approximant}{desc} not supported)"
             )
 
@@ -301,9 +299,9 @@ class WaveformGeneratorParameters:
     approximant: Union[str, Approximant]
     f_ref: float
     f_start: Optional[float]
-    mode_list: Optional[List[Modes]] = None,
-    transform: Optional[Union[Callable[[Polarization], Polarization],str]] = None,
-    spin_conversion_phase: Optional[float] = None,
+    mode_list: Optional[List[Modes]] = None
+    transform: Optional[Union[Callable[[Polarization], Polarization],str]] = None
+    spin_conversion_phase: Optional[float] = None
 
 
 
@@ -330,10 +328,12 @@ def build_waveform_generator(
     if parameters.transform is not None:
         if type(parameters.transform)==str:
             transform, _, _ = import_entity(parameters.transform)
-            if not check_function_signature(fn, [Polarization], Polarization):
+            # type ignore: we know transform is not None
+            if not check_function_signature(transform, [Polarization], Polarization):  # type: ignore
                 raise TypeError(
                     "waveform generator transform function should take an instance of Polarization as argument "
-                    f"and return an instance of polarization. The function {fn.__name__} has a different signature."
+                    f"and return an instance of polarization. The function {transform.__name__} "  # type: ignore
+                    "has a different signature."
                 )
     else: 
         transform = None
@@ -341,12 +341,14 @@ def build_waveform_generator(
     approximant: str
     if type(parameters.approximant) != str:
         # type ignore: mypy fails to see the check right above
-        approximant = get_approximant_description(parameters.approximant)  # type: ignore
+        approximant = get_approximant(parameters.approximant)  # type: ignore
     else:
         approximant = parameters.approximant 
     
     return WaveformGenerator(
-        approximant, domain, parameters.f_ref, 
+        Approximant(approximant), 
+        domain, 
+        parameters.f_ref, 
         f_start = parameters.f_start,
         mode_list = parameters.mode_list,
         transform = transform,

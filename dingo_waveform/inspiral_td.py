@@ -6,7 +6,7 @@ import lal
 import lalsimulation as LS
 
 from . import wfg_utils
-from .approximant import Approximant, TD_Approximant
+from .approximant import Approximant, TD_Approximant, get_approximant
 from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import DomainParameters
 from .lal_params import lal
@@ -45,7 +45,7 @@ class InspiralTDParameters(TableStr):
     f_min: float
     f_ref: float
     lal_params: Optional[lal.Dict]
-    approximant: Optional[Approximant]
+    approximant: int
 
     def get_spins(self) -> Spins:
         """
@@ -67,7 +67,7 @@ class InspiralTDParameters(TableStr):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
+        approximant: Approximant,
     ) -> "InspiralTDParameters":
         """
         Creates an instance from binary black hole parameters.
@@ -98,7 +98,7 @@ class InspiralTDParameters(TableStr):
             params[attr] = asdict(domain_params)[attr]
         params["phase"] = bbh_parameters.phase
         params["lal_params"] = lal_params
-        params["approximant"] = approximant
+        params["approximant"] = get_approximant(approximant)
         instance = cls(**params)
         _logger.debug(instance.to_table("generated inspiral td parameters"))
         return instance
@@ -112,7 +112,7 @@ class InspiralTDParameters(TableStr):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
+        approximant: Approximant,
     ) -> "InspiralTDParameters":
         """
         Creates an instance from waveform parameters.

@@ -50,7 +50,7 @@ class InspiralFDParameters(TableStr):
     f_max: float
     f_ref: float
     lal_params: Optional[lal.Dict]
-    approximant: Approximant
+    approximant: int
 
     def get_spins(self) -> Spins:
         """
@@ -95,7 +95,7 @@ class InspiralFDParameters(TableStr):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
+        approximant: Approximant,
     ) -> "InspiralFDParameters":
         """
         Create an instance from binary black hole parameters.
@@ -145,7 +145,7 @@ class InspiralFDParameters(TableStr):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
+        approximant: Approximant,
     ) -> "InspiralFDParameters":
         """
         Create an instance from waveform parameters.
