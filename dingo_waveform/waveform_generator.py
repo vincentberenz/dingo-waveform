@@ -24,10 +24,10 @@ from .polarizations import (
     polarizations_to_table,
 )
 from .types import FrequencySeries, Iota, Mode, Modes
+from .waveform_generator_parameters import WaveformGeneratorParameters
 from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
-
 
 
 class WaveformGenerator:
@@ -41,9 +41,10 @@ class WaveformGenerator:
         domain: Domain,
         f_ref: float,
         f_start: Optional[float] = None,
+        spin_conversion_phase: Optional[float] = None,
+        convert_to_SI: bool = True,
         mode_list: Optional[List[Modes]] = None,
         transform: Optional[Callable[[Polarization], Polarization]] = None,
-        spin_conversion_phase: Optional[float] = None,
     ):
         """
         Parameters
@@ -85,28 +86,27 @@ class WaveformGenerator:
             f"and approximant {approximant}"
         )
 
-        self._approximant = approximant
-        self._lal_params: Optional[lal.Dict] = None
-
-        if "SEOBNRv5" not in approximant:
-            # to check: confusing defining self._mode_list
-            # is required. It is used in `generate_hplus_hcross_m`,
-            # but in a way that feels redundant to what is happening here.
-            self._mode_list = mode_list
-            if mode_list is not None:
-                logging.debug(
-                    f"waveform generator: generating lal parameters based on mode list {mode_list}"
-                )
-                self._lal_params = get_lal_params(mode_list)
+        lal_params: Optional[lal.Dict]
+        if mode_list is not None:
+            lal_params = get_lal_params(mode_list)
         else:
-            # todo: is there something to do here ?
-            ...
+            lal_params = None
 
-        self._domain = domain
-        self._f_ref = f_ref
-        self._f_start = f_start
-        self._transform = transform
-        self._spin_conversion_phase = spin_conversion_phase
+        # packaging all attributes into an instance of WaveformGeneratorParameters
+        # allows to pass them as arguments to the various functions called by
+        # generate_hplus_hcross and generate_hplus_hcross_m while avoiding circular
+        # dependency.
+        self._waveform_generator_params = WaveformGeneratorParameters(
+            approximant=approximant,
+            domain=domain,
+            f_ref=f_ref,
+            f_start=f_start,
+            spin_conversion_phase=spin_conversion_phase,
+            convert_to_SI=convert_to_SI,
+            mode_list=mode_list,
+            lal_params=lal_params,
+            transform=transform,
+        )
 
     def generate_hplus_hcross_m(
         self, waveform_parameters: WaveformParameters
@@ -213,7 +213,6 @@ class WaveformGenerator:
         _logger.debug(f"generated polarizations:\n{polarizations_to_table(pol)}")
 
         return pol
-    
 
     def generate_hplus_hcross(
         self, waveform_parameters: WaveformParameters
@@ -300,17 +299,14 @@ class WaveformGeneratorParameters:
     f_ref: float
     f_start: Optional[float]
     mode_list: Optional[List[Modes]] = None
-    transform: Optional[Union[Callable[[Polarization], Polarization],str]] = None
+    transform: Optional[Union[Callable[[Polarization], Polarization], str]] = None
     spin_conversion_phase: Optional[float] = None
 
 
-
-
 def build_waveform_generator(
-        parameters: Union[WaveformGeneratorParameters, Dict], 
-        domain: Domain
-    )->WaveformGenerator:
-    
+    parameters: Union[WaveformGeneratorParameters, Dict], domain: Domain
+) -> WaveformGenerator:
+
     # if as dict as been passed as argument, 'casting' is to an instance of
     # WaveformGeneratorParameters
     if not isinstance(parameters, WaveformGeneratorParameters):
@@ -326,7 +322,7 @@ def build_waveform_generator(
     # to a transform function. We import it here.
     transform: Optional[Callable[[Polarization], Polarization]]
     if parameters.transform is not None:
-        if type(parameters.transform)==str:
+        if type(parameters.transform) == str:
             transform, _, _ = import_entity(parameters.transform)
             # type ignore: we know transform is not None
             if not check_function_signature(transform, [Polarization], Polarization):  # type: ignore
@@ -335,22 +331,22 @@ def build_waveform_generator(
                     f"and return an instance of polarization. The function {transform.__name__} "  # type: ignore
                     "has a different signature."
                 )
-    else: 
+    else:
         transform = None
-    
+
     approximant: str
     if type(parameters.approximant) != str:
         # type ignore: mypy fails to see the check right above
         approximant = get_approximant(parameters.approximant)  # type: ignore
     else:
-        approximant = parameters.approximant 
-    
+        approximant = parameters.approximant
+
     return WaveformGenerator(
-        Approximant(approximant), 
-        domain, 
-        parameters.f_ref, 
-        f_start = parameters.f_start,
-        mode_list = parameters.mode_list,
-        transform = transform,
-        spin_conversion_phase = parameters.spin_conversion_phase
+        Approximant(approximant),
+        domain,
+        parameters.f_ref,
+        f_start=parameters.f_start,
+        mode_list=parameters.mode_list,
+        transform=transform,
+        spin_conversion_phase=parameters.spin_conversion_phase,
     )

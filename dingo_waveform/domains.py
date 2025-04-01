@@ -279,10 +279,7 @@ class _CachedSampleFrequencies:
     @cached_property
     def sample_frequencies_torch(self) -> torch.Tensor:
         """Create PyTorch tensor version of frequencies."""
-        return torch.linspace(
-            0.0, self._f_max, 
-            steps=self._len, dtype=torch.float32
-        )
+        return torch.linspace(0.0, self._f_max, steps=self._len, dtype=torch.float32)
 
     @cached_property
     def sample_frequency_torch_cuda(self) -> torch.Tensor:
@@ -381,9 +378,7 @@ class FrequencyDomain(Domain):
         return d
 
     @classmethod
-    def from_parameters(
-        cls, domain_parameters: DomainParameters
-    ) -> "FrequencyDomain":
+    def from_parameters(cls, domain_parameters: DomainParameters) -> "FrequencyDomain":
         """
         Create a FrequencyDomain instance from given parameters.
 
@@ -405,8 +400,9 @@ class FrequencyDomain(Domain):
                 )
         # type ignore: we know f_min, f_max and delta_f are not None (from the test just above)
         return cls(
-            domain_parameters.f_min, domain_parameters.f_max,
-            domain_parameters.delta_f  # type: ignore
+            domain_parameters.f_min,  # type: ignore
+            domain_parameters.f_max,  # type: ignore
+            domain_parameters.delta_f,  # type: ignore
         )
 
     @override

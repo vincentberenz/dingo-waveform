@@ -13,12 +13,13 @@ wfg.spin_conversion_phase = 0.0.
 """
 
 from dataclasses import asdict
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union, cast
 
 import numpy as np
 import pytest
 from matplotlib import pyplot as plt
 
+from dingo_waveform.approximant import Approximant
 from dingo_waveform.domains import FrequencyDomain
 from dingo_waveform.gwutils import get_mismatch
 from dingo_waveform.polarizations import Polarization, sum_contributions_m
@@ -27,16 +28,15 @@ from dingo_waveform.types import Mode
 from dingo_waveform.waveform_generator import WaveformGenerator
 from dingo_waveform.waveform_parameters import WaveformParameters
 
+_approximants = ("IMRPhenomXPHM", "SEOBNRv4PHM", "SEOBNRv5PHM", "SEOBNRv5HM")
 
-# @pytest.fixture(params=["IMRPhenomXPHM", "SEOBNRv4PHM", "SEOBNRv5PHM", "SEOBNRv5HM"])
-# "SEOBNRv5PHM", "SEOBNRv5HM" not yet supported by this refactor ("new interface")
-@pytest.fixture(params=["IMRPhenomXPHM", "SEOBNRv4PHM"])
+
+@pytest.fixture(params=_approximants)
 def approximant(request):
     return request.param
 
 
-@pytest.fixture
-def uniform_fd_domain() -> FrequencyDomain:
+def get_uniform_fd_domain() -> FrequencyDomain:
     return FrequencyDomain(
         delta_f=0.125,
         f_min=10.0,
@@ -44,8 +44,7 @@ def uniform_fd_domain() -> FrequencyDomain:
     )
 
 
-@pytest.fixture
-def intrinsic_prior(approximant) -> IntrinsicPriors:
+def get_intrinsic_prior(approximant: Approximant) -> IntrinsicPriors:
     intrinsic_dict: Dict[str, Union[str, float]]
     if "PHM" in approximant:
         intrinsic_dict = {
@@ -81,13 +80,9 @@ def intrinsic_prior(approximant) -> IntrinsicPriors:
     return IntrinsicPriors(**intrinsic_dict)
 
 
-@pytest.fixture
-def wfg(uniform_fd_domain, approximant):
-    # if approximant in ["SEOBNRv5PHM", "SEOBNRv5HM"]:
-    #    wfg_class = NewInterfaceWaveformGenerator
-    # else:
-    wfg_class = WaveformGenerator
-    return wfg_class(
+def get_waveform_generator(approximant: Approximant) -> WaveformGenerator:
+    uniform_fd_domain = get_uniform_fd_domain()
+    return WaveformGenerator(
         approximant=approximant,
         domain=uniform_fd_domain,
         f_ref=10.0,
@@ -96,8 +91,7 @@ def wfg(uniform_fd_domain, approximant):
     )
 
 
-@pytest.fixture
-def num_evaluations(approximant):
+def get_num_evaluations(approximant: Approximant) -> int:
     if "Phenom" in approximant:
         return 10
     elif approximant == "SEOBNRv4PHM":
@@ -106,10 +100,9 @@ def num_evaluations(approximant):
         return 10
 
 
-@pytest.fixture
-def tolerances(approximant):
+def get_tolerances(approximant: Approximant) -> Tuple[float, float]:
     # Return (max, median) mismatches expected.
-    if approximant == "IMRPhenomXPHM":
+    if approximant == Approximant("IMRPhenomXPHM"):
         # The mismatches are typically be of order 1e-5 to 1e-9. This comes from the
         # calculation of the magnitude of the orbital angular momentum, which we calculate
         # to a different order the IMRPhenomXPHM. It's tricky to get this exactly right,
@@ -117,7 +110,7 @@ def tolerances(approximant):
         # get should not have a big effect in practice.
         return 2e-2, 1e-5
 
-    elif approximant == "SEOBNRv4PHM":
+    elif approximant == Approximant("SEOBNRv4PHM"):
         # The mismatches are typically be of order 1e-5. This is exclusively due to
         # different tapering. The reference polarizations are tapered and FFTed on the
         # level of polarizations, while for generate_hplus_hcross_m, the tapering and FFT
@@ -126,7 +119,7 @@ def tolerances(approximant):
         # was 7e-4, while almost all mismatches were of order 1e-5.
         return 5e-4, 5e-4
 
-    elif approximant in ["SEOBNRv5PHM", "SEOBNRv5HM"]:
+    elif approximant in (Approximant("SEOBNRv5PHM"), Approximant("SEOBNRv5HM")):
         # Tested on 1000 mismatches.
         return 1e-9, 1e-12
 
@@ -134,19 +127,13 @@ def tolerances(approximant):
         return 1e-5, 1e-5
 
 
-# Uncomment to test only one approximant.
-# try:
-#    import pyseobnr
-#
-#    approximant_list = ["IMRPhenomXPHM", "SEOBNRv4PHM", "SEOBNRv5PHM", "SEOBNRv5HM"]
-# except ImportError:
-approximant_list = ["IMRPhenomXPHM", "SEOBNRv4PHM"]
+@pytest.mark.parametrize("approximant", _approximants)
+def test_generate_hplus_hcross_m(approximant) -> None:
+    intrinsic_prior = get_intrinsic_prior(approximant)
+    wfg = get_waveform_generator(approximant)
+    num_evaluations = get_num_evaluations(approximant)
+    tolerances = get_tolerances(approximant)
 
-
-@pytest.mark.parametrize("approximant", approximant_list)
-def test_generate_hplus_hcross_m(
-    intrinsic_prior, wfg, num_evaluations, tolerances
-) -> None:
     mismatches: List[List[float]] = []
     for idx in range(num_evaluations):
         p: WaveformParameters = intrinsic_prior.sample()
@@ -161,12 +148,14 @@ def test_generate_hplus_hcross_m(
         p.phase += phase_shift
         pol_ref: Polarization = wfg.generate_hplus_hcross(p)
 
+        domain = cast(FrequencyDomain, wfg._domain)
+
         mismatches.append(
             [
                 get_mismatch(
                     asdict(pol)[pol_name],
                     asdict(pol_ref)[pol_name],
-                    wfg._domain,
+                    domain,
                     asd_file="aLIGO_ZERO_DET_high_P_asd.txt",
                 )
                 for pol_name in ("h_plus", "h_cross")

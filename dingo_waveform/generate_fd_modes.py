@@ -1,4 +1,3 @@
-
 # To be used in NewInterfaceWaveformGenerator.generate_hplus_hcross
 # (it does *not* override the WaveformGenerator method, but the convert_parameters
 # method is different)
@@ -7,23 +6,18 @@
 import logging
 from dataclasses import asdict, dataclass
 from math import isclose
-from typing import NewType, Optional, Union
+from typing import Optional, Union
 
-import astropy
 import astropy.units
-import lal
 import numpy as np
 from lalsimulation.gwsignal.core import waveform
+from lalsimulation.gwsignal.core.gw import GravitationalWavePolarizations
 from lalsimulation.gwsignal.models import (
     gwsignal_get_waveform_generator,
     pyseobnr_model,
 )
 
-from .approximant import (
-    Approximant,
-    ConditionedExtraTime_Approximant,
-    is_gwsignal_approximant,
-)
+from .approximant import Approximant, is_gwsignal_approximant
 from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import Domain, DomainParameters, FrequencyDomain
 from .gw_signals import GwSignalParameters
@@ -31,14 +25,16 @@ from .logging import TableStr
 from .polarizations import Polarization
 from .spins import Spins
 from .types import Iota, WaveformGenerationError
-from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 
-Generators = Union[
-    pyseobnr_model.SEOBNRv5HM, pyseobnr_model.SEOBNRv5EHM, pyseobnr_model.SEOBNRv5PHM,
-    waveform.LALCompactBinaryCoalescenceGenerator
+_Generators = Union[
+    pyseobnr_model.SEOBNRv5HM,
+    pyseobnr_model.SEOBNRv5EHM,
+    pyseobnr_model.SEOBNRv5PHM,
+    waveform.LALCompactBinaryCoalescenceGenerator,
 ]
+
 
 @dataclass
 class GenerateFDModesParameters(GwSignalParameters):
@@ -46,24 +42,22 @@ class GenerateFDModesParameters(GwSignalParameters):
     lal simulation's GenerateFDModes function
     via a generator (lalsimulation 'new interface')
     """
- 
+
     @classmethod
     def from_binary_black_holes_parameters(
         cls,
         bbh_params: BinaryBlackHoleParameters,
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
-        approximant: Approximant,
-        f_start: Optional[float] = None, 
-   )->"GenerateFDModesParameters":
-        
-        if not is_gwsignal_approximant(approximant):
-            raise ValueError(
-                f"Approximant {approximant} not supported for FDModesLOParameters "
-                "(not implemented in lalsimulation GWSignal)" 
-            )
+        f_start: Optional[float] = None,
+    ) -> "GenerateFDModesParameters":
 
-        gw_signal_params: GwSignalParameters = super().from_binary_black_hole_parameters(
+        # note: "from_waveform_parameters" is implemented by the superclass
+        # GwSignalParameters
+
+        gw_signal_params: (
+            GwSignalParameters
+        ) = super().from_binary_black_hole_parameters(
             bbh_params,
             domain_params,
             spin_conversion_phase,
@@ -73,20 +67,26 @@ class GenerateFDModesParameters(GwSignalParameters):
         return cls(**asdict(gw_signal_params))
 
     def apply(
-            self,
-            domain: FrequencyDomain,
-            approximant: Approximant,
-            ref_tol: float = 1e-6
-    )->Polarization:
+        self, domain: FrequencyDomain, approximant: Approximant, ref_tol: float = 1e-6
+    ) -> Polarization:
         """
         Generate Fourier domain GW polarizations (h_plus, h_cross).
 
         Wrapper over lalsimulation generator and
-        GenerateFDModes. 
+        GenerateFDModes.
         """
-        generator: Generators = gwsignal_get_waveform_generator(approximant)
-        params = {k:v for k,v in asdict(self).items() if v is not None}
-        hpc = waveform.GenerateFDModes(generator)
+
+        if not is_gwsignal_approximant(approximant):
+            raise ValueError(
+                f"Approximant {approximant} not supported for GenerateFDModesParameters "
+                "(not implemented in lalsimulation GWSignal)"
+            )
+
+        generator: _Generators = gwsignal_get_waveform_generator(approximant)
+        params = {k: v for k, v in asdict(self).items() if v is not None}
+        hpc: GravitationalWavePolarizations = waveform.GenerateFDModes(
+            params, generator
+        )
 
         hp = hpc.hp
         hc = hpc.hc

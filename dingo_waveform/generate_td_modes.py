@@ -8,23 +8,17 @@ from dataclasses import asdict, dataclass
 from typing import Optional, Union
 
 from lalsimulation.gwsignal.core import waveform
-from lalsimulation.gwsignal.models import (
-    gwsignal_get_waveform_generator,
-    pyseobnr_model,
-)
+from lalsimulation.gwsignal.models import gwsignal_get_waveform_generator
 
 from .approximant import Approximant
 from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import DomainParameters
 from .gw_signals import GwSignalParameters
 from .polarizations import Polarization
+from .types import GWSignalsGenerators
 
 _logger = logging.getLogger(__name__)
 
-Generators = Union[
-    pyseobnr_model.SEOBNRv5HM, pyseobnr_model.SEOBNRv5EHM, pyseobnr_model.SEOBNRv5PHM,
-    waveform.LALCompactBinaryCoalescenceGenerator
-]
 
 @dataclass
 class GenerateTDModesParameters(GwSignalParameters):
@@ -32,18 +26,19 @@ class GenerateTDModesParameters(GwSignalParameters):
     lal simulation's GenerateFDModes function
     via a generator (lalsimulation 'new interface')
     """
- 
+
     @classmethod
     def from_binary_black_holes_parameters(
         cls,
         bbh_params: BinaryBlackHoleParameters,
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
-        approximant: Approximant,
-        f_start: Optional[float] = None, 
-   )->"GenerateTDModesParameters":
-        
-        gw_signal_params: GwSignalParameters = super().from_binary_black_hole_parameters(
+        f_start: Optional[float] = None,
+    ) -> "GenerateTDModesParameters":
+
+        gw_signal_params: (
+            GwSignalParameters
+        ) = super().from_binary_black_hole_parameters(
             bbh_params,
             domain_params,
             spin_conversion_phase,
@@ -52,11 +47,11 @@ class GenerateTDModesParameters(GwSignalParameters):
 
         return cls(**asdict(gw_signal_params))
 
-    def apply(self, approximant: Approximant)->Polarization:
+    def apply(self, approximant: Approximant) -> Polarization:
         """
         Generate time domain GW polarizations (h_plus, h_cross)
         """
-        generator: Generators = gwsignal_get_waveform_generator(approximant)
-        params = {k:v for k,v in asdict(self).items() if v is not None}
+        generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
+        params = {k: v for k, v in asdict(self).items() if v is not None}
         hpc = waveform.GenerateFDModes(generator)
         return Polarization(h_cross=hpc.hp.value, h_plus=hpc.hp.value)

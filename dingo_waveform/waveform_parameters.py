@@ -57,4 +57,4 @@ class WaveformParameters(TableStr):
     # new interface and SEOBNRv5 specific parameters
     postadiabatic: Optional[Any] = None
     postadiabatic_type: Optional[Any] = None
-    lmax_nyquist: int = 2
+    lmax_nyquist: Optional[int] = None

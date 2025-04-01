@@ -1,8 +1,13 @@
 from dataclasses import dataclass
-from typing import NewType, Tuple, TypeAlias
+from typing import NewType, Tuple, TypeAlias, Union
 
 import lalsimulation as LS
 import numpy as np
+from lalsimulation.gwsignal.core import waveform
+from lalsimulation.gwsignal.models import (
+    gwsignal_get_waveform_generator,
+    pyseobnr_model,
+)
 from nptyping import Complex128, NDArray, Shape
 
 Iota = NewType("Iota", float)
@@ -30,5 +35,12 @@ Modes: TypeAlias = Tuple[Mode, Mode]
 Tuple of two modes.
 """
 
-class WaveformGenerationError(Exception):
-    ...
+GWSignalsGenerators = Union[
+    pyseobnr_model.SEOBNRv5HM,
+    pyseobnr_model.SEOBNRv5EHM,
+    pyseobnr_model.SEOBNRv5PHM,
+    waveform.LALCompactBinaryCoalescenceGenerator,
+]
+
+
+class WaveformGenerationError(Exception): ...

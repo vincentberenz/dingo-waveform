@@ -31,7 +31,8 @@ def aligned_spin_wf_parameters() -> Tuple[WaveformParameters, F_ref, str]:
     }
     f_ref = F_ref(20.0)
     approximant = "IMRPhenomPv2"
-    waveform_params = WaveformParameters(**parameters)
+    # type ignore: no idea why mypy is not happy with the argument
+    waveform_params = WaveformParameters(**parameters)  # type: ignore
     return waveform_params, f_ref, approximant
 
 
@@ -52,7 +53,8 @@ def precessing_spin_wf_parameters() -> Tuple[WaveformParameters, F_ref, str]:
     }
     f_ref = F_ref(100.0)
     approximant = "IMRPhenomPv2"
-    waveform_params = WaveformParameters(**parameters)
+    # type ignore: no idea why mypy is not happy with the argument
+    waveform_params = WaveformParameters(**parameters)  # type: ignore
     return waveform_params, f_ref, approximant
 
 
