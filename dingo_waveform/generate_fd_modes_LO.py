@@ -31,7 +31,7 @@ _SupportedApproximant = Approximant("IMRPhenomXPHM")
 
 
 @dataclass
-class GenerateFDModesLOParameters(GwSignalParameters):
+class _GenerateFDModesLOParameters(GwSignalParameters):
     """Dataclass for storing parameters for
     lal simulation's GenerateFDModes function
     via a generator (lalsimulation 'new interface')
@@ -44,7 +44,7 @@ class GenerateFDModesLOParameters(GwSignalParameters):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         f_start: Optional[float] = None,
-    ) -> "GenerateFDModesLOParameters":
+    ) -> "_GenerateFDModesLOParameters":
 
         gw_signal_params: (
             GwSignalParameters
@@ -142,8 +142,8 @@ def generate_FD_modes_LO(
         raise ValueError(f"generate_FD_modes_LO: phase parameter should not be None")
 
     instance = cast(
-        GenerateFDModesLOParameters,
-        GenerateFDModesLOParameters.from_waveform_parameters(
+        _GenerateFDModesLOParameters,
+        _GenerateFDModesLOParameters.from_waveform_parameters(
             waveform_params,
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.f_ref,

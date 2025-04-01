@@ -5,7 +5,7 @@
 
 import logging
 from dataclasses import asdict, dataclass
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, cast
 
 import astropy.units
 import gwpy
@@ -24,14 +24,17 @@ from .approximant import Approximant
 from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import DomainParameters, FrequencyDomain
 from .gw_signals import GwSignalParameters
-from .types import FrequencySeries, GWSignalsGenerators, Modes
+from .polarizations import Polarization, get_polarizations_from_fd_modes_m
+from .types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
+from .waveform_generator_parameters import WaveformGeneratorParameters
+from .waveform_parameters import WaveformParameters
 from .wfg_utils import taper_td_modes_in_place, td_modes_to_fd_modes
 
 _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class GenerateTDModesLO(GwSignalParameters):
+class _GenerateTDModesLO(GwSignalParameters):
 
     @classmethod
     def from_binary_black_holes_parameters(
@@ -40,7 +43,7 @@ class GenerateTDModesLO(GwSignalParameters):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         f_start: Optional[float] = None,
-    ) -> "GenerateTDModesLO":
+    ) -> "_GenerateTDModesLO":
 
         gw_signal_params: (
             GwSignalParameters
@@ -54,8 +57,8 @@ class GenerateTDModesLO(GwSignalParameters):
         return cls(**asdict(gw_signal_params))
 
     def apply(
-        self, approximant: Approximant, domain: FrequencyDomain
-    ) -> Dict[Modes, FrequencySeries]:
+        self, approximant: Approximant, domain: FrequencyDomain, phase: float
+    ) -> Dict[Mode, Polarization]:
 
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
@@ -81,4 +84,37 @@ class GenerateTDModesLO(GwSignalParameters):
 
         taper_td_modes_in_place(hlm_td)
 
-        return td_modes_to_fd_modes(hlm_td, domain)
+        h: Dict[Modes, FrequencySeries] = td_modes_to_fd_modes(hlm_td, domain)
+
+        return get_polarizations_from_fd_modes_m(h, Iota(self.inclination), phase)
+
+
+def generate_TD_modes_LO(
+    waveform_gen_params: WaveformGeneratorParameters,
+    waveform_params: WaveformParameters,
+    approximant: Approximant,
+) -> Dict[Mode, Polarization]:
+
+    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+        raise ValueError(
+            "generate_FD_modes can only be applied using on a FrequencyDomain "
+            f"(got {type(waveform_gen_params.domain)})"
+        )
+
+    if waveform_params.phase is None:
+        raise ValueError(f"generate_FD_modes_LO: phase parameter should not be None")
+
+    instance = cast(
+        _GenerateTDModesLO,
+        _GenerateTDModesLO.from_waveform_parameters(
+            waveform_params,
+            waveform_gen_params.domain.get_parameters(),
+            waveform_gen_params.f_ref,
+            waveform_gen_params.f_start,
+            waveform_gen_params.convert_to_SI,
+        ),
+    )
+
+    return instance.apply(
+        approximant, waveform_gen_params.domain, waveform_params.phase
+    )

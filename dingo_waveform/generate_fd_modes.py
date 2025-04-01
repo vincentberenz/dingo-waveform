@@ -6,7 +6,7 @@
 import logging
 from dataclasses import asdict, dataclass
 from math import isclose
-from typing import Optional, Union
+from typing import Optional, Union, cast
 
 import astropy.units
 import numpy as np
@@ -19,12 +19,12 @@ from lalsimulation.gwsignal.models import (
 
 from .approximant import Approximant, is_gwsignal_approximant
 from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import Domain, DomainParameters, FrequencyDomain
+from .domains import DomainParameters, FrequencyDomain
 from .gw_signals import GwSignalParameters
-from .logging import TableStr
 from .polarizations import Polarization
-from .spins import Spins
-from .types import Iota, WaveformGenerationError
+from .types import WaveformGenerationError
+from .waveform_generator_parameters import WaveformGeneratorParameters
+from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ _Generators = Union[
 
 
 @dataclass
-class GenerateFDModesParameters(GwSignalParameters):
+class _GenerateFDModesParameters(GwSignalParameters):
     """Dataclass for storing parameters for
     lal simulation's GenerateFDModes function
     via a generator (lalsimulation 'new interface')
@@ -50,7 +50,7 @@ class GenerateFDModesParameters(GwSignalParameters):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         f_start: Optional[float] = None,
-    ) -> "GenerateFDModesParameters":
+    ) -> "_GenerateFDModesParameters":
 
         # note: "from_waveform_parameters" is implemented by the superclass
         # GwSignalParameters
@@ -67,7 +67,7 @@ class GenerateFDModesParameters(GwSignalParameters):
         return cls(**asdict(gw_signal_params))
 
     def apply(
-        self, domain: FrequencyDomain, approximant: Approximant, ref_tol: float = 1e-6
+        self, domain: FrequencyDomain, approximant: Approximant, ref_tol
     ) -> Polarization:
         """
         Generate Fourier domain GW polarizations (h_plus, h_cross).
@@ -75,12 +75,6 @@ class GenerateFDModesParameters(GwSignalParameters):
         Wrapper over lalsimulation generator and
         GenerateFDModes.
         """
-
-        if not is_gwsignal_approximant(approximant):
-            raise ValueError(
-                f"Approximant {approximant} not supported for GenerateFDModesParameters "
-                "(not implemented in lalsimulation GWSignal)"
-            )
 
         generator: _Generators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
@@ -120,3 +114,36 @@ class GenerateFDModesParameters(GwSignalParameters):
         h_cross *= time_shift
 
         return Polarization(h_cross=h_cross, h_plus=h_plus)
+
+
+def generate_FD_modes(
+    waveform_gen_params: WaveformGeneratorParameters,
+    waveform_params: WaveformParameters,
+    approximant: Approximant,
+    ref_tol: float = 1e-6,
+) -> Polarization:
+
+    if not is_gwsignal_approximant(approximant):
+        raise ValueError(
+            f"Approximant {approximant} not supported for generate_FD_modes "
+            "(not implemented in lalsimulation GWSignal)"
+        )
+
+    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+        raise ValueError(
+            "generate_FD_modes can only be applied using on a FrequencyDomain "
+            f"(got {type(waveform_gen_params.domain)})"
+        )
+
+    instance = cast(
+        _GenerateFDModesParameters,
+        _GenerateFDModesParameters.from_waveform_parameters(
+            waveform_params,
+            waveform_gen_params.domain.get_parameters(),
+            waveform_gen_params.f_ref,
+            waveform_gen_params.f_start,
+            waveform_gen_params.convert_to_SI,
+        ),
+    )
+
+    return instance.apply(waveform_gen_params.domain, approximant, ref_tol)

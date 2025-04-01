@@ -5,7 +5,7 @@
 
 import logging
 from dataclasses import asdict, dataclass
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, cast
 
 import astropy.units
 import gwpy
@@ -25,13 +25,15 @@ from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import DomainParameters, FrequencyDomain
 from .gw_signals import GwSignalParameters
 from .types import FrequencySeries, GWSignalsGenerators, Modes
+from .waveform_generator_parameters import WaveformGeneratorParameters
+from .waveform_parameters import WaveformParameters
 from .wfg_utils import td_modes_to_fd_modes
 
 _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class SEOBRNRv5Conditioning:
+class _SEOBRNRv5Conditioning:
     f_min: float
     new_f_start: float
     t_extra: float
@@ -83,7 +85,7 @@ class SEOBRNRv5Conditioning:
 
 
 @dataclass
-class GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
+class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
 
     @classmethod
     def from_binary_black_holes_parameters(
@@ -92,7 +94,7 @@ class GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         f_start: Optional[float] = None,
-    ) -> "GenerateTDModesLOConditionalExtraTimeParameters":
+    ) -> "_GenerateTDModesLOConditionalExtraTimeParameters":
 
         gw_signal_params: (
             GwSignalParameters
@@ -107,7 +109,7 @@ class GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
 
     def get_starting_frequency_for_SEOBRNRv5_conditioning(
         self, extra_time_fraction: float = 0.1, extra_cycles: float = 3.0
-    ) -> SEOBRNRv5Conditioning:
+    ) -> _SEOBRNRv5Conditioning:
 
         f_min = self.f22_start
         m1 = self.mass1
@@ -146,7 +148,7 @@ class GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
 
         f_isco = 1.0 / (pow(6.0, 1.5) * np.pi * (m1 + m2) * lal.MTSUN_SI)
 
-        return SEOBRNRv5Conditioning(
+        return _SEOBRNRv5Conditioning(
             f_min=f_min,
             new_f_start=f_start,
             t_extra=extra_time_fraction * tchirp + textra,
@@ -157,7 +159,7 @@ class GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
     def apply(
         self, approximant: Approximant, domain: FrequencyDomain
     ) -> Dict[Modes, FrequencySeries]:
-        SEOBRNRv5_conditioning: SEOBRNRv5Conditioning = (
+        SEOBRNRv5_conditioning: _SEOBRNRv5Conditioning = (
             self.get_starting_frequency_for_SEOBRNRv5_conditioning()
         )
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
@@ -180,3 +182,36 @@ class GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
                 hlms_lal[modes] = hlm_lal
 
         return td_modes_to_fd_modes(hlm_lal, domain)
+
+
+def generate_FD_modes_LO_cond_extra_time(
+    waveform_gen_params: WaveformGeneratorParameters,
+    waveform_params: WaveformParameters,
+    approximant: Approximant,
+) -> Dict[Modes, FrequencySeries]:
+
+    supported_approximants = (Approximant("SEOBNRv5PHM"), Approximant("SEOBNRv5HM"))
+    if approximant not in supported_approximants:
+        raise ValueError(
+            "generate_FD_modes_LO_cond_extra_time does not support the approximant "
+            f"{approximant}. Supported: {' '.join(supported_approximants)}"
+        )
+
+    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+        raise ValueError(
+            "generate_FD_modes_LO_cond_extra_time can only be applied using on a FrequencyDomain "
+            f"(got {type(waveform_gen_params.domain)})"
+        )
+
+    instance = cast(
+        _GenerateTDModesLOConditionalExtraTimeParameters,
+        _GenerateTDModesLOConditionalExtraTimeParameters.from_waveform_parameters(
+            waveform_params,
+            waveform_gen_params.domain.get_parameters(),
+            waveform_gen_params.f_ref,
+            waveform_gen_params.f_start,
+            waveform_gen_params.convert_to_SI,
+        ),
+    )
+
+    return instance.apply(approximant, waveform_gen_params.domain)
