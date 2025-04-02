@@ -92,17 +92,16 @@ class _GenerateTDModesLO(GwSignalParameters):
 def generate_TD_modes_LO(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
-    approximant: Approximant,
 ) -> Dict[Mode, Polarization]:
 
     if not isinstance(waveform_gen_params.domain, FrequencyDomain):
         raise ValueError(
-            "generate_FD_modes can only be applied using on a FrequencyDomain "
+            "generate_TD_modes can only be applied using on a FrequencyDomain "
             f"(got {type(waveform_gen_params.domain)})"
         )
 
     if waveform_params.phase is None:
-        raise ValueError(f"generate_FD_modes_LO: phase parameter should not be None")
+        raise ValueError(f"generate_TD_modes_LO: phase parameter should not be None")
 
     instance = cast(
         _GenerateTDModesLO,
@@ -116,5 +115,7 @@ def generate_TD_modes_LO(
     )
 
     return instance.apply(
-        approximant, waveform_gen_params.domain, waveform_params.phase
+        waveform_gen_params.approximant,
+        waveform_gen_params.domain,
+        waveform_params.phase,
     )

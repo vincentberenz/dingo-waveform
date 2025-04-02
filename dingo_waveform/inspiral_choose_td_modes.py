@@ -1,18 +1,20 @@
 import logging
 from dataclasses import InitVar, asdict, astuple, dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, cast
 
 import lal
 import lalsimulation as LS
 
 from . import wfg_utils
-from .approximant import Approximant, TD_Approximant, get_approximant
+from .approximant import Approximant, get_approximant
 from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import DomainParameters, FrequencyDomain
 from .lal_params import lal
 from .logging import TableStr
+from .polarizations import Polarization, get_polarizations_from_fd_modes_m
 from .spins import Spins
 from .types import FrequencySeries, Iota, Mode, Modes
+from .waveform_generator_parameters import WaveformGeneratorParameters
 from .waveform_parameters import WaveformParameters
 from .wfg_utils import td_modes_to_fd_modes
 
@@ -20,7 +22,7 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class InspiralChooseTDModesParameters(TableStr):
+class _InspiralChooseTDModesParameters(TableStr):
     """Dataclass for storing parameters for
     lal simulation's SimInspiralChooseTDModes function.
     """
@@ -43,13 +45,13 @@ class InspiralChooseTDModesParameters(TableStr):
     lal_params: Optional[lal.Dict]
     l_max: int
     approximant: Optional[Approximant]
-    iota: InitVar[float] = 0
+    iota: InitVar[Iota] = 0
 
-    def __post_init__(self, iota):
+    def __post_init__(self, iota: Iota) -> None:
         # iota is required (used by self.apply) but is not an argument
         # for LS.SimInspiralChooseTDModes, and therefore should be 'excluded'
         # from the 'astuple' method.
-        # Defining it as 'InitVar' and setting it up in '__post_init__' allow
+        # Defining it as 'InitVar' and setting it up in '__post_init__' allows
         # for this.
         self.iota = iota
 
@@ -62,7 +64,7 @@ class InspiralChooseTDModesParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
         l_max_default: int = 5,
-    ) -> "InspiralChooseTDModesParameters":
+    ) -> "_InspiralChooseTDModesParameters":
         """Creates an instance from binary black hole parameters.
 
         Parameters
@@ -115,24 +117,24 @@ class InspiralChooseTDModesParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
-    ) -> "InspiralChooseTDModesParameters":
+    ) -> "_InspiralChooseTDModesParameters":
         """Creates an instance from waveform parameters.
 
         Parameters
         ----------
-        waveform_params : WaveformParameters
+        waveform_params :
             The waveform parameters.
-        f_ref : float
+        f_ref :
             The reference frequency.
-        convert_to_SI : bool
+        convert_to_SI :
             Whether to convert to SI units.
-        domain_params : DomainParameters
+        domain_params :
             The domain parameters.
-        spin_conversion_phase : Optional[float]
+        spin_conversion_phase :
             The phase for spin conversion.
-        lal_params : Optional[lal.Dict]
+        lal_params :
             The LAL parameters.
-        approximant : Optional[Approximant]
+        approximant :
             The approximant.
 
         Returns
@@ -151,20 +153,17 @@ class InspiralChooseTDModesParameters(TableStr):
             approximant,
         )
 
-    def apply(
-        self, domain: FrequencyDomain
-    ) -> Tuple[Dict[Modes, FrequencySeries], Iota]:
+    def apply(self, domain: FrequencyDomain, phase: float) -> Dict[Mode, Polarization]:
         """Applies the LAL simulation method and converts the result to the frequency domain.
 
         Parameters
         ----------
-        domain : FrequencyDomain
+        domain :
             The frequency domain to apply the transformation.
 
         Returns
         -------
-        Tuple[Dict[Modes, FrequencySeries], Iota]
-            The frequency series in the frequency domain and the iota.
+        The frequency series in the frequency domain and the iota.
         """
         _logger.debug(
             "calling LS.SimInspiralChooseTDModes with arguments:"
@@ -188,6 +187,40 @@ class InspiralChooseTDModesParameters(TableStr):
 
         hlm: Dict[Modes, FrequencySeries] = td_modes_to_fd_modes(hlm_, domain)
 
-        # type ignore: mypy fails to see that self has a iota attribute,
-        # likely because of its 'InitVar' definition.
-        return hlm, self.iota  # type: ignore
+        pol: Dict[Mode, Polarization] = get_polarizations_from_fd_modes_m(
+            hlm, self.iota, phase  # type: ignore
+        )
+
+        return pol
+
+
+def inspiral_choose_TD_modes(
+    waveform_gen_params: WaveformGeneratorParameters,
+    waveform_params: WaveformParameters,
+) -> Dict[Mode, Polarization]:
+
+    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+        raise ValueError(
+            "inspiral_choose_TD_modes can only be applied using on a FrequencyDomain "
+            f"(got {type(waveform_gen_params.domain)})"
+        )
+
+    if waveform_params.phase is None:
+        raise ValueError(
+            f"inspiral_choose_TD_modes: phase parameter should not be None"
+        )
+
+    instance = cast(
+        _InspiralChooseTDModesParameters,
+        _InspiralChooseTDModesParameters.from_waveform_parameters(
+            waveform_params,
+            waveform_gen_params.f_ref,
+            waveform_gen_params.convert_to_SI,
+            waveform_gen_params.domain.get_parameters(),
+            waveform_gen_params.spin_conversion_phase,
+            waveform_gen_params.lal_params,
+            waveform_gen_params.approximant,
+        ),
+    )
+
+    return instance.apply(waveform_gen_params.domain, waveform_params.phase)

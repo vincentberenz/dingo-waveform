@@ -12,9 +12,12 @@ from .approximant import (  # Added missing imports
     get_approximant_description,
 )
 from .domains import Domain, DomainParameters, FrequencyDomain, TimeDomain
+from .generate_fd_modes_LO import generate_FD_modes_LO
+from .generate_td_modes_LO import generate_TD_modes_LO
+from .generate_td_modes_LO_cond_extra_time import generate_TD_modes_LO_cond_extra_time
 from .imports import check_function_signature, import_entity
 from .inspiral_choose_fd_modes import InspiralChooseFDModesParameters
-from .inspiral_choose_td_modes import InspiralChooseTDModesParameters
+from .inspiral_choose_td_modes import inspiral_choose_TD_modes
 from .inspiral_fd import InspiralFDParameters
 from .inspiral_td import InspiralTDParameters
 from .lal_params import get_lal_params
@@ -93,9 +96,9 @@ class WaveformGenerator:
             lal_params = None
 
         # packaging all attributes into an instance of WaveformGeneratorParameters
-        # allows to pass them as arguments to the various functions called by
-        # generate_hplus_hcross and generate_hplus_hcross_m while avoiding circular
-        # dependency.
+        # is not very elegant, but it allows to pass them as arguments
+        # to the various functions called by generate_hplus_hcross and
+        # generate_hplus_hcross_m while avoiding circular dependency.
         self._waveform_generator_params = WaveformGeneratorParameters(
             approximant=approximant,
             domain=domain,
@@ -107,6 +110,32 @@ class WaveformGenerator:
             lal_params=lal_params,
             transform=transform,
         )
+
+    def _generate_hplus_hcross_m_checks(
+        self, waveform_parameters: WaveformParameters
+    ) -> None:
+
+        # for now, only frequency domain is supported
+        if not isinstance(self._waveform_generator_params.domain, FrequencyDomain):
+            raise ValueError(
+                "generate_hplus_hcross_m: only FrequencyDomain are supported "
+                f"({type(self._waveform_generator_params.domain)} not supported)"
+            )
+
+        # ensuring the phase field of the waveform parameters is not None
+        required_keys = ("phase",)
+        for rq in required_keys:
+            if getattr(waveform_parameters, rq) is None:
+                raise ValueError(
+                    f"generate_hplus_hcross_m: the parameters must specify a value for '{rq}'"
+                )
+
+        # for now, only frequency domains are supported
+        if not isinstance(self._waveform_generator_params.domain, FrequencyDomain):
+            raise ValueError(
+                "waveform generator generate_hplus_hcross_m: only "
+                f"FrequencyDomain is supported (not {type(self._waveform_generator_params.domain)})"
+            )
 
     def generate_hplus_hcross_m(
         self, waveform_parameters: WaveformParameters
@@ -128,91 +157,60 @@ class WaveformGenerator:
         # printing in the log the waveform parameters
         _logger.info(
             waveform_parameters.to_table(
-                f"generate hplus/hcross m with waveform parameters (f_ref={self._f_ref})"
+                f"generate hplus/hcross m with waveform parameters (f_ref={self._waveform_generator_params.f_ref})"
             )
         )
 
-        # ensuring the phase field of the waveform parameters is not None
-        required_keys = ("phase",)
-        for rq in required_keys:
-            if getattr(waveform_parameters, rq) is None:
-                raise ValueError(
-                    f"generate_hplus_hcross_m: the parameters must specify a value for '{rq}'"
-                )
+        # checking the configuration is suitable for calling generate_hplus_hcross_m.
+        # A ValueError will be raised if not.
+        # In a separate function for readability only.
+        self._generate_hplus_hcross_m_checks(waveform_parameters)
 
-        # for now, only frequency domains are supported
-        if not isinstance(self._domain, FrequencyDomain):
-            raise ValueError(
-                "waveform generator generate_hplus_hcross_m: only "
-                f"FrequencyDomain is supported (not {type(self._domain)})"
+        # Vincent note:
+        # The below uses the "old" interface for SEOBNRv4PHM and the "new"
+        # interface for any other approximant.
+        # Methods for using the "old" interface for IMRPhenomXPHM is also implemented,
+        # but is unused.
+        # Let me know if this should be changed.
+
+        # "old" interface
+        # SEOBNRv4PHM approximant (calling lalsimulation.SimInspiralChooseTDModes)
+        if self._waveform_generator_params.approximant == Approximant("SEOBNRv4PHM"):
+            _logger.info("generating polarizations using: inspiral_choose_td_modes")
+            return inspiral_choose_TD_modes(
+                self._waveform_generator_params, waveform_parameters
             )
 
-        # only FD_Approximant (IMRPhenomXPHM) and TD_Approximant (SEOBNRv4PHM) are supported
-        if not self._approximant in (FD_Approximant, TD_Approximant):
-            if self._approximant is None:
-                raise ValueError(
-                    "'None' approximant not supported for generate_hplus_hcross_m"
-                )
-            try:
-                desc = f" ({self._approximant})"
-            except Exception as e:
-                desc = ""
-            raise ValueError(
-                "generate_hplus_hcross_m: only the approximants "
-                f"{TD_Approximant} ({TD_Approximant}) and "
-                f"{FD_Approximant} ({FD_Approximant})"
-                f"are currently supported. {self._approximant}{desc} not supported)"
+        # "new" interface
+        # IMRPhenomXPHM approximant
+        # (calling: gwsignal_get_waveform_generator and waveform.GenerateFDModes)
+        if self._waveform_generator_params.approximant == Approximant("IMRPhenomXPHM"):
+            _logger.info("generate polarizations using: generate_FD_modes_LO")
+            return generate_FD_modes_LO(
+                self._waveform_generator_params, waveform_parameters
             )
 
-        convert_to_SI = True
-        hlm: Dict[Modes, FrequencySeries]
-        iota: Iota
-
-        # For TD approximant, we apply the SimInspiralChooseTDModes function
-        if self._approximant == TD_Approximant:
+        # "new" interface
+        # SEOBNRv5PHM or SEOBNRv5HM approximant
+        # (calling gwsignal_get_waveform_generator and GenerateFDModes)
+        if self._waveform_generator_params.approximant in (
+            Approximant("SEOBNRv5PHM"),
+            Approximant("SEOBNRv5HM"),
+        ):
             _logger.info(
-                "generating hplus/hcross m using inspiral choose TD modes parameters"
+                "generate polarizations using: generate_TD_modes_L0_conditioned_extra_time"
             )
-            inspiral_choose_td_modes_parameters = (
-                InspiralChooseTDModesParameters.from_waveform_parameters(
-                    waveform_parameters,
-                    self._f_ref,
-                    convert_to_SI,
-                    self._domain.get_parameters(),
-                    self._spin_conversion_phase,
-                    self._lal_params,
-                    self._approximant,
-                )
+            return generate_TD_modes_LO_cond_extra_time(
+                self._waveform_generator_params, waveform_parameters
             )
-            hlm, iota = inspiral_choose_td_modes_parameters.apply(self._domain)
 
-        # For the FD approximant, we apply the SimInspiralChooseFDModes function
-        elif self._approximant == FD_Approximant:
-            _logger.info(
-                "generating hplus/hcross m using inspiral choose FD modes parameters"
-            )
-            inspiral_choose_fd_modes_parameters = (
-                InspiralChooseFDModesParameters.from_waveform_parameters(
-                    waveform_parameters,
-                    self._f_ref,
-                    convert_to_SI,
-                    self._domain.get_parameters(),
-                    self._spin_conversion_phase,
-                    self._lal_params,
-                    self._approximant,
-                )
-            )
-            hlm, iota = inspiral_choose_fd_modes_parameters.apply()
-
-        # type ignore: (we know parameters.phase is not None, checked earlier in this function)
-        pol: Dict[Mode, Polarization] = get_polarizations_from_fd_modes_m(
-            hlm, iota, waveform_parameters.phase  # type: ignore
+        # "new" interface
+        # any other approximant
+        # (calling gwsignal_get_waveform_generator and GenerateFDModes)
+        _logger.info("generating polarizations using: generate_TD_modes_L0")
+        return generate_TD_modes_LO(
+            self._waveform_generator_params, waveform_parameters
         )
-
-        # logging the generated polarizations as a nice looking table.
-        _logger.debug(f"generated polarizations:\n{polarizations_to_table(pol)}")
-
-        return pol
 
     def generate_hplus_hcross(
         self, waveform_parameters: WaveformParameters

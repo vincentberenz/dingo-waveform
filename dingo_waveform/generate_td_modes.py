@@ -5,7 +5,7 @@
 
 import logging
 from dataclasses import asdict, dataclass
-from typing import Optional, Union
+from typing import Optional, cast
 
 from lalsimulation.gwsignal.core import waveform
 from lalsimulation.gwsignal.models import gwsignal_get_waveform_generator
@@ -16,12 +16,14 @@ from .domains import DomainParameters
 from .gw_signals import GwSignalParameters
 from .polarizations import Polarization
 from .types import GWSignalsGenerators
+from .waveform_generator_parameters import WaveformGeneratorParameters
+from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class GenerateTDModesParameters(GwSignalParameters):
+class _GenerateTDModesParameters(GwSignalParameters):
     """Dataclass for storing parameters for
     lal simulation's GenerateFDModes function
     via a generator (lalsimulation 'new interface')
@@ -34,7 +36,7 @@ class GenerateTDModesParameters(GwSignalParameters):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         f_start: Optional[float] = None,
-    ) -> "GenerateTDModesParameters":
+    ) -> "_GenerateTDModesParameters":
 
         gw_signal_params: (
             GwSignalParameters
@@ -55,3 +57,23 @@ class GenerateTDModesParameters(GwSignalParameters):
         params = {k: v for k, v in asdict(self).items() if v is not None}
         hpc = waveform.GenerateFDModes(generator)
         return Polarization(h_cross=hpc.hp.value, h_plus=hpc.hp.value)
+
+
+def generate_TD_modes(
+    waveform_gen_params: WaveformGeneratorParameters,
+    waveform_params: WaveformParameters,
+    approximant: Approximant,
+) -> Polarization:
+
+    instance = cast(
+        _GenerateTDModesParameters,
+        _GenerateTDModesParameters.from_waveform_parameters(
+            waveform_params,
+            waveform_gen_params.domain.get_parameters(),
+            waveform_gen_params.f_ref,
+            waveform_gen_params.f_start,
+            waveform_gen_params.convert_to_SI,
+        ),
+    )
+
+    return instance.apply(approximant)

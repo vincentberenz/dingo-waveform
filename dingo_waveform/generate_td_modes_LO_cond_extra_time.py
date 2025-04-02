@@ -24,7 +24,8 @@ from .approximant import Approximant
 from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import DomainParameters, FrequencyDomain
 from .gw_signals import GwSignalParameters
-from .types import FrequencySeries, GWSignalsGenerators, Modes
+from .polarizations import Polarization, get_polarizations_from_fd_modes_m
+from .types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
 from .waveform_generator_parameters import WaveformGeneratorParameters
 from .waveform_parameters import WaveformParameters
 from .wfg_utils import td_modes_to_fd_modes
@@ -157,8 +158,8 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
         )
 
     def apply(
-        self, approximant: Approximant, domain: FrequencyDomain
-    ) -> Dict[Modes, FrequencySeries]:
+        self, approximant: Approximant, domain: FrequencyDomain, phase: float
+    ) -> Dict[Mode, Polarization]:
         SEOBRNRv5_conditioning: _SEOBRNRv5Conditioning = (
             self.get_starting_frequency_for_SEOBRNRv5_conditioning()
         )
@@ -181,26 +182,33 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
                 )
                 hlms_lal[modes] = hlm_lal
 
-        return td_modes_to_fd_modes(hlm_lal, domain)
+        h: Dict[Modes, FrequencySeries] = td_modes_to_fd_modes(hlm_lal, domain)
+        return get_polarizations_from_fd_modes_m(h, Iota(self.inclination), phase)
 
 
-def generate_FD_modes_LO_cond_extra_time(
+def generate_TD_modes_LO_cond_extra_time(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
-    approximant: Approximant,
-) -> Dict[Modes, FrequencySeries]:
+) -> Dict[Mode, Polarization]:
+
+    approximant = waveform_gen_params.approximant
 
     supported_approximants = (Approximant("SEOBNRv5PHM"), Approximant("SEOBNRv5HM"))
     if approximant not in supported_approximants:
         raise ValueError(
-            "generate_FD_modes_LO_cond_extra_time does not support the approximant "
+            "generate_TD_modes_LO_cond_extra_time does not support the approximant "
             f"{approximant}. Supported: {' '.join(supported_approximants)}"
         )
 
     if not isinstance(waveform_gen_params.domain, FrequencyDomain):
         raise ValueError(
-            "generate_FD_modes_LO_cond_extra_time can only be applied using on a FrequencyDomain "
+            "generate_TD_modes_LO_cond_extra_time can only be applied using on a FrequencyDomain "
             f"(got {type(waveform_gen_params.domain)})"
+        )
+
+    if waveform_params.phase is None:
+        raise ValueError(
+            f"generate_TD_modes_LO_cond_extra_time: phase parameter should not be None"
         )
 
     instance = cast(
@@ -214,4 +222,6 @@ def generate_FD_modes_LO_cond_extra_time(
         ),
     )
 
-    return instance.apply(approximant, waveform_gen_params.domain)
+    return instance.apply(
+        approximant, waveform_gen_params.domain, waveform_params.phase
+    )
