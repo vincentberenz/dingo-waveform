@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import NewType, Tuple, TypeAlias, Union
+from typing import Callable, Dict, NewType, Tuple, TypeAlias, Union
 
 import lalsimulation as LS
 import numpy as np
@@ -9,6 +9,10 @@ from lalsimulation.gwsignal.models import (
     pyseobnr_model,
 )
 from nptyping import Complex128, NDArray, Shape
+
+from .polarizations import Polarization
+from .waveform_generator_parameters import WaveformGeneratorParameters
+from .waveform_parameters import WaveformParameters
 
 Iota = NewType("Iota", float)
 """
@@ -34,6 +38,14 @@ Modes: TypeAlias = Tuple[Mode, Mode]
 """
 Tuple of two modes.
 """
+
+GwPolarizationMethod: TypeAlias = Callable[
+    [WaveformGeneratorParameters, WaveformParameters], Dict[Mode, Polarization]
+]
+
+PolarizationMethod = Callable[
+    [WaveformGeneratorParameters, WaveformParameters], Polarization
+]
 
 GWSignalsGenerators = Union[
     pyseobnr_model.SEOBNRv5HM,

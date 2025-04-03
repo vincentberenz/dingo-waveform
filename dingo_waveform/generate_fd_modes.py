@@ -119,9 +119,10 @@ class _GenerateFDModesParameters(GwSignalParameters):
 def generate_FD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
-    approximant: Approximant,
     ref_tol: float = 1e-6,
 ) -> Polarization:
+
+    approximant = waveform_gen_params.approximant
 
     if not is_gwsignal_approximant(approximant):
         raise ValueError(

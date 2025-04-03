@@ -62,7 +62,6 @@ class _GenerateTDModesParameters(GwSignalParameters):
 def generate_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
-    approximant: Approximant,
 ) -> Polarization:
 
     instance = cast(
@@ -76,4 +75,4 @@ def generate_TD_modes(
         ),
     )
 
-    return instance.apply(approximant)
+    return instance.apply(waveform_gen_params.approximant)

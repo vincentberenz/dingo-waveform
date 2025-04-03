@@ -18,13 +18,14 @@ from .logging import TableStr
 from .polarizations import Polarization
 from .spins import Spins
 from .types import FrequencySeries, Iota, Mode
+from .waveform_generator_parameters import WaveformGeneratorParameters
 from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class InspiralFDParameters(TableStr):
+class _InspiralFDParameters(TableStr):
     """Dataclass for storing parameters for
     lal simulation's SimInspiralFD function.
     """
@@ -96,7 +97,7 @@ class InspiralFDParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
-    ) -> "InspiralFDParameters":
+    ) -> "_InspiralFDParameters":
         """
         Create an instance from binary black hole parameters.
 
@@ -146,7 +147,7 @@ class InspiralFDParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
-    ) -> "InspiralFDParameters":
+    ) -> "_InspiralFDParameters":
         """
         Create an instance from waveform parameters.
 
@@ -202,7 +203,7 @@ class InspiralFDParameters(TableStr):
         )
         LS.SimInspiralWaveformParamsInsertPhenomXHMThresholdMband(lal_params, 0)
         LS.SimInspiralWaveformParamsInsertPhenomXPHMThresholdMband(lal_params, 0)
-        params: "InspiralFDParameters" = deepcopy(self)
+        params: "_InspiralFDParameters" = deepcopy(self)
         params.lal_params = lal_params
         # arguments = list(astuple(params))
         #  The above would not always work, because lal.Dict can not be deep copied.
@@ -307,3 +308,29 @@ class InspiralFDParameters(TableStr):
         h_plus *= time_shift
         h_cross *= time_shift
         return Polarization(h_plus=h_plus, h_cross=h_cross)
+
+
+def inspiral_FD(
+    waveform_gen_params: WaveformGeneratorParameters,
+    waveform_params: WaveformParameters,
+) -> Polarization:
+
+    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+        raise ValueError(
+            "inspiral_fd can only be applied using on a FrequencyDomain "
+            f"(got {type(waveform_gen_params.domain)})"
+        )
+
+    inspiral_fd_params = _InspiralFDParameters.from_waveform_parameters(
+        waveform_params,
+        waveform_gen_params.f_ref,
+        waveform_gen_params.convert_to_SI,
+        waveform_gen_params.domain.get_parameters(),
+        waveform_gen_params.convert_to_SI,
+        waveform_gen_params.lal_params,
+        approximant=waveform_gen_params.approximant,
+    )
+
+    frequency_array = waveform_gen_params.domain.sample_frequencies()
+
+    return inspiral_fd_params.apply(frequency_array)

@@ -20,4 +20,3 @@ class WaveformGeneratorParameters:
     convert_to_SI: bool
     mode_list: Optional[List[Modes]]
     lal_params: Optional[lal.Dict]
-    transform: Optional[Callable[[Polarization], Polarization]]

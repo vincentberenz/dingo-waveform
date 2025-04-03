@@ -1,6 +1,6 @@
 import logging
 from dataclasses import asdict, astuple, dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, cast
 
 import lal
 import lalsimulation as LS
@@ -10,15 +10,17 @@ from .approximant import Approximant, get_approximant
 from .binary_black_holes import BinaryBlackHoleParameters
 from .domains import DomainParameters
 from .logging import TableStr
+from .polarizations import Polarization, get_polarizations_from_fd_modes_m
 from .spins import Spins
 from .types import FrequencySeries, Iota, Mode, Modes
+from .waveform_generator_parameters import WaveformGeneratorParameters
 from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class InspiralChooseFDModesParameters(TableStr):
+class _InspiralChooseFDModesParameters(TableStr):
     """
     Dataclass which attributes will be the arguments passed to
     LS.SimInspiralChooseFDModes.
@@ -82,7 +84,7 @@ class InspiralChooseFDModesParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
-    ) -> "InspiralChooseFDModesParameters":
+    ) -> "_InspiralChooseFDModesParameters":
         """
         Creates an instance from binary black hole parameters.
 
@@ -127,7 +129,7 @@ class InspiralChooseFDModesParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
-    ) -> "InspiralChooseFDModesParameters":
+    ) -> "_InspiralChooseFDModesParameters":
         """
         Creates an instance from waveform parameters.
 
@@ -154,7 +156,7 @@ class InspiralChooseFDModesParameters(TableStr):
             approximant,
         )
 
-    def apply(self) -> Tuple[Dict[Modes, FrequencySeries], Iota]:
+    def apply(self, phase: float) -> Dict[Mode, Polarization]:
         """
         Applies the LAL simulation method and converts the result to the L0 frame.
 
@@ -176,4 +178,28 @@ class InspiralChooseFDModesParameters(TableStr):
         # "Converting" to L0 frame
         hlm_fd: Dict[Modes, FrequencySeries] = self.convert_J_to_L0_frame(hlm_fd_)
 
-        return hlm_fd, self.iota
+        return get_polarizations_from_fd_modes_m(hlm_fd, self.iota, phase)
+
+
+def inspiral_choose_FD_modes(
+    waveform_gen_params: WaveformGeneratorParameters,
+    waveform_params: WaveformParameters,
+) -> Dict[Mode, Polarization]:
+
+    if waveform_params.phase is None:
+        raise ValueError(f"generate_TD_modes_LO: phase parameter should not be None")
+
+    instance = cast(
+        _InspiralChooseFDModesParameters,
+        _InspiralChooseFDModesParameters.from_waveform_parameters(
+            waveform_params,
+            waveform_gen_params.f_ref,
+            waveform_gen_params.convert_to_SI,
+            waveform_gen_params.domain.get_parameters(),
+            waveform_gen_params.spin_conversion_phase,
+            waveform_gen_params.lal_params,
+            waveform_gen_params.approximant,
+        ),
+    )
+
+    return instance.apply(waveform_params.phase)

@@ -14,13 +14,14 @@ from .logging import TableStr
 from .polarizations import Polarization
 from .spins import Spins
 from .types import FrequencySeries, Iota, Mode
+from .waveform_generator_parameters import WaveformGeneratorParameters
 from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class InspiralTDParameters(TableStr):
+class _InspiralTDParameters(TableStr):
     """Dataclass for storing parameters for
     lal simulation's SimInspiralTD function.
     """
@@ -68,7 +69,7 @@ class InspiralTDParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
-    ) -> "InspiralTDParameters":
+    ) -> "_InspiralTDParameters":
         """
         Creates an instance from binary black hole parameters.
 
@@ -113,7 +114,7 @@ class InspiralTDParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
-    ) -> "InspiralTDParameters":
+    ) -> "_InspiralTDParameters":
         """
         Creates an instance from waveform parameters.
 
@@ -160,3 +161,21 @@ class InspiralTDParameters(TableStr):
         parameters = list(astuple(self))
         hp, hc = LS.SimInspiralTD(*parameters)
         return Polarization(h_plus=hp.data.data, h_cross=hc.data.data)
+
+
+def inspiral_TD(
+    waveform_gen_params: WaveformGeneratorParameters,
+    waveform_params: WaveformParameters,
+) -> Polarization:
+
+    inspiral_td_params = _InspiralTDParameters.from_waveform_parameters(
+        waveform_params,
+        waveform_gen_params.f_ref,
+        waveform_gen_params.convert_to_SI,
+        waveform_gen_params.domain.get_parameters(),
+        waveform_gen_params.spin_conversion_phase,
+        waveform_gen_params.lal_params,
+        waveform_gen_params.approximant,
+    )
+
+    return inspiral_td_params.apply()
