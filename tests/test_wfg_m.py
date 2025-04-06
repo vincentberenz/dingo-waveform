@@ -148,7 +148,7 @@ def test_generate_hplus_hcross_m(approximant) -> None:
         p.phase += phase_shift
         pol_ref: Polarization = wfg.generate_hplus_hcross(p)
 
-        domain = cast(FrequencyDomain, wfg._domain)
+        domain = cast(FrequencyDomain, wfg._waveform_gen_params.domain)
 
         mismatches.append(
             [

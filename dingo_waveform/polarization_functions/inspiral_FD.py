@@ -2,24 +2,25 @@ import logging
 from copy import deepcopy
 from dataclasses import asdict, astuple, dataclass, fields
 from math import isclose
-from typing import Dict, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import lal
 import lalsimulation as LS
 import numpy as np
 from nptyping import Float32, NDArray, Shape
 
-from . import wfg_utils
-from .approximant import Approximant
-from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import DomainParameters, FrequencyDomain
-from .inspiral_choose_fd_modes import InspiralChooseFDModesParameters
-from .logging import TableStr
-from .polarizations import Polarization
-from .spins import Spins
-from .types import FrequencySeries, Iota, Mode
-from .waveform_generator_parameters import WaveformGeneratorParameters
-from .waveform_parameters import WaveformParameters
+from ..approximant import Approximant
+from ..binary_black_holes import BinaryBlackHoleParameters
+from ..domains import DomainParameters, FrequencyDomain
+from ..logging import TableStr
+from ..polarization_modes_functions.inspiral_choose_FD_modes import (
+    _InspiralChooseFDModesParameters,
+)
+from ..polarizations import Polarization
+from ..spins import Spins
+from ..types import Iota
+from ..waveform_generator_parameters import WaveformGeneratorParameters
+from ..waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 
@@ -118,10 +119,10 @@ class _InspiralFDParameters(TableStr):
         -------
         The created instance.
         """
-        # InspiralFDParameters are the same as InspiralChooseFDModesParameters,
+        # InspiralFDParameters are the same as _InspiralChooseFDModesParameters,
         # but with extra ecc attributes all set to zero.
         inspiral_choose_fd_modes_parameters = (
-            InspiralChooseFDModesParameters.from_binary_black_hole_parameters(
+            _InspiralChooseFDModesParameters.from_binary_black_hole_parameters(
                 bbh_parameters,
                 domain_params,
                 spin_conversion_phase,

@@ -1,21 +1,19 @@
 import logging
 from dataclasses import asdict, astuple, dataclass
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 import lal
 import lalsimulation as LS
 
-from . import wfg_utils
-from .approximant import Approximant, TD_Approximant, get_approximant
-from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import DomainParameters
-from .lal_params import lal
-from .logging import TableStr
-from .polarizations import Polarization
-from .spins import Spins
-from .types import FrequencySeries, Iota, Mode
-from .waveform_generator_parameters import WaveformGeneratorParameters
-from .waveform_parameters import WaveformParameters
+from ..approximant import Approximant, get_approximant
+from ..binary_black_holes import BinaryBlackHoleParameters
+from ..domains import DomainParameters
+from ..lal_params import lal
+from ..logging import TableStr
+from ..polarizations import Polarization
+from ..spins import Spins
+from ..waveform_generator_parameters import WaveformGeneratorParameters
+from ..waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 

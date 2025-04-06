@@ -5,18 +5,18 @@ from typing import Dict, Optional, cast
 import lal
 import lalsimulation as LS
 
-from . import wfg_utils
-from .approximant import Approximant, get_approximant
-from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import DomainParameters, FrequencyDomain
-from .lal_params import lal
-from .logging import TableStr
-from .polarizations import Polarization, get_polarizations_from_fd_modes_m
-from .spins import Spins
-from .types import FrequencySeries, Iota, Mode, Modes
-from .waveform_generator_parameters import WaveformGeneratorParameters
-from .waveform_parameters import WaveformParameters
-from .wfg_utils import td_modes_to_fd_modes
+from ..approximant import Approximant, get_approximant
+from ..binary_black_holes import BinaryBlackHoleParameters
+from ..domains import DomainParameters, FrequencyDomain
+from ..lal_params import lal
+from ..logging import TableStr
+from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
+from ..spins import Spins
+from ..types import FrequencySeries, Iota, Mode, Modes
+from ..waveform_generator_parameters import WaveformGeneratorParameters
+from ..waveform_parameters import WaveformParameters
+from . import polarization_modes_utils
+from .polarization_modes_utils import td_modes_to_fd_modes
 
 _logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class _InspiralChooseTDModesParameters(TableStr):
         # from the 'astuple' method.
         # Defining it as 'InitVar' and setting it up in '__post_init__' allows
         # for this.
-        self.iota = iota
+        self.iota = iota  # type: ignore
 
     @classmethod
     def from_binary_black_hole_parameters(
@@ -179,11 +179,11 @@ class _InspiralChooseTDModesParameters(TableStr):
         # Convert linked list of modes into dictionary with keys (l,m)
         # todo: is the type of data really lal.COMPLEX16FrequencySeries ?
         hlm_: Dict[Modes, lal.COMPLEX16FrequencySeries] = (
-            wfg_utils.linked_list_modes_to_dict_modes(hlm__)
+            polarization_modes_utils.linked_list_modes_to_dict_modes(hlm__)
         )
 
         # taper the time domain modes in place
-        wfg_utils.taper_td_modes_in_place(hlm_)
+        polarization_modes_utils.taper_td_modes_in_place(hlm_)
 
         hlm: Dict[Modes, FrequencySeries] = td_modes_to_fd_modes(hlm_, domain)
 

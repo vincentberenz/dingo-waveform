@@ -8,21 +8,18 @@ from typing import Dict, Optional, Tuple, cast
 import lal
 from lalsimulation.gwsignal.core import waveform
 from lalsimulation.gwsignal.core.gw import GravitationalWavePolarizations
-from lalsimulation.gwsignal.models import (
-    gwsignal_get_waveform_generator,
-    pyseobnr_model,
-)
+from lalsimulation.gwsignal.models import gwsignal_get_waveform_generator
 
-from .approximant import Approximant
-from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import DomainParameters, FrequencyDomain
-from .gw_signals import GwSignalParameters
-from .polarizations import Polarization, get_polarizations_from_fd_modes_m
-from .spins import Spins
-from .types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
-from .waveform_generator_parameters import WaveformGeneratorParameters
-from .waveform_parameters import WaveformParameters
-from .wfg_utils import linked_list_modes_to_dict_modes
+from ..approximant import Approximant
+from ..binary_black_holes import BinaryBlackHoleParameters
+from ..domains import DomainParameters
+from ..gw_signals_parameters import GwSignalParameters
+from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
+from ..spins import Spins
+from ..types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
+from ..waveform_generator_parameters import WaveformGeneratorParameters
+from ..waveform_parameters import WaveformParameters
+from .polarization_modes_utils import linked_list_modes_to_dict_modes
 
 _logger = logging.getLogger(__name__)
 

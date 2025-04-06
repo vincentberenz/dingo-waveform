@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Union
 
 import lal
 
@@ -20,3 +20,4 @@ class WaveformGeneratorParameters:
     convert_to_SI: bool
     mode_list: Optional[List[Modes]]
     lal_params: Optional[lal.Dict]
+    transform: Optional[Callable[[Polarization], Polarization]] = None

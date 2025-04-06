@@ -5,16 +5,16 @@ from typing import Dict, Optional, cast
 import lal
 import lalsimulation as LS
 
-from . import wfg_utils
-from .approximant import Approximant, get_approximant
-from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import DomainParameters
-from .logging import TableStr
-from .polarizations import Polarization, get_polarizations_from_fd_modes_m
-from .spins import Spins
-from .types import FrequencySeries, Iota, Mode, Modes
-from .waveform_generator_parameters import WaveformGeneratorParameters
-from .waveform_parameters import WaveformParameters
+from ..approximant import Approximant, get_approximant
+from ..binary_black_holes import BinaryBlackHoleParameters
+from ..domains import DomainParameters
+from ..logging import TableStr
+from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
+from ..spins import Spins
+from ..types import FrequencySeries, Iota, Mode, Modes
+from ..waveform_generator_parameters import WaveformGeneratorParameters
+from ..waveform_parameters import WaveformParameters
+from . import polarization_modes_utils
 
 _logger = logging.getLogger(__name__)
 
@@ -169,7 +169,7 @@ class _InspiralChooseFDModesParameters(TableStr):
 
         # "Converting" to frequency series
         hlm_fd__: Dict[Modes, lal.COMPLEX16FrequencySeries] = (
-            wfg_utils.linked_list_modes_to_dict_modes(hlm_fd___)
+            polarization_modes_utils.linked_list_modes_to_dict_modes(hlm_fd___)
         )
         hlm_fd_: Dict[Modes, FrequencySeries] = {
             k: v.data.data for k, v in hlm_fd__.items()

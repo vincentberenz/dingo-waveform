@@ -29,7 +29,8 @@ dependencies = [
     "nptyping",
     "rich",
     "scipy-stubs[scipy]",
-    "multipledispatch"
+    "multipledispatch",
+    "tomli"
 ]
 
 #[tool.setuptools]

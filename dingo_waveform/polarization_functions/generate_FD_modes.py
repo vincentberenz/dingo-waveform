@@ -17,14 +17,14 @@ from lalsimulation.gwsignal.models import (
     pyseobnr_model,
 )
 
-from .approximant import Approximant, is_gwsignal_approximant
-from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import DomainParameters, FrequencyDomain
-from .gw_signals import GwSignalParameters
-from .polarizations import Polarization
-from .types import WaveformGenerationError
-from .waveform_generator_parameters import WaveformGeneratorParameters
-from .waveform_parameters import WaveformParameters
+from ..approximant import Approximant, is_gwsignal_approximant
+from ..binary_black_holes import BinaryBlackHoleParameters
+from ..domains import DomainParameters, FrequencyDomain
+from ..gw_signals_parameters import GwSignalParameters
+from ..polarizations import Polarization
+from ..types import WaveformGenerationError
+from ..waveform_generator_parameters import WaveformGeneratorParameters
+from ..waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 

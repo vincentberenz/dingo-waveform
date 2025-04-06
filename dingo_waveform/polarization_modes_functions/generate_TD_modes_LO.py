@@ -7,12 +7,9 @@ import logging
 from dataclasses import asdict, dataclass
 from typing import Dict, Optional, Union, cast
 
-import astropy.units
 import gwpy
 import gwpy.frequencyseries
 import lal
-import lalsimulation
-import numpy as np
 from lalsimulation.gwsignal.core import waveform
 from lalsimulation.gwsignal.core.gw import (
     GravitationalWaveModes,
@@ -20,15 +17,15 @@ from lalsimulation.gwsignal.core.gw import (
 )
 from lalsimulation.gwsignal.models import gwsignal_get_waveform_generator
 
-from .approximant import Approximant
-from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import DomainParameters, FrequencyDomain
-from .gw_signals import GwSignalParameters
-from .polarizations import Polarization, get_polarizations_from_fd_modes_m
-from .types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
-from .waveform_generator_parameters import WaveformGeneratorParameters
-from .waveform_parameters import WaveformParameters
-from .wfg_utils import taper_td_modes_in_place, td_modes_to_fd_modes
+from ..approximant import Approximant
+from ..binary_black_holes import BinaryBlackHoleParameters
+from ..domains import DomainParameters, FrequencyDomain
+from ..gw_signals_parameters import GwSignalParameters
+from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
+from ..types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
+from ..waveform_generator_parameters import WaveformGeneratorParameters
+from ..waveform_parameters import WaveformParameters
+from .polarization_modes_utils import taper_td_modes_in_place, td_modes_to_fd_modes
 
 _logger = logging.getLogger(__name__)
 
