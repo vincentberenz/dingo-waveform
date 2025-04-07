@@ -1,8 +1,3 @@
-# To be used in NewInterfaceWaveformGenerator.generate_hplus_hcross
-# (it does *not* override the WaveformGenerator method, but the convert_parameters
-# method is different)
-
-
 import logging
 from dataclasses import asdict, dataclass
 from math import isclose
@@ -38,10 +33,9 @@ _Generators = Union[
 
 @dataclass
 class _GenerateFDModesParameters(GwSignalParameters):
-    """Dataclass for storing parameters for
-    lal simulation's GenerateFDModes function
-    via a generator (lalsimulation 'new interface')
-    """
+    # For the list of Fields, see the superclass GwSignalParameter
+    # This class is private to this module, see generate_FD_modes
+    # at the bottom if this file.
 
     @classmethod
     def from_binary_black_holes_parameters(
@@ -69,12 +63,13 @@ class _GenerateFDModesParameters(GwSignalParameters):
     def apply(
         self, domain: FrequencyDomain, approximant: Approximant, ref_tol
     ) -> Polarization:
-        """
-        Generate Fourier domain GW polarizations (h_plus, h_cross).
 
-        Wrapper over lalsimulation generator and
-        GenerateFDModes.
-        """
+        _logger.debug(
+            self.to_table(
+                "generating polarization using "
+                "lalsimulation.gwsignal.core.waveform.GenerateFDModes"
+            )
+        )
 
         generator: _Generators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
@@ -121,6 +116,29 @@ def generate_FD_modes(
     waveform_params: WaveformParameters,
     ref_tol: float = 1e-6,
 ) -> Polarization:
+    """
+    Wrapper over lalsimulation.gwsignal.core.waveform.GenerateFDModes
+
+    Arguments
+    ---------
+    waveform_gen_params
+      waveform generation configuration
+    waveform_params
+      waveform configuration
+
+    Returns
+    -------
+    Polarizations
+
+    Raises
+    ------
+    ValueError
+      if the domain is not a frequency domain or the
+      approximant is not supported by lalsimulation GWSignal.
+    WaveformGeneratorError
+      if the generatate waveform does not 'agree' with the frequency
+      grid defined in the domain
+    """
 
     approximant = waveform_gen_params.approximant
 
@@ -136,6 +154,8 @@ def generate_FD_modes(
             f"(got {type(waveform_gen_params.domain)})"
         )
 
+    # note: from_waveform_parameters is implemented by the superclass
+    #  of _GenerateFDModesParameters (GwSignalParameters).
     instance = cast(
         _GenerateFDModesParameters,
         _GenerateFDModesParameters.from_waveform_parameters(

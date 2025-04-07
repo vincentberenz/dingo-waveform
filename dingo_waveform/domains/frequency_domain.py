@@ -98,7 +98,7 @@ class _CachedSampleFrequencies:
 # decorator to be used in the FrequencyDomain, for managing
 # cached sample frequencies. This will decorate the setters for
 # the properties f_min, f_max and delta_f. When the value of any
-# of these properties change, the attribute '_cached_sample_frequencies'
+# of these properties changes, the attribute '_cached_sample_frequencies'
 # is rebuilt, so that the sample frequencies get recomputed if needed.
 def _reinit_cached_sample_frequencies(func):
     @wraps(func)
@@ -152,6 +152,7 @@ class FrequencyDomain(Domain):
             f_min, f_max, delta_f
         )
 
+    @override
     def get_parameters(self) -> DomainParameters:
         """
         Get the parameters of the frequency domain.
@@ -173,6 +174,7 @@ class FrequencyDomain(Domain):
         )
         return d
 
+    @override
     @classmethod
     def from_parameters(cls, domain_parameters: DomainParameters) -> "FrequencyDomain":
         """

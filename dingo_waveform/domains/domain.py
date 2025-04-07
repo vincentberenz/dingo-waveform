@@ -12,11 +12,23 @@ _module_import_path = "dingo_waveform.domains"
 
 @dataclass
 class DomainParameters:
-    delta_f: Optional[float]
-    f_min: Optional[float]
+    """
+    Dataclass representation of the domain.
+    Domain instances can be created from instances of DomainParameters,
+    or "saved" as instances of DomainParameters.
+
+    The type, if not None, is expected to be an import path to a subclass
+    of Domain. It will be used by the 'build_domain' function to instantiate
+    the proper domain class.
+    """
+
     f_max: Optional[float]
     delta_t: Optional[float]
-    window_factor: Optional[float]
+    f_min: Optional[float] = None
+    delta_f: Optional[float] = None
+    window_factor: Optional[float] = None
+    time_duration: Optional[float] = None
+    sampling_rate: Optional[float] = None
     type: Optional[str] = None
 
 
@@ -154,7 +166,9 @@ class Domain(ABC):
 def build_domain(domain_parameters: Union[DomainParameters, Dict]) -> Domain:
     """
     Build an instance of domain based on an instance of DomainParameters,
-    or a corresponding dictionary.
+    or a corresponding dictionary. The class used will be based on the 'type'
+    field, which should be an import path to a subclass of Domain, e.g.
+    'dingo_waveform.domains.FrequencyDomain', 'dingo_waveform.domains.TimeDomain'
 
     Parameters
     ----------

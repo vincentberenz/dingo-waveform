@@ -18,7 +18,7 @@ from ..polarization_modes_functions.inspiral_choose_FD_modes import (
 )
 from ..polarizations import Polarization
 from ..spins import Spins
-from ..types import Iota
+from ..types import Iota, WaveformGenerationError
 from ..waveform_generator_parameters import WaveformGeneratorParameters
 from ..waveform_parameters import WaveformParameters
 
@@ -55,39 +55,24 @@ class _InspiralFDParameters(TableStr):
     approximant: int
 
     def get_spins(self) -> Spins:
-        """
-        Get the spins of the binary black hole system.
-
-        Returns
-        -------
-        The spins of the binary black hole system.
-        """
         return Spins(
             self.iota, self.s1x, self.s1y, self.s1z, self.s2x, self.s2y, self.s2z
         )
 
     def to_tuple(self) -> Tuple[Union[float, Optional[lal.Dict]]]:
-        """
-        Returns
-        -------
+        # This instance casted to a tuple. It differs from:
+        #
+        #   p = InspiralFDParameters()
+        #   t = astuple(p)
+        #
+        # Above, t contains deep copies of fields, which is not
+        # supported by instances of lal.Dict; i.e. if lal_params is not None
+        # `astuple(p)` will raise a runtime error. But in the following case:
+        #
+        #   t = p.to_tuple()
+        #
+        # t will contain a reference to lal_params and no error will be raised.
 
-        This instance casted to a tuple. It differs from:
-
-        ```
-        p = InspiralFDParameters()
-        t = astuple(p)
-        ```
-
-        In the case above, t contains deep copies of fields, which is not
-        supported by instances of lal.Dict; i.e. if lal_params is not None
-        `astuple(p)` will raise a runtime error. But in the following case:
-
-        ```
-        t = p.to_tuple()
-        ```
-
-        t will contain a reference to lal_params and no error will be raised.
-        """
         return tuple(getattr(self, f.name) for f in fields(self))
 
     @classmethod
@@ -99,28 +84,7 @@ class _InspiralFDParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
     ) -> "_InspiralFDParameters":
-        """
-        Create an instance from binary black hole parameters.
 
-        Parameters
-        ----------
-        bbh_parameters :
-            The binary black hole parameters.
-        domain_params :
-            The domain parameters.
-        spin_conversion_phase :
-            The phase for spin conversion.
-        lal_params :
-            The LAL parameters.
-        approximant :
-            The approximant.
-
-        Returns
-        -------
-        The created instance.
-        """
-        # InspiralFDParameters are the same as _InspiralChooseFDModesParameters,
-        # but with extra ecc attributes all set to zero.
         inspiral_choose_fd_modes_parameters = (
             _InspiralChooseFDModesParameters.from_binary_black_hole_parameters(
                 bbh_parameters,
@@ -149,30 +113,7 @@ class _InspiralFDParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
     ) -> "_InspiralFDParameters":
-        """
-        Create an instance from waveform parameters.
 
-        Parameters
-        ----------
-        waveform_parameters :
-            The waveform parameters.
-        f_ref :
-            The reference frequency.
-        convert_to_SI :
-            Whether to convert to SI units.
-        domain_params :
-            The domain parameters.
-        spin_conversion_phase :
-            The phase for spin conversion.
-        lal_params :
-            The LAL parameters.
-        approximant :
-            The approximant.
-
-        Returns
-        -------
-        The created instance.
-        """
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
             waveform_parameters, f_ref, convert_to_SI
         )
@@ -199,6 +140,9 @@ class _InspiralFDParameters(TableStr):
 
         if max(np.max(np.abs(hp.data.data)), np.max(np.abs(hc.data.data))) <= threshold:
             return hp, hc, True
+
+        _logger.debug("unstability detected, attempting to turning of multibanding")
+
         lal_params = (
             self.lal_params if self.lal_params is not None else lal.CreateDict()
         )
@@ -211,6 +155,9 @@ class _InspiralFDParameters(TableStr):
         #  (a RuntimeError is raised).
         #  So we do instead:
         arguments = list(params.to_tuple())
+
+        _logger.debug(params.to_table("calling LS.SimInspiralFD with parameters"))
+
         hp, hc = LS.SimInspiralFD(*arguments)
         if max(np.max(np.abs(hp.data.data)), np.max(np.abs(hc.data.data))) <= threshold:
             return hp, hc, True
@@ -225,42 +172,11 @@ class _InspiralFDParameters(TableStr):
         stability_threshold: float = 1e-20,
         delta_f_tolerance: float = 1e-6,
     ) -> Polarization:
-        """
-        Apply the LAL simulation method and convert the result to the frequency domain.
 
-        Parameters
-        ----------
-        frequency_array :
-            The frequency array to apply the transformation.
-        auto_turn_off_multibanding :
-            Whether to automatically turn off multibanding if numerical instability is detected.
-            Multibanding is a technique used to optimize waveform generation by reducing computational
-            cost. However, it can sometimes lead to numerical instability, especially when the waveform
-            amplitudes exceed a certain threshold. If this parameter is set to True, the method will
-            attempt to turn off multibanding to regain stability.
-        raise_error_on_numerical_unstability :
-            Whether to raise an error if numerical instability is detected. If set to True, a RuntimeError
-            will be raised when numerical instability is detected and cannot be resolved by turning off
-            multibanding.
-        stability_threshold :
-            The numerical stability threshold. This value is used to determine if the waveform amplitudes
-            are stable. If the maximum amplitude exceeds this threshold, the waveform is considered unstable.
-        delta_f_tolerance :
-            The tolerance for delta_f consistency. This ensures that the frequency resolution of the
-            generated waveform matches the expected resolution within this tolerance.
+        _logger.debug(
+            self.to_table("generating polarization using lalsimulation.SimInspiralFD")
+        )
 
-        Returns
-        -------
-        The polarization in the frequency domain.
-
-        Raises
-        ------
-        RuntimeError
-            If raise_error_on_numerical_unstability is True and numerical instability is detected
-            even after attempting to turn off multibanding.
-        ValueError
-            If the waveform delta_f is inconsistent with the domain's delta_f.
-        """
         hp: lal.COMPLEX16FrequencySeries
         hc: lal.COMPLEX16FrequencySeries
 
@@ -282,7 +198,7 @@ class _InspiralFDParameters(TableStr):
                 _logger.error(error_message)
 
         if not isclose(self.delta_f, hp.deltaF, rel_tol=delta_f_tolerance):
-            raise ValueError(
+            raise WaveformGenerationError(
                 f"Waveform delta_f is inconsistent with domain: {hp.deltaF} vs {self.delta_f}!"
                 f"To avoid this, ensure that f_max = {self.f_max} is a power of two"
                 "when you are using a native time-domain waveform model."
@@ -303,11 +219,13 @@ class _InspiralFDParameters(TableStr):
             h_plus[: len(hp.data.data)] = hp.data.data
             h_cross[: len(hc.data.data)] = hc.data.data
 
-        # Undo the time shift done in SimInspiralFD to the waveform
+        _logger.debug("undoing the time shift done in SimInspiralFD to the waveform")
+
         dt = 1 / hp.deltaF + (hp.epoch.gpsSeconds + hp.epoch.gpsNanoSeconds * 1e-9)
         time_shift = np.exp(-1j * 2 * np.pi * dt * frequency_array)
         h_plus *= time_shift
         h_cross *= time_shift
+
         return Polarization(h_plus=h_plus, h_cross=h_cross)
 
 
@@ -315,6 +233,28 @@ def inspiral_FD(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Polarization:
+    """
+    Wrapper over lalsimulation.SimInspiralFD
+
+    Arguments
+    ---------
+    waveform_gen_params
+      waveform generation configuration
+    waveform_params
+      waveform configuration
+
+    Returns
+    -------
+    Polarizations
+
+    Raises
+    ------
+    ValueError
+      if the domain is not an instance of FrequencyDomain
+    WaveformGenerationError
+      if an numerical instability that could not be solved by
+      turning off the multibanding is detected
+    """
 
     if not isinstance(waveform_gen_params.domain, FrequencyDomain):
         raise ValueError(

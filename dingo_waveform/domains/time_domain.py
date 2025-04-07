@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from functools import lru_cache
 
 import numpy as np
@@ -14,8 +15,6 @@ class TimeDomain(Domain):
     The time bins are assumed to be uniform between [0, duration]
     with spacing 1 / sampling_rate.
     window_factor is used to compute noise_std().
-
-    UNDER CONSTRUCTION.
     """
 
     def __init__(self, time_duration: float, sampling_rate: float):
@@ -34,6 +33,13 @@ class TimeDomain(Domain):
 
     @override
     def update(self) -> None:
+        """
+        TimeDomain does not support update.
+
+        Raises
+        ------
+        A NotImplementedError
+        """
         raise NotImplementedError("TimeDomain does not support update")
 
     @lru_cache()
@@ -58,7 +64,7 @@ class TimeDomain(Domain):
         np.ndarray
             Array of uniform times.
         """
-        num_bins = self.__len__()
+        num_bins = len(self)
         return np.linspace(
             0.0,
             self._time_duration,
@@ -110,9 +116,6 @@ class TimeDomain(Domain):
         """
         return 1.0 / np.sqrt(2.0 * self.delta_t)
 
-    def time_translate_data(self, data, dt) -> np.ndarray:
-        raise NotImplementedError
-
     @property
     def f_max(self) -> float:
         """
@@ -139,21 +142,57 @@ class TimeDomain(Domain):
 
     @property
     def sampling_rate(self) -> float:
+        """
+        Returns the sampling rate.
+        """
         return self._sampling_rate
 
     @property
     def min_idx(self) -> int:
+        """Return the minimum index of the domain."""
         return 0
 
     @property
     def max_idx(self) -> int:
+        """Return the maximum index of the domain."""
         return round(self._time_duration * self._sampling_rate)
 
-    @property
-    def domain_dict(self):
-        """Enables to rebuild the domain via calling build_domain(domain_dict)."""
-        return {
-            "type": "TimeDomain",
-            "time_duration": self._time_duration,
-            "sampling_rate": self._sampling_rate,
-        }
+    @override
+    def get_parameters(self) -> DomainParameters:
+        """
+        Returns the corresponding instance of DomainParameters,
+        filling the fields delta_t, f_max, time_duration and
+        sampling_rate.
+        """
+        return DomainParameters(
+            delta_t=self.delta_t,
+            f_max=self.f_max,
+            time_duration=self._time_duration,
+            sampling_rate=self._sampling_rate,
+            # type will be "dingo_waveform.domains.TimeDomain"
+            type=f"{_module_import_path}.TimeDomain",
+        )
+
+    @override
+    @classmethod
+    def from_parameters(cls, domain_parameters: DomainParameters) -> "TimeDomain":
+        """
+        Construct an instance of TimeDomain from the parameters.
+        It uses the fields time_duration and sampling_rate, which should not be
+        None
+
+        Raises
+        ------
+        A ValueError if either the file time_duration or sampling_rate is None.
+        """
+        for attr in ("time_duration", "sampling_rate"):
+            if getattr(domain_parameters, attr) is None:
+                raise ValueError(
+                    "Can not construct TimeDomain from "
+                    f"{repr(asdict(domain_parameters))}: {attr} should not be None"
+                )
+        # type ignore: we know time_duration and sampling_rate are not None
+        return cls(
+            domain_parameters.time_duration,  # type: ignore
+            domain_parameters.sampling_rate,  # type: ignore
+        )

@@ -1,8 +1,3 @@
-# To be used in NewInterfaceWaveformGenerator.generate_hplus_hcross
-# (it does *not* override the WaveformGenerator method, but the convert_parameters
-# method is different)
-
-
 import logging
 from dataclasses import asdict, dataclass
 from typing import Optional, cast
@@ -24,10 +19,11 @@ _logger = logging.getLogger(__name__)
 
 @dataclass
 class _GenerateTDModesParameters(GwSignalParameters):
-    """Dataclass for storing parameters for
-    lal simulation's GenerateFDModes function
-    via a generator (lalsimulation 'new interface')
-    """
+    # To see the list of fiels: see the superclass GwSignalParameters.
+    # The superclass also implement the from_waveform_parameters
+    # method.
+    # This class is private to this module, see the method
+    # generate_TD_modes at the bottom of this file.
 
     @classmethod
     def from_binary_black_holes_parameters(
@@ -50,12 +46,17 @@ class _GenerateTDModesParameters(GwSignalParameters):
         return cls(**asdict(gw_signal_params))
 
     def apply(self, approximant: Approximant) -> Polarization:
-        """
-        Generate time domain GW polarizations (h_plus, h_cross)
-        """
+
+        _logger.debug(
+            self.to_table(
+                "generating polarization using "
+                "lalsimulation.gwsignal.core.waveform.GenerateFDModes"
+            )
+        )
+
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
-        hpc = waveform.GenerateFDModes(generator)
+        hpc = waveform.GenerateTDModes(generator)
         return Polarization(h_cross=hpc.hp.value, h_plus=hpc.hp.value)
 
 
@@ -63,7 +64,23 @@ def generate_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Polarization:
+    """
+    Wrapper over lalsimulation.gwsignal.core.waveform.GenerateTDModes
 
+    Arguments
+    ---------
+    waveform_gen_params
+      waveform generation configuration
+    waveform_params
+      waveform configuration
+
+    Returns
+    -------
+    Polarizations
+    """
+
+    # note: from_waveform_parameters is implemented by the superclass
+    #  of _GenerateTDModesParameters (GwSignalParameters).
     instance = cast(
         _GenerateTDModesParameters,
         _GenerateTDModesParameters.from_waveform_parameters(
