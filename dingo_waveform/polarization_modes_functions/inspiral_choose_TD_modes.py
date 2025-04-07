@@ -23,10 +23,6 @@ _logger = logging.getLogger(__name__)
 
 @dataclass
 class _InspiralChooseTDModesParameters(TableStr):
-    """Dataclass for storing parameters for
-    lal simulation's SimInspiralChooseTDModes function.
-    """
-
     # Warning: order matters ! The arguments will be generated
     # in the order below:
     phiRef: float
@@ -65,28 +61,8 @@ class _InspiralChooseTDModesParameters(TableStr):
         approximant: Approximant,
         l_max_default: int = 5,
     ) -> "_InspiralChooseTDModesParameters":
-        """Creates an instance from binary black hole parameters.
+        # Creates an instance from binary black hole parameters.
 
-        Parameters
-        ----------
-        bbh_parameters : BinaryBlackHoleParameters
-            The binary black hole parameters.
-        domain_params : DomainParameters
-            The domain parameters.
-        spin_conversion_phase : Optional[float]
-            The phase for spin conversion.
-        lal_params : Optional[lal.Dict]
-            The LAL parameters.
-        approximant : Optional[Approximant]
-            The approximant.
-        l_max_default : int
-            Default maximum l value for modes.
-
-        Returns
-        -------
-        InspiralChooseTDModesParameters
-            The created instance.
-        """
         spins: Spins = bbh_parameters.get_spins(spin_conversion_phase)
         params = asdict(spins)
         params["phiRef"] = 0.0
@@ -118,30 +94,8 @@ class _InspiralChooseTDModesParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
     ) -> "_InspiralChooseTDModesParameters":
-        """Creates an instance from waveform parameters.
+        # Creates an instance from waveform parameters.
 
-        Parameters
-        ----------
-        waveform_params :
-            The waveform parameters.
-        f_ref :
-            The reference frequency.
-        convert_to_SI :
-            Whether to convert to SI units.
-        domain_params :
-            The domain parameters.
-        spin_conversion_phase :
-            The phase for spin conversion.
-        lal_params :
-            The LAL parameters.
-        approximant :
-            The approximant.
-
-        Returns
-        -------
-        InspiralChooseTDModesParameters
-            The created instance.
-        """
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
             waveform_params, f_ref, convert_to_SI
         )
@@ -154,17 +108,6 @@ class _InspiralChooseTDModesParameters(TableStr):
         )
 
     def apply(self, domain: FrequencyDomain, phase: float) -> Dict[Mode, Polarization]:
-        """Applies the LAL simulation method and converts the result to the frequency domain.
-
-        Parameters
-        ----------
-        domain :
-            The frequency domain to apply the transformation.
-
-        Returns
-        -------
-        The frequency series in the frequency domain and the iota.
-        """
         _logger.debug(
             "calling LS.SimInspiralChooseTDModes with arguments:"
             f"{', '.join([str(v) for v in astuple(self)])}"
@@ -198,6 +141,26 @@ def inspiral_choose_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:
+    """
+    Wrapper over lalsimulation.SimInspiralChooseTDModes
+
+    Arguments
+    ---------
+    waveform_gen_params
+      waveform generation configuration
+    waveform_params
+      waveform configuration
+
+    Returns
+    -------
+    Dictionary mode / polarizations
+
+    Raises
+    ------
+    ValueError
+      - if the specified domain is not an instance of FrequencyDomain
+      - if the phase parameter is not specified
+    """
 
     if not isinstance(waveform_gen_params.domain, FrequencyDomain):
         raise ValueError(

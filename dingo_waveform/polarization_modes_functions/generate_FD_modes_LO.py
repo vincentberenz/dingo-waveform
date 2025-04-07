@@ -29,10 +29,9 @@ _SupportedApproximant = Approximant("IMRPhenomXPHM")
 
 @dataclass
 class _GenerateFDModesLOParameters(GwSignalParameters):
-    """Dataclass for storing parameters for
-    lal simulation's GenerateFDModes function
-    via a generator (lalsimulation 'new interface')
-    """
+
+    # For fields and source of the method "from_waveform_parameters"
+    # see the code of the superclass GwSignalParameters
 
     @classmethod
     def from_binary_black_holes_parameters(
@@ -59,16 +58,14 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
         spin_conversion_phase: float,
         phase: float,
     ) -> Dict[Mode, Polarization]:
-        """
-        Generate Fourier domain GW polarizations (h_plus, h_cross).
-
-        Wrapper over lalsimulation generator and
-        GenerateFDModes.
-        """
 
         # only approximant supported.
         # (so no need to pass it as argument)
         approximant = Approximant("IMRPhenomXPHM")
+
+        _logger.debug(
+            self.to_table("generating polarization using waveform.GenerateFDModes")
+        )
 
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
@@ -80,7 +77,7 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
         for key, value in hlm_fd.items():
             if type(key) != str:
                 hlm_lal = lal.CreateCOMPLEX16TimeSeries(
-                    "hplus",
+                    key,
                     value.epoch.value,
                     0,
                     value.dt.value,
@@ -129,6 +126,26 @@ def generate_FD_modes_LO(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:
+    """
+    Wrapper over lalsimulation.gwsignal.core.waveform.GenerateFDModes
+    using the IMRPhenomXPHM approximant.
+
+    Arguments
+    ---------
+    waveform_gen_params
+      waveform generation configuration
+    waveform_params
+      waveform configuration
+
+    Returns
+    -------
+    Dictionary mode / polarizations
+
+    Raises
+    ------
+    ValueError
+      if spin_conversion_phase or phase is not specified in the configuration
+    """
 
     if waveform_gen_params.spin_conversion_phase is None:
         raise ValueError(

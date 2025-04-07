@@ -57,6 +57,10 @@ class _GenerateTDModesLO(GwSignalParameters):
         self, approximant: Approximant, domain: FrequencyDomain, phase: float
     ) -> Dict[Mode, Polarization]:
 
+        _logger.debug(
+            self.to_table("generating polarization using waveform.GenerateFDModes")
+        )
+
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
 
@@ -90,6 +94,26 @@ def generate_TD_modes_LO(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:
+    """
+    Wrapper over lalsimulation.gwsignal.core.waveform.GenerateFDModes
+
+    Arguments
+    ---------
+    waveform_gen_params
+      waveform generation configuration
+    waveform_params
+      waveform configuration
+
+    Returns
+    -------
+    Dictionary mode / polarizations
+
+    Raises
+    ------
+    ValueError
+      - if the domain is not of the class FrequencyDomain
+      - if the phase parameter is not specified
+    """
 
     if not isinstance(waveform_gen_params.domain, FrequencyDomain):
         raise ValueError(

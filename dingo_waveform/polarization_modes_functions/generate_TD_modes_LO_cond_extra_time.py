@@ -163,15 +163,21 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
         SEOBRNRv5_conditioning: _SEOBRNRv5Conditioning = (
             self.get_starting_frequency_for_SEOBRNRv5_conditioning()
         )
+
+        _logger.debug(
+            self.to_table("generating polarization using waveform.GenerateFDModes")
+        )
+
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
         params["f22_start"] = SEOBRNRv5_conditioning.new_f_start * astropy.units.Hz
         hlm_td: GravitationalWaveModes = waveform.GenerateFDModes(params, generator)
 
+        _logger.debug("tapering TD modes for SEOBRNRv5 extra time")
+
+        hlms_lal: Dict[Modes, lal.CreateCOMPLEX16TimeSeries] = {}
         key: SpinWeightedSphericalHarmonicMode
         value: Union[gwpy.timeseries.TimeSeries, gwpy.frequencyseries.FrequencySeries]
-        hlms_lal: Dict[Modes, lal.CreateCOMPLEX16TimeSeries] = {}
-
         for key, value in hlm_td.items():
             if type(key) != str:
                 modes: Modes = (key.l, key.m)
@@ -190,6 +196,29 @@ def generate_TD_modes_LO_cond_extra_time(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:
+    """
+    Wrapper over lalsimulation.gwsignal.core.waveform.GenerateFDModes
+    using the SEOBNRv5PHM or the SEOBNRv5HM approximant;
+    tapering TD modes for SEOBRNRv5 extra time
+
+    Arguments
+    ---------
+    waveform_gen_params
+      waveform generation configuration
+    waveform_params
+      waveform configuration
+
+    Returns
+    -------
+    Dictionary mode / polarizations
+
+    Raises
+    ------
+    ValueError
+      - if the specified approximant is neither SEOBNRv5PHM nor SEOBNRv5HM
+      - if the domain is not of the class FrequencyDomain
+      - if the phase parameter is not specified
+    """
 
     approximant = waveform_gen_params.approximant
 

@@ -97,6 +97,11 @@ class _InspiralTDParameters(TableStr):
         )
 
     def apply(self) -> Polarization:
+
+        _logger.debug(
+            self.to_table("generating polarization using lalsimulation.SimInspiralTD")
+        )
+
         parameters = list(astuple(self))
         hp, hc = LS.SimInspiralTD(*parameters)
         return Polarization(h_plus=hp.data.data, h_cross=hc.data.data)

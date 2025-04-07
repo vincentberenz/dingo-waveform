@@ -21,10 +21,6 @@ _logger = logging.getLogger(__name__)
 
 @dataclass
 class _InspiralChooseFDModesParameters(TableStr):
-    """
-    Dataclass which attributes will be the arguments passed to
-    LS.SimInspiralChooseFDModes.
-    """
 
     # Order matters !
     # The list of arguments will be generated via the 'astuple' dataclass
@@ -49,12 +45,6 @@ class _InspiralChooseFDModesParameters(TableStr):
     approximant: int
 
     def get_spins(self) -> Spins:
-        """
-        Returns the spins.
-
-        Returns:
-            Spins: The spins of the system.
-        """
         return Spins(
             self.iota, self.s1x, self.s1y, self.s1z, self.s2x, self.s2y, self.s2z
         )
@@ -62,15 +52,7 @@ class _InspiralChooseFDModesParameters(TableStr):
     def convert_J_to_L0_frame(
         self, hlm_J: Dict[Modes, FrequencySeries]
     ) -> Dict[Modes, FrequencySeries]:
-        """
-        Converts the given frequency series to the L0 frame.
 
-        Parameters:
-            hlm_J: The frequency series in the J frame.
-
-        Returns:
-            Dict[Modes, FrequencySeries]: The frequency series in the L0 frame.
-        """
         converted_to_SI = True
         return self.get_spins().convert_J_to_L0_frame(
             hlm_J, self.mass_1, self.mass_2, converted_to_SI, self.f_ref, self.phase
@@ -85,19 +67,8 @@ class _InspiralChooseFDModesParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
     ) -> "_InspiralChooseFDModesParameters":
-        """
-        Creates an instance from binary black hole parameters.
+        # Creates an instance from binary black hole parameters.
 
-        Parameters:
-            bbh_parameters: The binary black hole parameters.
-            domain_params: The domain parameters.
-            spin_conversion_phase: The phase for spin conversion.
-            lal_params: The LAL parameters.
-            approximant: The approximant.
-
-        Returns:
-            InspiralChooseFDModesParameters: The created instance.
-        """
         spins: Spins = bbh_parameters.get_spins(spin_conversion_phase)
         # adding iota, s1x, ..., s2x, ...
         parameters = asdict(spins)
@@ -130,21 +101,8 @@ class _InspiralChooseFDModesParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
     ) -> "_InspiralChooseFDModesParameters":
-        """
-        Creates an instance from waveform parameters.
+        # Creates an instance from waveform parameters.
 
-        Parameters:
-            waveform_parameters: The waveform parameters.
-            f_ref: The reference frequency.
-            convert_to_SI: Whether to convert to SI units.
-            domain_params: The domain parameters.
-            spin_conversion_phase: The phase for spin conversion.
-            lal_params: The LAL parameters.
-            approximant: The approximant.
-
-        Returns:
-            InspiralChooseFDModesParameters: The created instance.
-        """
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
             waveform_parameters, f_ref, convert_to_SI
         )
@@ -157,12 +115,13 @@ class _InspiralChooseFDModesParameters(TableStr):
         )
 
     def apply(self, phase: float) -> Dict[Mode, Polarization]:
-        """
-        Applies the LAL simulation method and converts the result to the L0 frame.
 
-        Returns:
-            Tuple[Dict[Modes, FrequencySeries], Iota]: The frequency series in the L0 frame and the iota.
-        """
+        _logger.debug(
+            self.to_table(
+                "generating modes / polarizations using lalsimulation.SimInspiralChooseFDModes"
+            )
+        )
+
         # Calling the lal simulation method
         arguments = list(astuple(self))
         hlm_fd___: LS.SphHarmFrequencySeries = LS.SimInspiralChooseFDModes(*arguments)
@@ -185,6 +144,25 @@ def inspiral_choose_FD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:
+    """
+    Wrapper over lalsimulation.SimInspiralChooseFDModes
+
+    Arguments
+    ---------
+    waveform_gen_params
+      waveform generation configuration
+    waveform_params
+      waveform configuration
+
+    Returns
+    -------
+    Dictionary mode / polarizations
+
+    Raises
+    ------
+    ValueError
+      if the phase parameter is not specified
+    """
 
     if waveform_params.phase is None:
         raise ValueError(f"generate_TD_modes_LO: phase parameter should not be None")
