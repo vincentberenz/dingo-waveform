@@ -45,6 +45,10 @@ def _convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
 
 @dataclass
 class BinaryBlackHoleParameters(TableStr):
+    """
+    Parameters required for calling lalsimulation functions.
+    """
+
     luminosity_distance: float
     a_1: float
     a_2: float

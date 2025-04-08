@@ -4,6 +4,7 @@ from math import isclose
 from typing import Optional, Union, cast
 
 import astropy.units
+import lalsimulation
 import numpy as np
 from lalsimulation.gwsignal.core import waveform
 from lalsimulation.gwsignal.core.gw import GravitationalWavePolarizations
@@ -12,7 +13,7 @@ from lalsimulation.gwsignal.models import (
     pyseobnr_model,
 )
 
-from ..approximant import Approximant, is_gwsignal_approximant
+from ..approximant import Approximant
 from ..binary_black_holes import BinaryBlackHoleParameters
 from ..domains import DomainParameters, FrequencyDomain
 from ..gw_signals_parameters import GwSignalParameters
@@ -142,7 +143,7 @@ def generate_FD_modes(
 
     approximant = waveform_gen_params.approximant
 
-    if not is_gwsignal_approximant(approximant):
+    if not lalsimulation.SimInspiralGetApproximantFromString(approximant):
         raise ValueError(
             f"Approximant {approximant} not supported for generate_FD_modes "
             "(not implemented in lalsimulation GWSignal)"

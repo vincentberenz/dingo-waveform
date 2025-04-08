@@ -165,7 +165,9 @@ def inspiral_choose_FD_modes(
     """
 
     if waveform_params.phase is None:
-        raise ValueError(f"generate_TD_modes_LO: phase parameter should not be None")
+        raise ValueError(
+            f"inspiral_choose_FD_modes: phase parameter should not be None"
+        )
 
     instance = cast(
         _InspiralChooseFDModesParameters,

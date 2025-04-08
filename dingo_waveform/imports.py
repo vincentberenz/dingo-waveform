@@ -62,6 +62,16 @@ def import_entity(import_path: str) -> Tuple[Any, str, str]:
     Given an import path as a string, returns a tuple containing the imported entity,
     the related module (as a string), and the entity name (as a string).
 
+    Example of usage:
+
+    ```
+    domain_class, module_path, name = import_entity('dingo_waveform.domains.FrequencyDomain')
+
+    # domain_class: the FrequencyDomain class
+    # module path: "dingo_waveform.domains"
+    # name: "FrequencyDomain"
+    ```
+
     Parameters
     ----------
     import_path : The import path as a string.
@@ -75,6 +85,7 @@ def import_entity(import_path: str) -> Tuple[Any, str, str]:
     ImportError
         If the import failed.
     """
+
     # Split the import path to get the module path and entity name
     *module_parts, entity_name = import_path.split(".")
     module_path = ".".join(module_parts)
@@ -101,6 +112,37 @@ def import_function(
     expected_param_types: List[type],
     expected_return_type: type,
 ) -> Optional[Callable]:
+    """
+    Dynamically imports and validates a function based on its signature.
+
+    This function serves two purposes:
+    1. Imports a function from a specified import path
+    2. Validates that the imported function matches the expected signature
+
+    Parameters
+    ----------
+    import_path_or_fn :
+        Either:
+            - A string representing the import path (e.g., 'module.submodule.function_name')
+            - An existing callable function to validate
+            - None to return None immediately
+    expected_param_types :
+        List of expected parameter types that the function should accept
+    expected_return_type :
+        Expected return type of the function
+
+    Returns
+    -------
+    The imported and validated function, or None if import_path_or_fn is None
+
+    Raises
+    ------
+    ValueError
+        If the function's signature does not match the expected parameters or return type
+    ImportError
+        If the module import fails or if the specified entity cannot be found
+    """
+
     if import_path_or_fn is None:
         return None
     if not isinstance(import_path_or_fn, str):

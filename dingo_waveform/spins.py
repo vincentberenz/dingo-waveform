@@ -63,6 +63,19 @@ def rotate_y(
 
 @dataclass
 class Spins(TableStr):
+    """
+    Container class for spin parameters of a binary system.
+
+    Attributes
+    ----------
+    iota : float
+        Inclination angle between the binary's orbital angular momentum and the line of sight
+    s1x, s1y, s1z : float
+        Dimensionless spin components of the first object in the x, y, z directions
+    s2x, s2y, s2z : float
+        Dimensionless spin components of the second object in the x, y, z directions
+    """
+
     iota: float
     s1x: float
     s1y: float

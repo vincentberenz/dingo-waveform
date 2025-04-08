@@ -1,13 +1,25 @@
+from dataclasses import dataclass
+from typing import Optional
+
 import numpy as np
 import pytest
 import torch
+from scipy.signal.windows import tukey
 
 from dingo_waveform.domains import DomainParameters, FrequencyDomain, build_domain
-from dingo_waveform.gwutils import get_tukey_window_factor
+from dingo_waveform.types import FrequencySeries
 
 _uniform_FD_params = {"f_min": 20.0, "f_max": 4096.0, "delta_f": 1.0 / 4.0}
 
 _window_factor_args = {"f_s": 4096, "T": 8.0, "roll_off": 0.4}
+
+
+def _get_tukey_window_factor(T: float, f_s: int, roll_off: float):
+    """Compute window factor. If window is not provided as array or tensor but as
+    window_kwargs, first build the window."""
+    alpha = 2 * roll_off / T
+    w = tukey(int(T * f_s), alpha)
+    return np.sum(w**2) / len(w)
 
 
 def test_uniform_FD() -> None:
@@ -175,7 +187,7 @@ def test_FD_caching() -> None:
 def test_FD_window_factor():
     p = _uniform_FD_params
     domain = FrequencyDomain(**p)
-    window_factor = get_tukey_window_factor(**_window_factor_args)
+    window_factor = _get_tukey_window_factor(**_window_factor_args)
     assert window_factor == 0.9374713897717841
     # check that window_factor is initially None
     assert domain.window_factor is None

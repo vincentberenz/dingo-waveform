@@ -8,7 +8,7 @@ from rich.style import Style
 from rich.table import Table
 
 # This will be used by the 'to_table' method in this module
-# to 'cast' type to a color (e.g. str value will be printed in 
+# to 'cast' type to a color (e.g. str value will be printed in
 # cyan in the table)
 _TYPE_STYLES = {
     str: Style(color="cyan"),
@@ -28,7 +28,7 @@ class DataclassType(Protocol):
     # For reason I do not fully understand, dataclass is not a type.
     # Therefore typing hints like 'f(a: dataclass)->None' is not valid.
     # This is a protocol to implement a similar feature.
-    # e.g. 'f(a: DataclassType)->None'. 
+    # e.g. 'f(a: DataclassType)->None'.
     # (I am not sure it works that well).
     __dataclass_fields__: dict[str, Field]
     __dataclass_params__: dict[str, Any]
@@ -36,7 +36,7 @@ class DataclassType(Protocol):
 
 
 def _get_value_style(value: Any) -> Style:
-    # returns the Style (i.e. the color) associated with the value, 
+    # returns the Style (i.e. the color) associated with the value,
     # based on _TYPE_STYLES (defined in this module) or _NONE_STYLE
     # (if value is None).
     if value is None:
@@ -49,12 +49,11 @@ def _get_type_representation(value: Any) -> str:
     # return a str representation of value based on its type.
     # e.g.if value is an int: simply 'int'.
     # For numpy array, the shape and dtype are also indicated.
-    # If you want a type to be associated with more info in 
+    # If you want a type to be associated with more info in
     # to_table (see below), this is the place to edit.
     if isinstance(value, np.ndarray):
         return f"numpy.ndarray(shape={value.shape}, dtype='{value.dtype}')"
 
-    # Handle other types as before
     value_type = type(value)
     repr_ = str(value_type).replace("typing.", "")
     return repr_.replace("class ", "").replace("<'", "").replace("'>", "")
@@ -65,7 +64,7 @@ def to_table(
 ) -> str:
     """
     Convert a dataclass instance or a dictionary to a formatted table string.
-    Useful for informative logging.
+    Useful for informative logging. Based on the "rich" package.
 
     Parameters
     ----------
@@ -73,9 +72,10 @@ def to_table(
       The dataclass or dictionary to represent as a table
     console:
       The console used for printing to stdout. If None, one will be created.
-      
+
+    Returns
     -------
-    A string representing the instance as a formatted table with columns 
+    A string representing the instance as a formatted table with columns
     for field name, type, and value
     """
 
@@ -124,7 +124,7 @@ def to_table(
 
 class TableStr:
     """
-    Mixin for dataclasses, adding the 'to_table' method. This method return
+    Mixin for dataclasses, adding the 'to_table' method. This method returns
     a table string representation of the dataclass, one line per field. Each
     line contains the field name, its type and its value.
 
@@ -150,14 +150,13 @@ class TableStr:
     # c    str    hello_world
     ```
     """
-    
 
     # console (tool for printing to stdout) to be reused over
     _console = Console()
 
     def to_table(self, header: Optional[str] = None) -> str:
         """
-        Returns a table representation of 'self', 'self' expected to be 
+        Returns a table representation of 'self', 'self' expected to be
         an instance of dataclass.
 
         Parameters

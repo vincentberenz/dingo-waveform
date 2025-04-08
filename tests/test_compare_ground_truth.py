@@ -24,6 +24,7 @@ from lalsimulation import SimInspiralChooseFDModes, SphHarmFrequencySeries
 
 from dingo_waveform.approximant import Approximant
 from dingo_waveform.domains import FrequencyDomain
+from dingo_waveform.polarization_functions import inspiral_FD
 from dingo_waveform.polarization_modes_functions import (
     inspiral_choose_FD_modes,
     polarization_modes_utils,
@@ -31,7 +32,6 @@ from dingo_waveform.polarization_modes_functions import (
 from dingo_waveform.polarizations import Polarization, sum_contributions_m
 from dingo_waveform.types import FrequencySeries, Mode, Modes
 from dingo_waveform.waveform_generator import WaveformGenerator
-from dingo_waveform.waveform_generator_parameters import WaveformGeneratorParameters
 from dingo_waveform.waveform_parameters import WaveformParameters
 
 
@@ -127,11 +127,17 @@ def test_IMRPhenomXPHM_approximant() -> None:
         f_min=f_min,
         f_max=f_max,
     )
-    waveform_parameters = WaveformParameters(**p)
+    waveform_parameters = WaveformParameters(**p)  # type: ignore
 
     # instantiating the waveform generator
     wfg = WaveformGenerator(
-        approximant, domain, f_ref, f_start, spin_conversion_phase=spin_conversion_phase
+        approximant,
+        domain,
+        f_ref,
+        f_start,
+        spin_conversion_phase=spin_conversion_phase,
+        polarization_function=inspiral_FD,
+        polarization_modes_function=inspiral_choose_FD_modes,
     )
 
     # computing the waveform
