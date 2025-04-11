@@ -2,16 +2,13 @@ from typing import NewType
 
 import lalsimulation as LS
 
-Approximant = NewType("Approximant", int)
-
-# Predefined Approximant values
-TD_Approximant = Approximant(52)  # 'SEOBNRv4PHM'
-FD_Approximant = Approximant(101)  # 'IMRPhenomXPHM'
+Approximant = NewType("Approximant", str)
 
 
-def get_approximant(approximant: str) -> Approximant:
+def get_approximant(approximant: Approximant) -> int:
     """
     Converts a string representation of an approximant to its integer value.
+    Note: alias for lalsimulation.GetApproximantFromString
 
     Parameters
     ----------
@@ -22,12 +19,14 @@ def get_approximant(approximant: str) -> Approximant:
     -------
     The integer value of the approximant.
     """
-    return Approximant(LS.GetApproximantFromString(approximant))
+    # TODO: we do not need this function, once can directly use LS.GetApproximantFromString
+    return LS.GetApproximantFromString(approximant)
 
 
-def get_approximant_description(approximant: Approximant) -> str:
+def get_approximant_description(approximant: int) -> str:
     """
     Converts an integer value of an approximant to its string description.
+    Note: alias for lalsimulation.GetStringFromApproximant
 
     Parameters
     ----------
@@ -38,4 +37,5 @@ def get_approximant_description(approximant: Approximant) -> str:
     -------
         The string description of the approximant.
     """
+    # TODO: we do not need this function, one can directly call LS.GetStringFromApproximant
     return LS.GetStringFromApproximant(int(approximant))

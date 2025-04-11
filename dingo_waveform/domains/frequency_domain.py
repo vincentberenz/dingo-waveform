@@ -1,232 +1,15 @@
-import importlib
-from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
-from functools import cached_property, lru_cache, wraps
-from typing import Any, Callable, Dict, Mapping, Optional, Tuple, Type, Union, cast
+from dataclasses import asdict
+from functools import cached_property, wraps
+from typing import Optional, Union
 
 import numpy as np
 import torch
 from multipledispatch import dispatch
 from typing_extensions import override
 
+from .domain import Domain, DomainParameters
+
 _module_import_path = "dingo_waveform.domains"
-
-
-@dataclass
-class DomainParameters:
-    delta_f: Optional[float]
-    f_min: Optional[float]
-    f_max: Optional[float]
-    delta_t: Optional[float]
-    window_factor: Optional[float]
-    type: Optional[str] = None
-
-
-class Domain(ABC):
-    """Base class representing a physical domain for data processing."""
-
-    @abstractmethod
-    def get_parameters(self) -> DomainParameters:
-        """
-        Get the parameters of the domain.
-
-        Returns
-        -------
-        DomainParameters
-            The parameters of the domain.
-        """
-        raise NotImplementedError(
-            "Subclasses of Domain must implement the get_parameters method."
-        )
-
-    @classmethod
-    @abstractmethod
-    def from_parameters(cls, domain_parameters: DomainParameters) -> "Domain":
-        """
-        Create a domain instance from given parameters.
-
-        Parameters
-        ----------
-        domain_parameters
-            The parameters to create the domain.
-
-        Returns
-        -------
-        Domain
-            A corresponding instance of the domain.
-        """
-        raise NotImplementedError(
-            "Subclasses of Domain must implement the from_parameters class method."
-        )
-
-    @abstractmethod
-    def __len__(self) -> int:
-        """
-        Return the number of bins or points in the domain.
-
-        Returns
-        -------
-        int
-            The number of bins or points in the domain.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def __call__(self, *args, **kwargs) -> np.ndarray:
-        """
-        Generate array of bins in the domain.
-
-        Returns
-        -------
-        np.ndarray
-            Array of bins in the domain.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def update(self, *args) -> None:
-        """
-        Update domain parameters.
-        """
-        raise NotImplementedError(
-            "Subclasses of Domain must implement the update method"
-        )
-
-    @abstractmethod
-    def time_translate_data(
-        self, data: Union[np.ndarray, torch.Tensor], dt: Union[float, torch.Tensor]
-    ) -> Union[np.ndarray, torch.Tensor]:
-        """
-        Translate data in time domain by dt seconds.
-
-        Parameters
-        ----------
-        data
-            Input data array/tensor.
-        dt
-            Time shift amount.
-
-        Returns
-        -------
-        Translated data.
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def noise_std(self) -> float:
-        """
-        Standard deviation of the noise distribution.
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def sampling_rate(self) -> float:
-        """
-        Sampling rate of the data.
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def f_max(self) -> float:
-        """Maximum frequency in Hz."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def duration(self) -> float:
-        """Duration of the waveform in seconds."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def min_idx(self) -> int:
-        """Minimum index of the domain."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def max_idx(self) -> int:
-        """Maximum index of the domain."""
-        raise NotImplementedError
-
-
-def build_domain(domain_parameters: Union[DomainParameters, Dict]) -> Domain:
-    """
-    Build an instance of domain based on an instance of DomainParameters,
-    or a corresponding dictionary.
-
-    Parameters
-    ----------
-    domain_parameters
-        The parameters to create the domain.
-
-    Returns
-    -------
-    An instance of the domain.
-    """
-
-    # if as dict as been passed as argument, 'casting' is to an instance of
-    # DomainParameters
-    if not isinstance(domain_parameters, DomainParameters):
-        try:
-            domain_parameters = DomainParameters(**domain_parameters)
-        except Exception as e:
-            raise ValueError(
-                f"Constructing domain: failed to construct from dictionary {repr(domain_parameters)}. {type(e)}: {e}"
-            )
-    domain_parameters = cast(DomainParameters, domain_parameters)
-
-    if domain_parameters.type is None:
-        raise ValueError(
-            f"Constructing domain. Can not construct from {repr(asdict(domain_parameters))}: 'type' should not be None."
-        )
-
-    # type should be the import path of the domain class to construct
-    # (e.g. dingo_waveform.domains.FrequencyDomain).
-    # But legacy code may just have used the class name (e.g. FrequencyDomain).
-    # Reconstructing the import path.
-    if not "." in domain_parameters.type:
-        # i.e. dingo_waveform.domains.<DomainClassName>
-        domain_parameters.type = f"{_module_import_path}.{domain_parameters.type}"
-
-    # returning the class, module and class name from the import path,
-    # e.g. dingo_waveform.domains.FrequencyDomain ->
-    #   FrequencyDomain (the class)
-    #   dingo_waveform.domains (the module)
-    #   "FrequencyDomain" (the class as str)
-    def _get_class(import_path: str) -> Tuple[Type, str, str]:
-        module_name, class_name = import_path.rsplit(".", 1)
-        module = importlib.import_module(module_name)
-        return getattr(module, class_name), module_name, class_name
-
-    # importing the class to build
-    try:
-        class_, module_name, class_name = _get_class(domain_parameters.type)
-    except ImportError as e:
-        raise ImportError(
-            f"Constructing domain: failed to import '{domain_parameters.type}': {e}"
-        )
-    except AttributeError as e:
-        raise AttributeError(
-            f"Constructing domain: could not import'{domain_parameters.type}'. "
-            f"Could import module '{module_name}', but not {class_name}. Error: {e}"
-        )
-    if not issubclass(class_, Domain):
-        raise ValueError(
-            f"Constructing domain: could import '{domain_parameters.type}', but this is not a subclass of 'Domain'"
-        )
-
-    try:
-        instance = class_.from_parameters(domain_parameters)
-    except Exception as e:
-        raise RuntimeError(
-            f"Constructing domain. Failed to construct {class_name} from arguments {repr(asdict(domain_parameters))}. {type(e)}: {e}"
-        )
-
-    return instance
 
 
 class _CachedSampleFrequencies:
@@ -315,7 +98,7 @@ class _CachedSampleFrequencies:
 # decorator to be used in the FrequencyDomain, for managing
 # cached sample frequencies. This will decorate the setters for
 # the properties f_min, f_max and delta_f. When the value of any
-# of these properties change, the attribute '_cached_sample_frequencies'
+# of these properties changes, the attribute '_cached_sample_frequencies'
 # is rebuilt, so that the sample frequencies get recomputed if needed.
 def _reinit_cached_sample_frequencies(func):
     @wraps(func)
@@ -369,6 +152,7 @@ class FrequencyDomain(Domain):
             f_min, f_max, delta_f
         )
 
+    @override
     def get_parameters(self) -> DomainParameters:
         """
         Get the parameters of the frequency domain.
@@ -390,6 +174,7 @@ class FrequencyDomain(Domain):
         )
         return d
 
+    @override
     @classmethod
     def from_parameters(cls, domain_parameters: DomainParameters) -> "FrequencyDomain":
         """
@@ -408,11 +193,14 @@ class FrequencyDomain(Domain):
         for attr in ("f_min", "f_max", "delta_f"):
             if getattr(domain_parameters, attr) is None:
                 raise ValueError(
-                    f"Can not construct FrequencyDomain from {repr(asdict(domain_parameters))}: {attr} should not be None"
+                    "Can not construct FrequencyDomain from "
+                    f"{repr(asdict(domain_parameters))}: {attr} should not be None"
                 )
         # type ignore: we know f_min, f_max and delta_f are not None (from the test just above)
         return cls(
-            domain_parameters.f_min, domain_parameters.f_max, domain_parameters.delta_f  # type: ignore
+            domain_parameters.f_min,  # type: ignore
+            domain_parameters.f_max,  # type: ignore
+            domain_parameters.delta_f,  # type: ignore
         )
 
     @override
@@ -442,8 +230,10 @@ class FrequencyDomain(Domain):
         # note:
         if delta_f is not None and delta_f != self._delta_f:
             raise ValueError(
-                "FrequencyDomain.set_new_range: can not change the value delta_f when "
-                f"setting a new range. Current value: {self._delta_f}, argument: {delta_f}"
+                "FrequencyDomain.set_new_range: "
+                "can not change the value delta_f when "
+                "setting a new range. "
+                f"Current value: {self._delta_f}, argument: {delta_f}"
             )
         # note: this will clean up the sample frequency cache, so this function does not
         #  need to be directly decorated with @_reinit_cached_sample_frequencies
@@ -884,154 +674,3 @@ class FrequencyDomain(Domain):
             if data.shape[-2] > 2:
                 result[..., 2:, :] = data[..., 2:, :]
             return result
-
-
-class TimeDomain(Domain):
-    """Defines the physical time domain on which the data of interest live.
-
-    The time bins are assumed to be uniform between [0, duration]
-    with spacing 1 / sampling_rate.
-    window_factor is used to compute noise_std().
-
-    UNDER CONSTRUCTION.
-    """
-
-    def __init__(self, time_duration: float, sampling_rate: float):
-        """
-        Initialize a TimeDomain instance.
-
-        Parameters
-        ----------
-        time_duration
-            Duration of the time domain in seconds.
-        sampling_rate
-            Sampling rate in Hz.
-        """
-        self._time_duration = time_duration
-        self._sampling_rate = sampling_rate
-
-    @override
-    def update(self) -> None:
-        raise NotImplementedError("TimeDomain does not support update")
-
-    @lru_cache()
-    def __len__(self):
-        """
-        Number of time bins given duration and sampling rate.
-
-        Returns
-        -------
-        int
-            Number of time bins.
-        """
-        return int(self._time_duration * self._sampling_rate)
-
-    @lru_cache()
-    def __call__(self) -> np.ndarray:
-        """
-        Array of uniform times at which data is sampled.
-
-        Returns
-        -------
-        np.ndarray
-            Array of uniform times.
-        """
-        num_bins = self.__len__()
-        return np.linspace(
-            0.0,
-            self._time_duration,
-            num=num_bins,
-            endpoint=False,
-            dtype=np.float32,
-        )
-
-    @property
-    def delta_t(self) -> float:
-        """
-        The size of the time bins.
-
-        Returns
-        -------
-        float
-            Size of the time bins.
-        """
-        return 1.0 / self._sampling_rate
-
-    @delta_t.setter
-    def delta_t(self, delta_t: float):
-        """
-        Set the size of the time bins.
-
-        Parameters
-        ----------
-        delta_t
-            The new size of the time bins.
-        """
-        self._sampling_rate = 1.0 / delta_t
-
-    @property
-    def noise_std(self) -> float:
-        """
-        Standard deviation of the whitened noise distribution.
-
-        To have noise that comes from a multivariate *unit* normal
-        distribution, you must divide by this factor. In practice, this means
-        dividing the whitened waveforms by this.
-
-        In the continuum limit in time domain, the standard deviation of white
-        noise would at each point go to infinity, hence the delta_t factor.
-
-        Returns
-        -------
-        float
-            Standard deviation of the whitened noise distribution.
-        """
-        return 1.0 / np.sqrt(2.0 * self.delta_t)
-
-    def time_translate_data(self, data, dt) -> np.ndarray:
-        raise NotImplementedError
-
-    @property
-    def f_max(self) -> float:
-        """
-        The maximum frequency [Hz] is typically set to half the sampling rate.
-
-        Returns
-        -------
-        float
-            Maximum frequency in Hz.
-        """
-        return self._sampling_rate / 2.0
-
-    @property
-    def duration(self) -> float:
-        """
-        Waveform duration in seconds.
-
-        Returns
-        -------
-        float
-            Duration of the waveform.
-        """
-        return self._time_duration
-
-    @property
-    def sampling_rate(self) -> float:
-        return self._sampling_rate
-
-    @property
-    def min_idx(self) -> int:
-        return 0
-
-    @property
-    def max_idx(self) -> int:
-        return round(self._time_duration * self._sampling_rate)
-
-    @property
-    def domain_dict(self):
-        """Enables to rebuild the domain via calling build_domain(domain_dict)."""
-        return {
-            "type": "TimeDomain",
-            "time_duration": self._time_duration,
-            "sampling_rate": self._sampling_rate,
-        }

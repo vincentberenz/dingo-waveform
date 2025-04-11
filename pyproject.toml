@@ -29,17 +29,18 @@ dependencies = [
     "nptyping",
     "rich",
     "scipy-stubs[scipy]",
-    "multipledispatch"
+    "multipledispatch",
+    "tomli"
 ]
 
-[tool.setuptools]
-package-data = {
-    "" = ["py.typed"]
-}
+#[tool.setuptools]
+#package-data = {
+#    "" = ["py.typed"]
+#}
 
-[tool.setuptools.packages.find]
-include = ["dingo_waveform"]
-namespaces = false
+#[tool.setuptools.packages.find]
+#include = ["dingo_waveform"]
+#namespaces = false
 
 [project.optional-dependencies]
 dev = [
@@ -49,5 +50,6 @@ dev = [
     "mypy",
     "pylint",
     "pytest",
+    "types-PyYAML"
 ]
 

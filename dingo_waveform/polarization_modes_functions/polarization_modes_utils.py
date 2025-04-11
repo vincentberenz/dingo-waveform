@@ -4,8 +4,8 @@ import lal
 import lalsimulation as LS
 import numpy as np
 
-from .domains import FrequencyDomain
-from .types import FrequencySeries, Modes
+from ..domains.frequency_domain import FrequencyDomain
+from ..types import FrequencySeries, Modes
 
 
 def linked_list_modes_to_dict_modes(
@@ -164,4 +164,3 @@ def td_modes_to_fd_modes(
         hlm_fd[lm][-1] = hlm_fd[lm][0]
 
     return hlm_fd
-

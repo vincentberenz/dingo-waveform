@@ -2,29 +2,31 @@ import logging
 from copy import deepcopy
 from dataclasses import asdict, astuple, dataclass, fields
 from math import isclose
-from typing import Dict, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import lal
 import lalsimulation as LS
 import numpy as np
 from nptyping import Float32, NDArray, Shape
 
-from . import wfg_utils
-from .approximant import Approximant
-from .binary_black_holes import BinaryBlackHoleParameters
-from .domains import DomainParameters, FrequencyDomain
-from .inspiral_choose_fd_modes import InspiralChooseFDModesParameters
-from .logging import TableStr
-from .polarizations import Polarization
-from .spins import Spins
-from .types import FrequencySeries, Iota, Mode
-from .waveform_parameters import WaveformParameters
+from ..approximant import Approximant
+from ..binary_black_holes import BinaryBlackHoleParameters
+from ..domains import DomainParameters, FrequencyDomain
+from ..logging import TableStr
+from ..polarization_modes_functions.inspiral_choose_FD_modes import (
+    _InspiralChooseFDModesParameters,
+)
+from ..polarizations import Polarization
+from ..spins import Spins
+from ..types import Iota, WaveformGenerationError
+from ..waveform_generator_parameters import WaveformGeneratorParameters
+from ..waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class InspiralFDParameters(TableStr):
+class _InspiralFDParameters(TableStr):
     """Dataclass for storing parameters for
     lal simulation's SimInspiralFD function.
     """
@@ -50,42 +52,27 @@ class InspiralFDParameters(TableStr):
     f_max: float
     f_ref: float
     lal_params: Optional[lal.Dict]
-    approximant: Approximant
+    approximant: int
 
     def get_spins(self) -> Spins:
-        """
-        Get the spins of the binary black hole system.
-
-        Returns
-        -------
-        The spins of the binary black hole system.
-        """
         return Spins(
             self.iota, self.s1x, self.s1y, self.s1z, self.s2x, self.s2y, self.s2z
         )
 
     def to_tuple(self) -> Tuple[Union[float, Optional[lal.Dict]]]:
-        """
-        Returns
-        -------
+        # This instance casted to a tuple. It differs from:
+        #
+        #   p = InspiralFDParameters()
+        #   t = astuple(p)
+        #
+        # Above, t contains deep copies of fields, which is not
+        # supported by instances of lal.Dict; i.e. if lal_params is not None
+        # `astuple(p)` will raise a runtime error. But in the following case:
+        #
+        #   t = p.to_tuple()
+        #
+        # t will contain a reference to lal_params and no error will be raised.
 
-        This instance casted to a tuple. It differs from:
-
-        ```
-        p = InspiralFDParameters()
-        t = astuple(p)
-        ```
-
-        In the case above, t contains deep copies of fields, which is not
-        supported by instances of lal.Dict; i.e. if lal_params is not None
-        `astuple(p)` will raise a runtime error. But in the following case:
-
-        ```
-        t = p.to_tuple()
-        ```
-
-        t will contain a reference to lal_params and no error will be raised.
-        """
         return tuple(getattr(self, f.name) for f in fields(self))
 
     @classmethod
@@ -95,32 +82,11 @@ class InspiralFDParameters(TableStr):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
-    ) -> "InspiralFDParameters":
-        """
-        Create an instance from binary black hole parameters.
+        approximant: Approximant,
+    ) -> "_InspiralFDParameters":
 
-        Parameters
-        ----------
-        bbh_parameters :
-            The binary black hole parameters.
-        domain_params :
-            The domain parameters.
-        spin_conversion_phase :
-            The phase for spin conversion.
-        lal_params :
-            The LAL parameters.
-        approximant :
-            The approximant.
-
-        Returns
-        -------
-        The created instance.
-        """
-        # InspiralFDParameters are the same as InspiralChooseFDModesParameters,
-        # but with extra ecc attributes all set to zero.
         inspiral_choose_fd_modes_parameters = (
-            InspiralChooseFDModesParameters.from_binary_black_hole_parameters(
+            _InspiralChooseFDModesParameters.from_binary_black_hole_parameters(
                 bbh_parameters,
                 domain_params,
                 spin_conversion_phase,
@@ -141,36 +107,13 @@ class InspiralFDParameters(TableStr):
         cls,
         waveform_parameters: WaveformParameters,
         f_ref: float,
-        convert_to_SI: bool,
+        convert_to_SI: Optional[bool],
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
-        approximant: Optional[Approximant],
-    ) -> "InspiralFDParameters":
-        """
-        Create an instance from waveform parameters.
+        approximant: Approximant,
+    ) -> "_InspiralFDParameters":
 
-        Parameters
-        ----------
-        waveform_parameters :
-            The waveform parameters.
-        f_ref :
-            The reference frequency.
-        convert_to_SI :
-            Whether to convert to SI units.
-        domain_params :
-            The domain parameters.
-        spin_conversion_phase :
-            The phase for spin conversion.
-        lal_params :
-            The LAL parameters.
-        approximant :
-            The approximant.
-
-        Returns
-        -------
-        The created instance.
-        """
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
             waveform_parameters, f_ref, convert_to_SI
         )
@@ -197,18 +140,24 @@ class InspiralFDParameters(TableStr):
 
         if max(np.max(np.abs(hp.data.data)), np.max(np.abs(hc.data.data))) <= threshold:
             return hp, hc, True
+
+        _logger.debug("unstability detected, attempting to turning of multibanding")
+
         lal_params = (
             self.lal_params if self.lal_params is not None else lal.CreateDict()
         )
         LS.SimInspiralWaveformParamsInsertPhenomXHMThresholdMband(lal_params, 0)
         LS.SimInspiralWaveformParamsInsertPhenomXPHMThresholdMband(lal_params, 0)
-        params: "InspiralFDParameters" = deepcopy(self)
+        params: "_InspiralFDParameters" = deepcopy(self)
         params.lal_params = lal_params
         # arguments = list(astuple(params))
         #  The above would not always work, because lal.Dict can not be deep copied.
         #  (a RuntimeError is raised).
         #  So we do instead:
         arguments = list(params.to_tuple())
+
+        _logger.debug(params.to_table("calling LS.SimInspiralFD with parameters"))
+
         hp, hc = LS.SimInspiralFD(*arguments)
         if max(np.max(np.abs(hp.data.data)), np.max(np.abs(hc.data.data))) <= threshold:
             return hp, hc, True
@@ -223,42 +172,11 @@ class InspiralFDParameters(TableStr):
         stability_threshold: float = 1e-20,
         delta_f_tolerance: float = 1e-6,
     ) -> Polarization:
-        """
-        Apply the LAL simulation method and convert the result to the frequency domain.
 
-        Parameters
-        ----------
-        frequency_array :
-            The frequency array to apply the transformation.
-        auto_turn_off_multibanding :
-            Whether to automatically turn off multibanding if numerical instability is detected.
-            Multibanding is a technique used to optimize waveform generation by reducing computational
-            cost. However, it can sometimes lead to numerical instability, especially when the waveform
-            amplitudes exceed a certain threshold. If this parameter is set to True, the method will
-            attempt to turn off multibanding to regain stability.
-        raise_error_on_numerical_unstability :
-            Whether to raise an error if numerical instability is detected. If set to True, a RuntimeError
-            will be raised when numerical instability is detected and cannot be resolved by turning off
-            multibanding.
-        stability_threshold :
-            The numerical stability threshold. This value is used to determine if the waveform amplitudes
-            are stable. If the maximum amplitude exceeds this threshold, the waveform is considered unstable.
-        delta_f_tolerance :
-            The tolerance for delta_f consistency. This ensures that the frequency resolution of the
-            generated waveform matches the expected resolution within this tolerance.
+        _logger.debug(
+            self.to_table("generating polarization using lalsimulation.SimInspiralFD")
+        )
 
-        Returns
-        -------
-        The polarization in the frequency domain.
-
-        Raises
-        ------
-        RuntimeError
-            If raise_error_on_numerical_unstability is True and numerical instability is detected
-            even after attempting to turn off multibanding.
-        ValueError
-            If the waveform delta_f is inconsistent with the domain's delta_f.
-        """
         hp: lal.COMPLEX16FrequencySeries
         hc: lal.COMPLEX16FrequencySeries
 
@@ -280,7 +198,7 @@ class InspiralFDParameters(TableStr):
                 _logger.error(error_message)
 
         if not isclose(self.delta_f, hp.deltaF, rel_tol=delta_f_tolerance):
-            raise ValueError(
+            raise WaveformGenerationError(
                 f"Waveform delta_f is inconsistent with domain: {hp.deltaF} vs {self.delta_f}!"
                 f"To avoid this, ensure that f_max = {self.f_max} is a power of two"
                 "when you are using a native time-domain waveform model."
@@ -301,9 +219,59 @@ class InspiralFDParameters(TableStr):
             h_plus[: len(hp.data.data)] = hp.data.data
             h_cross[: len(hc.data.data)] = hc.data.data
 
-        # Undo the time shift done in SimInspiralFD to the waveform
+        _logger.debug("undoing the time shift done in SimInspiralFD to the waveform")
+
         dt = 1 / hp.deltaF + (hp.epoch.gpsSeconds + hp.epoch.gpsNanoSeconds * 1e-9)
         time_shift = np.exp(-1j * 2 * np.pi * dt * frequency_array)
         h_plus *= time_shift
         h_cross *= time_shift
+
         return Polarization(h_plus=h_plus, h_cross=h_cross)
+
+
+def inspiral_FD(
+    waveform_gen_params: WaveformGeneratorParameters,
+    waveform_params: WaveformParameters,
+) -> Polarization:
+    """
+    Wrapper over lalsimulation.SimInspiralFD
+
+    Arguments
+    ---------
+    waveform_gen_params
+      waveform generation configuration
+    waveform_params
+      waveform configuration
+
+    Returns
+    -------
+    Polarizations
+
+    Raises
+    ------
+    ValueError
+      if the domain is not an instance of FrequencyDomain
+    WaveformGenerationError
+      if an numerical instability that could not be solved by
+      turning off the multibanding is detected
+    """
+
+    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+        raise ValueError(
+            "inspiral_fd can only be applied using on a FrequencyDomain "
+            f"(got {type(waveform_gen_params.domain)})"
+        )
+
+    inspiral_fd_params = _InspiralFDParameters.from_waveform_parameters(
+        waveform_params,
+        waveform_gen_params.f_ref,
+        waveform_gen_params.convert_to_SI,
+        waveform_gen_params.domain.get_parameters(),
+        waveform_gen_params.spin_conversion_phase,
+        waveform_gen_params.lal_params,
+        approximant=waveform_gen_params.approximant,
+    )
+
+    frequency_array = waveform_gen_params.domain.sample_frequencies()
+
+    return inspiral_fd_params.apply(frequency_array)

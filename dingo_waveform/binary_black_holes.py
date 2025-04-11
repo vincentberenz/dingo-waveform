@@ -10,8 +10,6 @@ from bilby.gw.conversion import (
     convert_to_lal_binary_black_hole_parameters,
 )
 
-from .approximant import Approximant
-from .domains import DomainParameters
 from .logging import TableStr, to_table
 from .spins import Spins
 from .waveform_parameters import WaveformParameters
@@ -20,18 +18,8 @@ _logger = logging.getLogger(__name__)
 
 
 def _convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
-    """
-    Convert a single element array to a number.
-
-    Parameters
-    ----------
-    x:
-        Array or float
-
-    Returns
-    -------
-    A number
-    """
+    # "convert" x to float, by x.item() if x is a numpy array,
+    # float(x) otherwise.
     if isinstance(x, np.ndarray):
         if x.shape == () or x.shape == (1,):
             return float(x.item())
@@ -45,6 +33,10 @@ def _convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
 
 @dataclass
 class BinaryBlackHoleParameters(TableStr):
+    """
+    Parameters required for calling lalsimulation functions.
+    """
+
     luminosity_distance: float
     a_1: float
     a_2: float
@@ -69,7 +61,10 @@ class BinaryBlackHoleParameters(TableStr):
 
     @classmethod
     def from_waveform_parameters(
-        cls, waveform_params: WaveformParameters, f_ref: float, convert_to_SI: bool
+        cls,
+        waveform_params: WaveformParameters,
+        f_ref: float,
+        convert_to_SI: Optional[bool],
     ) -> "BinaryBlackHoleParameters":
         """
         Create a BinaryBlackHoleParameters instance from WaveformParameters.
@@ -77,7 +72,7 @@ class BinaryBlackHoleParameters(TableStr):
         Parameters
         ----------
         waveform_params:
-            The waveform parameters to convert.
+            The waveform parameters (i.e. user config for waveform generation) to convert.
         f_ref:
             The reference frequency.
         convert_to_SI:
@@ -87,6 +82,15 @@ class BinaryBlackHoleParameters(TableStr):
         -------
         A BinaryBlackHoleParameters instance.
         """
+        # By default we convert masses to SI
+        # NOTE: for methods using the "new" interface,
+        #  i.e. lalsimulation.gwsignal, convert_to_SI
+        #  will be set to False before from_waveform_parameters
+        #  is called. See:
+        #  gw_signals_parameters.GwSignalParameters.from_waveform_parameters
+        if convert_to_SI is None:
+            convert_to_SI = True
+
         # Convert the waveform parameters to a dictionary
         params = asdict(waveform_params)
 
@@ -96,20 +100,10 @@ class BinaryBlackHoleParameters(TableStr):
         # Filter out any parameters that are None
         params = {k: v for k, v in params.items() if v is not None}
 
-        # Log the parameters being passed to the conversion function
-        _logger.debug(
-            "calling convert_to_lal_binary_black_hole_parameters with parameters:\n"
-            f"{to_table(params)}"
-        )
-
         # Convert the parameters to LAL binary black hole parameters
         converted_params, _ = convert_to_lal_binary_black_hole_parameters(params)
-
-        # Log the converted parameters
-        _logger.debug(
-            "output of convert_to_lal_binary_black_hole_parameters:\n"
-            f"{to_table(converted_params)}"
-        )
+        for k, v in converted_params.items():
+            converted_params[k] = _convert_to_float(v) if v is not None else None
 
         # If conversion to SI units is required, perform the conversion
         if convert_to_SI:

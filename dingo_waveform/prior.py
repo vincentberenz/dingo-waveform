@@ -26,17 +26,18 @@ from .waveform_parameters import WaveformParameters
 
 class BBHExtrinsicPriorDict(BBHPriorDict):
     """
-    This class is the same as BBHPriorDict except that it does not require mass parameters.
-
-    It also contains a method for estimating the standardization parameters.
+    Subclass of BBHPriorDict not requiring mass parameters.
+    It supports methods for estimating the standardization parameters.
 
     TODO:
         * Add support for zenith/azimuth
         * Defaults?
     """
+
     def default_conversion_function(self, sample):
-        # Convert sample to LAL binary black hole parameters.
-        
+        # Overwrite the default_conversion_function of the superclass
+        # BBHPriorDict. Convert sample to LAL binary black hole parameters.
+
         out_sample = fill_from_fixed_priors(sample, self)
         out_sample, _ = convert_to_lal_binary_black_hole_parameters(out_sample)
 
@@ -251,7 +252,7 @@ class IntrinsicPriors(TableStr):
 def _create_priors_dataclass() -> Type:
     # Create a dataclass combining fields from IntrinsicPriors and ExtrinsicPriors.
     # It is called when this module is imported first, so that the class 'Priors'
-    # gets part of the user API.
+    # becomes part of the user API.
 
     # Get fields from both classes
     extrinsic_fields = list(fields(ExtrinsicPriors))
@@ -371,7 +372,7 @@ def _create_priors_dataclass() -> Type:
 
     # this 'constructs' the dataclass 'Priors'.
     # This class will be called 'Priors' (first argument), it will have the fields
-    # 'all_fields' (combined fiels of extrinsic and intrinsic priors) and will 
+    # 'all_fields' (combined fiels of extrinsic and intrinsic priors) and will
     # inheritate from TableStr (for table representation) and _PriorSample (for the
     # methods 'sample' and 'samples')
     return make_dataclass("Priors", all_fields, bases=(TableStr, _PriorSampling))
@@ -381,7 +382,12 @@ def _create_priors_dataclass() -> Type:
 # It also has the 'sample' method which returns a list of WaveformParameters.
 # Once created here (which happens when this module is imported), user can create instances of
 # Priors.
+# This class is created programmatically at runtime. I could not find a simpler way
+# to do this (did I miss something ?)
 Priors = _create_priors_dataclass()
+"""
+Dataclass that includes all fields of the IntrinsicPriors and the ExtrinsicPriors dataclasses.
+"""
 
 
 def prior_split(
