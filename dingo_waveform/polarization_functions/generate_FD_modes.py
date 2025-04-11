@@ -1,10 +1,9 @@
 import logging
+import sys
 from dataclasses import asdict, dataclass
 from math import isclose
 from typing import Optional, Union, cast
 
-import astropy.units
-import lalsimulation
 import numpy as np
 from lalsimulation.gwsignal.core import waveform
 from lalsimulation.gwsignal.core.gw import GravitationalWavePolarizations
@@ -65,16 +64,21 @@ class _GenerateFDModesParameters(GwSignalParameters):
         self, domain: FrequencyDomain, approximant: Approximant, ref_tol
     ) -> Polarization:
 
-        _logger.debug(
+        self.lmax_nyquist = 2
+
+        _logger.info(
             self.to_table(
                 "generating polarization using "
-                "lalsimulation.gwsignal.core.waveform.GenerateFDModes"
+                "lalsimulation.gwsignal.core.waveform.GenerateFDWaveform"
             )
         )
 
+        if not "pyseobnr" in sys.modules:
+            import pyseobnr
+
         generator: _Generators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
-        hpc: GravitationalWavePolarizations = waveform.GenerateFDModes(
+        hpc: GravitationalWavePolarizations = waveform.GenerateFDWaveform(
             params, generator
         )
 
@@ -82,7 +86,7 @@ class _GenerateFDModesParameters(GwSignalParameters):
         hc = hpc.hc
 
         # Ensure that the waveform agrees with the frequency grid defined in the domain.
-        if not isclose(self.deltaF, hp.df.value, rel_tol=ref_tol):
+        if not isclose(self.deltaF.value, hp.df.value, rel_tol=ref_tol):
             raise WaveformGenerationError(
                 f"Waveform delta_f is inconsistent with domain: {hp.df.value} vs {self.deltaF}!"
                 f"To avoid this, ensure that f_max = {self.f_max} is a power of two"
@@ -143,11 +147,11 @@ def generate_FD_modes(
 
     approximant = waveform_gen_params.approximant
 
-    if not lalsimulation.SimInspiralGetApproximantFromString(approximant):
-        raise ValueError(
-            f"Approximant {approximant} not supported for generate_FD_modes "
-            "(not implemented in lalsimulation GWSignal)"
-        )
+    # if not lalsimulation.SimInspiralGetApproximantFromString(approximant):
+    #    raise ValueError(
+    #        f"Approximant {approximant} not supported for generate_FD_modes "
+    #        "(not implemented in lalsimulation GWSignal)"
+    #    )
 
     if not isinstance(waveform_gen_params.domain, FrequencyDomain):
         raise ValueError(

@@ -16,11 +16,12 @@ class Polarization:
 
     Parameters
     ----------
-    h_plus : 
+    h_plus :
         The plus polarization component of the gravitational wave.
-    h_cross : 
+    h_cross :
         The cross polarization component of the gravitational wave.
     """
+
     h_plus: FrequencySeries
     h_cross: FrequencySeries
 

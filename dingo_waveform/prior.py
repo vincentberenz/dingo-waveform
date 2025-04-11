@@ -252,7 +252,7 @@ class IntrinsicPriors(TableStr):
 def _create_priors_dataclass() -> Type:
     # Create a dataclass combining fields from IntrinsicPriors and ExtrinsicPriors.
     # It is called when this module is imported first, so that the class 'Priors'
-    # gets part of the user API.
+    # becomes part of the user API.
 
     # Get fields from both classes
     extrinsic_fields = list(fields(ExtrinsicPriors))
@@ -382,7 +382,12 @@ def _create_priors_dataclass() -> Type:
 # It also has the 'sample' method which returns a list of WaveformParameters.
 # Once created here (which happens when this module is imported), user can create instances of
 # Priors.
+# This class is created programmatically at runtime. I could not find a simpler way
+# to do this (did I miss something ?)
 Priors = _create_priors_dataclass()
+"""
+Dataclass that includes all fields of the IntrinsicPriors and the ExtrinsicPriors dataclasses.
+"""
 
 
 def prior_split(

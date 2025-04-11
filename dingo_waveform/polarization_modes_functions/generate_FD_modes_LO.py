@@ -2,6 +2,7 @@
 
 
 import logging
+import sys
 from dataclasses import asdict, dataclass
 from typing import Dict, Optional, Tuple, cast
 
@@ -61,12 +62,14 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
 
         # only approximant supported.
         # (so no need to pass it as argument)
-        approximant = Approximant("IMRPhenomXPHM")
+        approximant = _SupportedApproximant
 
         _logger.debug(
             self.to_table("generating polarization using waveform.GenerateFDModes")
         )
 
+        if not "pyseobnr" in sys.modules:
+            import pyseobnr
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
         hlm_fd: GravitationalWavePolarizations = waveform.GenerateFDModes(
@@ -145,6 +148,7 @@ def generate_FD_modes_LO(
     ------
     ValueError
       if spin_conversion_phase or phase is not specified in the configuration
+      if the approximant specified is not IMRPhenomXPHM
     """
 
     if waveform_gen_params.spin_conversion_phase is None:
@@ -154,6 +158,12 @@ def generate_FD_modes_LO(
 
     if waveform_params.phase is None:
         raise ValueError(f"generate_FD_modes_LO: phase parameter should not be None")
+
+    if waveform_gen_params.approximant != _SupportedApproximant:
+        raise ValueError(
+            f"generate_FD_modes_LO supports only {_SupportedApproximant}. "
+            f"{waveform_gen_params.approximant} is not supported."
+        )
 
     instance = cast(
         _GenerateFDModesLOParameters,

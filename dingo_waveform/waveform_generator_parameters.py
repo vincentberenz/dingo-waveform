@@ -5,14 +5,15 @@ import lal
 
 from .approximant import Approximant
 from .domains import Domain
+from .logging import TableStr
 from .polarizations import Polarization
 from .types import Modes
 
 
 @dataclass
-class WaveformGeneratorParameters:
+class WaveformGeneratorParameters(TableStr):
     """
-    Container class for parameters controlling gravitational wave waveform generation.
+    Container class for parameters controlling gravitational waveform generation.
 
     Attributes
     ----------
@@ -42,7 +43,7 @@ class WaveformGeneratorParameters:
     f_ref: float
     f_start: Optional[float]
     spin_conversion_phase: Optional[float]
-    convert_to_SI: bool
+    convert_to_SI: Optional[bool]
     mode_list: Optional[List[Modes]]
     lal_params: Optional[lal.Dict]
     transform: Optional[Callable[[Polarization], Polarization]] = None

@@ -107,7 +107,7 @@ class _InspiralFDParameters(TableStr):
         cls,
         waveform_parameters: WaveformParameters,
         f_ref: float,
-        convert_to_SI: bool,
+        convert_to_SI: Optional[bool],
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
@@ -267,7 +267,7 @@ def inspiral_FD(
         waveform_gen_params.f_ref,
         waveform_gen_params.convert_to_SI,
         waveform_gen_params.domain.get_parameters(),
-        waveform_gen_params.convert_to_SI,
+        waveform_gen_params.spin_conversion_phase,
         waveform_gen_params.lal_params,
         approximant=waveform_gen_params.approximant,
     )

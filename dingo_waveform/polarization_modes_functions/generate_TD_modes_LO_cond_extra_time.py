@@ -4,6 +4,7 @@
 
 
 import logging
+import sys
 from dataclasses import asdict, dataclass
 from typing import Dict, Optional, Union, cast
 
@@ -108,32 +109,32 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
 
         return cls(**asdict(gw_signal_params))
 
-    def get_starting_frequency_for_SEOBRNRv5_conditioning(
+    def _get_starting_frequency_for_SEOBRNRv5_conditioning(
         self, extra_time_fraction: float = 0.1, extra_cycles: float = 3.0
     ) -> _SEOBRNRv5Conditioning:
 
-        f_min = self.f22_start
-        m1 = self.mass1
-        m2 = self.mass2
-        S1z = self.spin1z
-        S2z = self.spin2z
+        f_min = self.f22_start.value
+        m1 = self.mass1.value
+        m2 = self.mass2.value
+        S1z = self.spin1z.value
+        S2z = self.spin2z.value
         original_f_min = f_min
 
-        f_isco = 1.0 / (pow(9.0, 1.5) * np.pi * (m1 + m2) * lalsimulation.MTSUN_SI)
+        f_isco = 1.0 / (pow(9.0, 1.5) * np.pi * (m1 + m2) * lal.MTSUN_SI)
         if f_min > f_isco:
             f_min = f_isco
 
         # upper bound on the chirp time starting at f_min
         tchirp = lalsimulation.SimInspiralChirpTimeBound(
-            f_min, m1 * lalsimulation.MSUN_SI, m2 * lalsimulation.MSUN_SI, S1z, S2z
+            f_min, m1 * lal.MSUN_SI, m2 * lal.MSUN_SI, S1z, S2z
         )
         # upper bound on the final black hole spin */
         spinkerr = lalsimulation.SimInspiralFinalBlackHoleSpinBound(S1z, S2z)
         # upper bound on the final plunge, merger, and ringdown time */
         tmerge = lalsimulation.SimInspiralMergeTimeBound(
-            m1 * lalsimulation.MSUN_SI, m2 * lalsimulation.MSUN_SI
+            m1 * lal.MSUN_SI, m2 * lal.MSUN_SI
         ) + lalsimulation.SimInspiralRingdownTimeBound(
-            (m1 + m2) * lalsimulation.MSUN_SI, spinkerr
+            (m1 + m2) * lal.MSUN_SI, spinkerr
         )
 
         # extra time to include for all waveforms to take care of situations where
@@ -161,17 +162,19 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
         self, approximant: Approximant, domain: FrequencyDomain, phase: float
     ) -> Dict[Mode, Polarization]:
         SEOBRNRv5_conditioning: _SEOBRNRv5Conditioning = (
-            self.get_starting_frequency_for_SEOBRNRv5_conditioning()
+            self._get_starting_frequency_for_SEOBRNRv5_conditioning()
         )
 
         _logger.debug(
             self.to_table("generating polarization using waveform.GenerateFDModes")
         )
 
+        if not "pyseobnr" in sys.modules:
+            import pyseobnr
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
         params["f22_start"] = SEOBRNRv5_conditioning.new_f_start * astropy.units.Hz
-        hlm_td: GravitationalWaveModes = waveform.GenerateFDModes(params, generator)
+        hlm_td: GravitationalWaveModes = waveform.GenerateTDModes(params, generator)
 
         _logger.debug("tapering TD modes for SEOBRNRv5 extra time")
 
@@ -180,7 +183,7 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
         value: Union[gwpy.timeseries.TimeSeries, gwpy.frequencyseries.FrequencySeries]
         for key, value in hlm_td.items():
             if type(key) != str:
-                modes: Modes = (key.l, key.m)
+                modes: Modes = (Mode(key[0]), Mode(key[1]))
                 hlm_lal: lal.CreateCOMPLEX16TimeSeries = (
                     SEOBRNRv5_conditioning.taper_td_modes_for_SEOBRNRv5_extra_time(
                         value
@@ -188,8 +191,8 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
                 )
                 hlms_lal[modes] = hlm_lal
 
-        h: Dict[Modes, FrequencySeries] = td_modes_to_fd_modes(hlm_lal, domain)
-        return get_polarizations_from_fd_modes_m(h, Iota(self.inclination), phase)
+        h: Dict[Modes, FrequencySeries] = td_modes_to_fd_modes(hlms_lal, domain)
+        return get_polarizations_from_fd_modes_m(h, Iota(self.inclination.value), phase)
 
 
 def generate_TD_modes_LO_cond_extra_time(
@@ -246,6 +249,7 @@ def generate_TD_modes_LO_cond_extra_time(
             waveform_params,
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.f_ref,
+            waveform_gen_params.spin_conversion_phase,
             waveform_gen_params.f_start,
             waveform_gen_params.convert_to_SI,
         ),

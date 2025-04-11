@@ -23,6 +23,8 @@ from scipy.interpolate import interp1d
 
 from dingo_waveform.approximant import Approximant
 from dingo_waveform.domains import FrequencyDomain
+from dingo_waveform.polarization_functions import inspiral_FD
+from dingo_waveform.polarization_modes_functions import inspiral_choose_FD_modes
 from dingo_waveform.polarizations import Polarization, sum_contributions_m
 from dingo_waveform.prior import IntrinsicPriors
 from dingo_waveform.types import FrequencySeries, Mode
@@ -129,6 +131,8 @@ def get_waveform_generator(approximant: Approximant) -> WaveformGenerator:
         f_ref=10.0,
         f_start=10.0,
         spin_conversion_phase=0.0,
+        # polarization_function=inspiral_FD,
+        # polarization_modes_function=inspiral_choose_FD_modes,
     )
 
 

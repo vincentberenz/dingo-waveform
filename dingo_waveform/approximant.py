@@ -19,6 +19,7 @@ def get_approximant(approximant: Approximant) -> int:
     -------
     The integer value of the approximant.
     """
+    # TODO: we do not need this function, once can directly use LS.GetApproximantFromString
     return LS.GetApproximantFromString(approximant)
 
 
@@ -36,4 +37,5 @@ def get_approximant_description(approximant: int) -> str:
     -------
         The string description of the approximant.
     """
+    # TODO: we do not need this function, one can directly call LS.GetStringFromApproximant
     return LS.GetStringFromApproximant(int(approximant))

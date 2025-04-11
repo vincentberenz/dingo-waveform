@@ -95,7 +95,7 @@ class _InspiralChooseFDModesParameters(TableStr):
         cls,
         waveform_parameters: WaveformParameters,
         f_ref: float,
-        convert_to_SI: bool,
+        convert_to_SI: Optional[bool],
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
