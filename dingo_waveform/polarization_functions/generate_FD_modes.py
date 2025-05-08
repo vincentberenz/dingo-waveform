@@ -13,7 +13,7 @@ from lalsimulation.gwsignal.models import (
 )
 
 from ..approximant import Approximant
-from ..binary_black_holes import BinaryBlackHoleParameters
+from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters, FrequencyDomain
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization
@@ -146,12 +146,6 @@ def generate_FD_modes(
     """
 
     approximant = waveform_gen_params.approximant
-
-    # if not lalsimulation.SimInspiralGetApproximantFromString(approximant):
-    #    raise ValueError(
-    #        f"Approximant {approximant} not supported for generate_FD_modes "
-    #        "(not implemented in lalsimulation GWSignal)"
-    #    )
 
     if not isinstance(waveform_gen_params.domain, FrequencyDomain):
         raise ValueError(

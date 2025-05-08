@@ -17,7 +17,7 @@ from .waveform_parameters import WaveformParameters
 _logger = logging.getLogger(__name__)
 
 
-def _convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
+def convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
     # "convert" x to float, by x.item() if x is a numpy array,
     # float(x) otherwise.
     if isinstance(x, np.ndarray):
@@ -25,7 +25,7 @@ def _convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
             return float(x.item())
         else:
             raise ValueError(
-                f"Expected an array of length one, but go shape = {x.shape}"
+                f"Expected an array of length one, but got shape = {x.shape}"
             )
     else:
         return float(x)  # type: ignore
@@ -103,7 +103,7 @@ class BinaryBlackHoleParameters(TableStr):
         # Convert the parameters to LAL binary black hole parameters
         converted_params, _ = convert_to_lal_binary_black_hole_parameters(params)
         for k, v in converted_params.items():
-            converted_params[k] = _convert_to_float(v) if v is not None else None
+            converted_params[k] = convert_to_float(v) if v is not None else None
 
         # If conversion to SI units is required, perform the conversion
         if convert_to_SI:
@@ -162,7 +162,7 @@ class BinaryBlackHoleParameters(TableStr):
 
         # Convert the parameters to the iota and Cartesian spin components using the external function.
         iota_and_cart_spins: List[float] = [
-            float(_convert_to_float(value))
+            float(convert_to_float(value))
             for value in bilby_to_lalsimulation_spins(*args)
         ]
 

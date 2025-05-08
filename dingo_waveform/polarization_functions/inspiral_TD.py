@@ -6,7 +6,7 @@ import lal
 import lalsimulation as LS
 
 from ..approximant import Approximant, get_approximant
-from ..binary_black_holes import BinaryBlackHoleParameters
+from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters
 from ..lal_params import lal
 from ..logging import TableStr

@@ -12,7 +12,7 @@ from lalsimulation.gwsignal.core.gw import GravitationalWavePolarizations
 from lalsimulation.gwsignal.models import gwsignal_get_waveform_generator
 
 from ..approximant import Approximant
-from ..binary_black_holes import BinaryBlackHoleParameters
+from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization, get_polarizations_from_fd_modes_m

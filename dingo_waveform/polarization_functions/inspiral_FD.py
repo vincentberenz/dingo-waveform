@@ -10,7 +10,7 @@ import numpy as np
 from nptyping import Float32, NDArray, Shape
 
 from ..approximant import Approximant
-from ..binary_black_holes import BinaryBlackHoleParameters
+from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters, FrequencyDomain
 from ..logging import TableStr
 from ..polarization_modes_functions.inspiral_choose_FD_modes import (
@@ -60,7 +60,7 @@ class _InspiralFDParameters(TableStr):
         )
 
     def to_tuple(self) -> Tuple[Union[float, Optional[lal.Dict]]]:
-        # This instance casted to a tuple. It differs from:
+        # This instance is casted to a tuple. It differs from:
         #
         #   p = InspiralFDParameters()
         #   t = astuple(p)

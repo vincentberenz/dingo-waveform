@@ -26,7 +26,7 @@ def linked_list_modes_to_dict_modes(
 def _get_tapering_window_for_complex_time_series(h, tapering_flag: int = 1):
     """
     Get window for tapering of a complex time series from the lal backend. This is done
-    by  tapering the time series with lal, and dividing tapered output by untapered
+    by tapering the time series with lal, and dividing tapered output by untapered
     input. lal does not support tapering of complex time series objects, so as a
     workaround we taper only the real part of the array and extract the window based on
     this.

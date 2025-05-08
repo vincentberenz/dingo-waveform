@@ -8,7 +8,7 @@ import astropy.units
 import numpy as np
 from astropy.units import Quantity
 
-from .binary_black_holes import BinaryBlackHoleParameters
+from .binary_black_holes_parameters import BinaryBlackHoleParameters
 from .domains import DomainParameters
 from .logging import TableStr
 from .spins import Spins
@@ -16,18 +16,6 @@ from .types import Mode
 from .waveform_parameters import WaveformParameters
 
 _logger = logging.getLogger(__name__)
-
-
-def _convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
-    if isinstance(x, np.ndarray):
-        if x.shape == () or x.shape == (1,):
-            return float(x.item())
-        else:
-            raise ValueError(
-                f"Expected an array of length one, but go shape = {x.shape}"
-            )
-    else:
-        return float(x)  # type: ignore
 
 
 @dataclass
