@@ -1,13 +1,9 @@
-import json
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Dict, Optional, Union, cast
 
 import numpy as np
-import tomli
 import torch
-from multipledispatch import dispatch
 
 from ..imports import import_entity
 
@@ -34,40 +30,6 @@ class DomainParameters:
     time_duration: Optional[float] = None
     sampling_rate: Optional[float] = None
     type: Optional[str] = None
-
-    @classmethod
-    def from_file(cls, file_path: Union[str, Path]) -> "DomainParameters":
-        """
-        Create a DomainParameters instance from a TOML or JSON file.
-
-        Parameters
-        ----------
-        file_path : str
-            Path to the TOML or JSON file containing domain parameters.
-
-        Returns
-        -------
-        DomainParameters
-            An instance of DomainParameters with values loaded from the file.
-
-        Raises
-        ------
-        ValueError
-            If the file format is not supported or if the file cannot be parsed.
-        """
-
-        if str(file_path).lower().endswith(".json"):
-            with open(file_path, "r") as f:
-                params = json.load(f)
-        elif str(file_path).lower().endswith(".toml"):
-            with open(file_path, "rb") as f:
-                params = tomli.load(f)
-        else:
-            raise ValueError(
-                f"Unsupported file format: {file_path}. Only .json and .toml files are supported."
-            )
-
-        return cls(**params)
 
 
 class Domain(ABC):
@@ -201,20 +163,35 @@ class Domain(ABC):
         raise NotImplementedError
 
 
-@dispatch(DomainParameters)
-def build_domain(domain_parameters: DomainParameters) -> Domain:
+def build_domain(domain_parameters: Union[DomainParameters, Dict]) -> Domain:
     """
-    Build an instance of domain based on an instance of DomainParameters.
+    Build an instance of domain based on an instance of DomainParameters,
+    or a corresponding dictionary. The class used will be based on the 'type'
+    field, which should be an import path to a subclass of Domain, e.g.
+    'dingo_waveform.domains.FrequencyDomain', 'dingo_waveform.domains.TimeDomain'
 
     Parameters
     ----------
     domain_parameters
-        An instance of DomainParameters
+        The parameters to create the domain.
 
     Returns
     -------
     An instance of the domain.
     """
+
+    # if as dict as been passed as argument, 'casting' is to an instance of
+    # DomainParameters
+    if not isinstance(domain_parameters, DomainParameters):
+        try:
+            domain_parameters = DomainParameters(**domain_parameters)
+        except Exception as e:
+            raise ValueError(
+                "Constructing domain: failed to construct from dictionary "
+                f"{repr(domain_parameters)}. {type(e)}: {e}"
+            ) from e
+    domain_parameters = cast(DomainParameters, domain_parameters)
+
     if domain_parameters.type is None:
         raise ValueError(
             "Constructing domain. Can not construct from "
@@ -222,9 +199,15 @@ def build_domain(domain_parameters: DomainParameters) -> Domain:
             "'type' should not be None."
         )
 
+    # type should be the import path of the domain class to construct
+    # (e.g. dingo_waveform.domains.FrequencyDomain).
+    # But legacy code may just have used the class name (e.g. FrequencyDomain).
+    # Reconstructing the import path.
     if not "." in domain_parameters.type:
+        # i.e. dingo_waveform.domains.<DomainClassName>
         domain_parameters.type = f"{_module_import_path}.{domain_parameters.type}"
 
+    # importing the class to build
     class_, _, class_name = import_entity(domain_parameters.type)
 
     if not issubclass(class_, Domain):
@@ -242,56 +225,3 @@ def build_domain(domain_parameters: DomainParameters) -> Domain:
         ) from e
 
     return instance
-
-
-@dispatch(dict)
-def build_domain(domain_parameters: Dict) -> Domain:
-    """
-    Build an instance of domain based on a dictionary with domain parameters.
-
-    Parameters
-    ----------
-    domain_parameters
-        A dictionary with domain parameters
-
-    Returns
-    -------
-    An instance of the domain.
-    """
-    try:
-        domain_parameters = DomainParameters(**domain_parameters)
-    except Exception as e:
-        raise ValueError(
-            "Constructing domain: failed to construct from dictionary "
-            f"{repr(domain_parameters)}. {type(e)}: {e}"
-        ) from e
-    return build_domain(domain_parameters)
-
-
-@dispatch((str, Path))
-def build_domain(domain_parameters: Union[str, Path]) -> Domain:
-    """
-    Build an instance of domain based on a path to a TOML/JSON file.
-    If the file has a key "domain", then it will build the domain based
-    on the related sub-dictionary.
-
-    Parameters
-    ----------
-    domain_parameters
-        A path to a TOML or JSON file containing domain parameters
-
-    Returns
-    -------
-    An instance of the domain.
-    """
-    try:
-        domain_parameters_ = DomainParameters.from_file(domain_parameters)
-    except Exception as e:
-        raise ValueError(
-            f"Constructing domain: failed to load parameters from file "
-            f"{repr(domain_parameters)}. {type(e)}: {e}"
-        ) from e
-    try:
-        return build_domain(domain_parameters_["domain"])
-    except KeyError:
-        return build_domain(domain_parameters_)

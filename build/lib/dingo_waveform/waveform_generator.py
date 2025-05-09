@@ -1,16 +1,11 @@
-import json
 import logging
-from pathlib import Path
 from typing import Callable, Dict, List, Optional, TypeAlias, Union, cast
 
 import lal
-import numpy as np
-import tomli
-from multipledispatch import dispatch
 
 from . import polarization_functions, polarization_modes_functions
 from .approximant import Approximant, get_approximant
-from .domains import Domain, FrequencyDomain, TimeDomain, build_domain
+from .domains import Domain, FrequencyDomain, TimeDomain
 from .imports import check_function_signature, import_entity, import_function
 from .lal_params import get_lal_params
 from .polarizations import Polarization, polarizations_to_table
@@ -424,17 +419,17 @@ class WaveformGenerator:
         return polarization_modes
 
 
-@dispatch(WaveformGeneratorParameters, Domain)
 def build_waveform_generator(
-    parameters: WaveformGeneratorParameters, domain: Domain
+    parameters: Union[WaveformGeneratorParameters, Dict], domain: Domain
 ) -> WaveformGenerator:
     """
     Factory function to create a WaveformGenerator instance from parameters.
 
     Parameters
     ----------
-    parameters : WaveformGeneratorParameters
-        Parameters controlling the waveform generation
+    parameters :
+        Either an instance of WaveformGeneratorParameters or a dictionary
+        containing the necessary parameters.
     domain : Domain
         The computational domain for the waveform generation
 
@@ -444,9 +439,22 @@ def build_waveform_generator(
 
     Raises
     ------
+    ValueError
+        If the dictionary cannot be converted to WaveformGeneratorParameters
     TypeError
         If the transform function has an invalid signature
     """
+
+    # if as dict as been passed as argument, 'casting' is to an instance of
+    # WaveformGeneratorParameters
+    if not isinstance(parameters, WaveformGeneratorParameters):
+        try:
+            domain_parameters = WaveformGeneratorParameters(**parameters)
+        except Exception as e:
+            raise ValueError(
+                f"Constructing domain: failed to construct from dictionary {repr(domain_parameters)}. {type(e)}: {e}"
+            )
+    parameters = cast(WaveformGeneratorParameters, parameters)
 
     # if transform is not None and is a string, we expect it to be an import path
     # to a transform function. We import it here.
@@ -481,84 +489,3 @@ def build_waveform_generator(
         transform=transform,
         spin_conversion_phase=parameters.spin_conversion_phase,
     )
-
-
-@dispatch(dict, Domain)
-def build_waveform_generator(parameters: Dict, domain: Domain) -> WaveformGenerator:
-    """
-    Factory function to create a WaveformGenerator instance from a dictionary of parameters.
-
-    Parameters
-    ----------
-    parameters : Dict
-        Dictionary containing the waveform generator parameters
-    domain : Domain
-        The computational domain for the waveform generation
-
-    Returns
-    -------
-    A configured WaveformGenerator instance ready for use
-
-    Raises
-    ------
-    ValueError
-        If the dictionary cannot be converted to WaveformGeneratorParameters
-    """
-    try:
-        parameters_ = WaveformGeneratorParameters(**parameters)
-    except Exception as e:
-        raise ValueError(
-            f"Constructing waveform generator: failed to construct from dictionary {repr(parameters)}. {type(e)}: {e}"
-        ) from e
-    return build_waveform_generator(parameters_, domain)
-
-
-@dispatch((str, Path))
-def build_waveform_generator(file_path: Union[str, Path]) -> WaveformGenerator:
-    """
-    Factory function to create a WaveformGenerator instance from a TOML/JSON file.
-    The file should contain a "domain" key for the domain parameters and a
-    "waveform_generator" key for the waveform generator parameters.
-
-    Parameters
-    ----------
-    file_path : Union[str, Path]
-        Path to the TOML or JSON file containing the parameters
-
-    Returns
-    -------
-    A configured WaveformGenerator instance ready for use
-
-    Raises
-    ------
-    ValueError
-        If the file cannot be loaded or parsed
-    KeyError
-        If required keys are missing from the file
-    """
-    if str(file_path).lower().endswith(".json"):
-        with open(file_path, "r") as f:
-            params = json.load(f)
-    elif str(file_path).lower().endswith(".toml"):
-        with open(file_path, "rb") as f:
-            params = tomli.load(f)
-    else:
-        raise ValueError(
-            f"Unsupported file format: {file_path}. Only .json and .toml files are supported."
-        )
-
-    try:
-        domain_dict = params["domain"]
-    except KeyError:
-        raise KeyError(f"Missing required key '{e}' in configuration file {file_path}")
-    domain: Domain = build_domain(domain_dict)
-
-    try:
-        waveform_generator_dict = params["waveform_generator"]
-    except KeyError as e:
-        raise KeyError(f"Missing required key '{e}' in configuration file {file_path}")
-    waveform_generator_dict["domain"] = domain
-
-    generator_params = WaveformGeneratorParameters(**waveform_generator_dict)
-
-    return build_waveform_generator(generator_params, domain)

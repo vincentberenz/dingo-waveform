@@ -28,9 +28,11 @@ dependencies = [
     "torch",
     "nptyping",
     "rich",
+    "scipy>=1.13.0,<1.14.0",
     "scipy-stubs[scipy]",
     "multipledispatch",
-    "tomli"
+    "tomli",
+    "dingo-gw"
 ]
 
 #[tool.setuptools]
