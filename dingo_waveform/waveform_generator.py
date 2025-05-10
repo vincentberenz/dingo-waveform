@@ -1,6 +1,6 @@
 import json
 import logging
-from pathlib import Path
+from pathlib import Path, PosixPath
 from typing import Callable, Dict, List, Optional, TypeAlias, Union, cast
 
 import lal
@@ -11,7 +11,7 @@ from multipledispatch import dispatch
 from . import polarization_functions, polarization_modes_functions
 from .approximant import Approximant, get_approximant
 from .domains import Domain, FrequencyDomain, TimeDomain, build_domain
-from .imports import check_function_signature, import_entity, import_function
+from .imports import check_function_signature, import_entity, import_function, read_file
 from .lal_params import get_lal_params
 from .polarizations import Polarization, polarizations_to_table
 from .types import Mode, Modes
@@ -110,7 +110,7 @@ class WaveformGenerator:
         spin_conversion_phase: Optional[float] = None,
         convert_to_SI: Optional[bool] = None,
         mode_list: Optional[List[Modes]] = None,
-        transform: Optional[Callable[[Polarization], Polarization]] = None,
+        transform: Optional[Union[str, Callable[[Polarization], Polarization]]] = None,
         polarization_function: Optional[Union[str, PolarizationFunction]] = None,
         polarization_modes_function: Optional[
             Union[str, PolarizationModesFunction]
@@ -136,7 +136,8 @@ class WaveformGenerator:
         mode_list :
             List of (ell, m) tuples specifying the spherical harmonic modes
         transform :
-            Optional transformation function to apply to the generated polarizations
+            Optional transformation function to apply to the generated polarizations.
+            Passed as the function itself or as an import path.
         polarization_function :
             Either a string representing the import path of a function to use, or
             the function itself to generate single polarization waveforms
@@ -156,15 +157,20 @@ class WaveformGenerator:
         # (used in generate_hplus_hcross)
         # has the proper signature (if not None)
         if transform is not None:
-            if not check_function_signature(
-                transform,
-                [Polarization],
-                Polarization,
-            ):
-                raise ValueError(
-                    f"waveform_generator: can not use {transform} as polarization transform function, "
-                    "as it does not have the required signature (args: Polarization, return type: Polarization)"
-                )
+            if type(transform) == "str":
+                transform = import_function(transform, [Polarization], Polarization)
+            else:
+                transform = cast(Callable, transform)
+                if not check_function_signature(
+                    transform,
+                    [Polarization],
+                    Polarization,
+                ):
+                    raise ValueError(
+                        f"waveform_generator: can not use {transform} as polarization transform function, "
+                        "as it does not have the required signature (args: Polarization, return type: Polarization)"
+                    )
+        transform = cast(Callable[[Polarization], Polarization], transform)
 
         # packaging all attributes into an instance of WaveformGeneratorParameters
         # is not very elegant, but it allows to pass them as arguments
@@ -424,141 +430,79 @@ class WaveformGenerator:
         return polarization_modes
 
 
-@dispatch(WaveformGeneratorParameters, Domain)
-def build_waveform_generator(
-    parameters: WaveformGeneratorParameters, domain: Domain
-) -> WaveformGenerator:
-    """
-    Factory function to create a WaveformGenerator instance from parameters.
+@dispatch(dict, Domain)
+def build_waveform_generator(params: Dict, domain: Domain) -> WaveformGenerator:
 
-    Parameters
-    ----------
-    parameters : WaveformGeneratorParameters
-        Parameters controlling the waveform generation
-    domain : Domain
-        The computational domain for the waveform generation
+    for key in ("approximant", "f_ref"):
+        if key not in params.keys():
+            raise ValueError(
+                f"the key '{key}' is required to build a waveform generator from a dictionary"
+            )
 
-    Returns
-    -------
-    A configured WaveformGenerator instance ready for use
+    approximant = str(params["approximant"])
+    f_ref = float(params["f_ref"])
 
-    Raises
-    ------
-    TypeError
-        If the transform function has an invalid signature
-    """
+    spin_conversion_phase = params.get("spin_conversion_phase", None)
+    if spin_conversion_phase is not None:
+        spin_conversion_phase = bool(spin_conversion_phase)
 
-    # if transform is not None and is a string, we expect it to be an import path
-    # to a transform function. We import it here.
-    transform: Optional[Callable[[Polarization], Polarization]]
-    if parameters.transform is not None:
-        if type(parameters.transform) == str:
-            # type ignore: we know parameters.transform is a string
-            transform, _, _ = import_entity(parameters.transform)  # type: ignore
-            # type ignore: we know transform is not None
-            if not check_function_signature(transform, [Polarization], Polarization):  # type: ignore
-                raise TypeError(
-                    "waveform generator transform function should take an instance of Polarization as argument "
-                    f"and return an instance of polarization. The function {transform.__name__} "  # type: ignore
-                    "has a different signature."
-                )
-    else:
-        transform = None
+    f_start = params.get("f_start", None)
+    if f_start is not None:
+        f_start = float(f_start)
 
-    approximant: str
-    if type(parameters.approximant) != str:
-        # type ignore: mypy fails to see the check right above
-        approximant = get_approximant(parameters.approximant)  # type: ignore
-    else:
-        approximant = parameters.approximant
+    convert_to_SI = params.get("convert_to_SI", None)
+    if convert_to_SI is not None:
+        convert_to_SI = bool(convert_to_SI)
+
+    mode_list = params.get("mode_list", None)
+
+    transform = params.get("transform", None)
+    if transform is not None:
+        transform = str(transform)
+
+    polarization_function = params.get("polarization_function", None)
+    if polarization_function is not None:
+        polarization_function = str(polarization_function)
+
+    polarization_modes_function = params.get("polarization_mode_function", None)
+    if polarization_modes_function is not None:
+        polarization_modes_function = str(polarization_modes_function)
 
     return WaveformGenerator(
-        Approximant(approximant),
+        approximant,
         domain,
-        parameters.f_ref,
-        f_start=parameters.f_start,
-        mode_list=parameters.mode_list,
+        f_ref,
+        f_start=f_start,
+        spin_conversion_phase=spin_conversion_phase,
+        convert_to_SI=convert_to_SI,
+        mode_list=mode_list,
         transform=transform,
-        spin_conversion_phase=parameters.spin_conversion_phase,
+        polarization_function=polarization_function,
+        polarization_modes_function=polarization_modes_function,
     )
 
 
-@dispatch(dict, Domain)
-def build_waveform_generator(parameters: Dict, domain: Domain) -> WaveformGenerator:
-    """
-    Factory function to create a WaveformGenerator instance from a dictionary of parameters.
+@dispatch(dict)
+def build_waveform_generator(params: Dict) -> WaveformGenerator:
 
-    Parameters
-    ----------
-    parameters : Dict
-        Dictionary containing the waveform generator parameters
-    domain : Domain
-        The computational domain for the waveform generation
+    for key in ("domain", "waveform_generator"):
+        if key not in params.keys():
+            raise ValueError(
+                f"the key '{key}' is required to build a waveform generator from a dictionary"
+            )
+    domain_params = params["domain"]
+    domain: Domain = build_domain(domain_params)
 
-    Returns
-    -------
-    A configured WaveformGenerator instance ready for use
-
-    Raises
-    ------
-    ValueError
-        If the dictionary cannot be converted to WaveformGeneratorParameters
-    """
-    try:
-        parameters_ = WaveformGeneratorParameters(**parameters)
-    except Exception as e:
-        raise ValueError(
-            f"Constructing waveform generator: failed to construct from dictionary {repr(parameters)}. {type(e)}: {e}"
-        ) from e
-    return build_waveform_generator(parameters_, domain)
+    waveform_params = params["waveform_generator"]
+    return build_waveform_generator(waveform_params, domain)
 
 
-@dispatch((str, Path))
-def build_waveform_generator(file_path: Union[str, Path]) -> WaveformGenerator:
-    """
-    Factory function to create a WaveformGenerator instance from a TOML/JSON file.
-    The file should contain a "domain" key for the domain parameters and a
-    "waveform_generator" key for the waveform generator parameters.
+@dispatch(Path)
+def build_waveform_generator(file_path: Path) -> WaveformGenerator:
+    params = read_file(file_path)
+    return build_waveform_generator(params)
 
-    Parameters
-    ----------
-    file_path : Union[str, Path]
-        Path to the TOML or JSON file containing the parameters
 
-    Returns
-    -------
-    A configured WaveformGenerator instance ready for use
-
-    Raises
-    ------
-    ValueError
-        If the file cannot be loaded or parsed
-    KeyError
-        If required keys are missing from the file
-    """
-    if str(file_path).lower().endswith(".json"):
-        with open(file_path, "r") as f:
-            params = json.load(f)
-    elif str(file_path).lower().endswith(".toml"):
-        with open(file_path, "rb") as f:
-            params = tomli.load(f)
-    else:
-        raise ValueError(
-            f"Unsupported file format: {file_path}. Only .json and .toml files are supported."
-        )
-
-    try:
-        domain_dict = params["domain"]
-    except KeyError:
-        raise KeyError(f"Missing required key '{e}' in configuration file {file_path}")
-    domain: Domain = build_domain(domain_dict)
-
-    try:
-        waveform_generator_dict = params["waveform_generator"]
-    except KeyError as e:
-        raise KeyError(f"Missing required key '{e}' in configuration file {file_path}")
-    waveform_generator_dict["domain"] = domain
-
-    generator_params = WaveformGeneratorParameters(**waveform_generator_dict)
-
-    return build_waveform_generator(generator_params, domain)
+@dispatch(str)
+def build_waveform_generator(file_path: Path) -> WaveformGenerator:
+    return build_waveform_generator(Path(file_path))

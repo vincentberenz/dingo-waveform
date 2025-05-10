@@ -1,4 +1,5 @@
 from dataclasses import Field, asdict, dataclass, fields, make_dataclass
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -20,6 +21,7 @@ from bilby.gw.conversion import (
 )
 from bilby.gw.prior import BBHPriorDict
 
+from .imports import read_file
 from .logging import TableStr
 from .waveform_parameters import WaveformParameters
 
@@ -216,6 +218,11 @@ class IntrinsicPriors(TableStr):
         'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
     )
     geocent_time: Union[str, float] = 0.0
+
+    @classmethod
+    def from_file(cls, file_path: Union[str, Path]) -> "IntrinsicPriors":
+        parameters = read_file(file_path)
+        return cls(**parameters)
 
     def sample(self) -> WaveformParameters:
         """

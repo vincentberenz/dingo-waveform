@@ -27,7 +27,7 @@ class DomainParameters:
     """
 
     f_max: Optional[float]
-    delta_t: Optional[float]
+    delta_t: Optional[float] = None
     f_min: Optional[float] = None
     delta_f: Optional[float] = None
     window_factor: Optional[float] = None

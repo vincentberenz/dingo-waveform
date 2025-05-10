@@ -1,6 +1,21 @@
 import importlib
 import inspect
-from typing import Any, Callable, List, Optional, Tuple, Type, Union, get_type_hints
+import json
+from pathlib import Path
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    get_type_hints,
+)
+
+import tomli
+import yaml
 
 
 def check_function_signature(
@@ -158,3 +173,20 @@ def import_function(
             f"(args: {expected_return_type}, return: {expected_return_type}"
         )
     return fn
+
+
+def read_file(file_path: Union[Path, str]) -> Dict:
+    if str(file_path).lower().endswith(".json"):
+        with open(file_path, "r") as f:
+            params = json.load(f)
+    elif str(file_path).lower().endswith(".toml"):
+        with open(file_path, "rb") as f:
+            params = tomli.load(f)
+    elif str(file_path).lower().endswith((".yaml", ".yml")):
+        with open(file_path, "r") as f:
+            params = yaml.safe_load(f)
+    else:
+        raise ValueError(
+            f"Unsupported file format: {file_path}. Only .json, .toml, .yaml, and .yml files are supported."
+        )
+    return params

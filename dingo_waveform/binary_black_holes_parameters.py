@@ -49,9 +49,9 @@ class BinaryBlackHoleParameters(TableStr):
     f_ref: float
     chirp_mass: float
     mass_ratio: float
-    total_mass: float
     mass_1: float
     mass_2: float
+    total_mass: Optional[float] = None
     geocent_time: Optional[float] = None
     l_max: Optional[int] = None
     chi_1: Optional[float] = None

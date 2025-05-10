@@ -1,7 +1,8 @@
 import json
 
 import pytest
-import tomli
+import toml
+import yaml
 
 from dingo_waveform.domains import FrequencyDomain
 from dingo_waveform.waveform_generator import (
@@ -15,16 +16,6 @@ from dingo_waveform.waveform_generator_parameters import WaveformGeneratorParame
 def domain():
     """Create a test frequency domain."""
     return FrequencyDomain(f_min=20.0, f_max=1024.0, delta_f=0.125)
-
-
-@pytest.fixture
-def generator_parameters():
-    """Create test waveform generator parameters."""
-    return WaveformGeneratorParameters(
-        approximant="IMRPhenomPv2",
-        f_ref=20.0,
-        spin_conversion_phase=0.0,
-    )
 
 
 @pytest.fixture
@@ -58,15 +49,30 @@ def config_file_json(config_dict, tmp_path):
 def config_file_toml(config_dict, tmp_path):
     """Create a temporary TOML config file."""
     file_path = tmp_path / "config.toml"
-    with open(file_path, "wb") as f:
-        tomli.dump(config_dict, f)
+    with open(file_path, "w") as f:
+        toml.dump(config_dict, f)
     return file_path
 
 
-def test_build_waveform_generator_from_parameters(domain, generator_parameters):
-    """Test building a waveform generator from parameters."""
-    generator = build_waveform_generator(generator_parameters, domain)
-    _assert_waveform_generator(generator)
+@pytest.fixture
+def config_file_yaml(config_dict, tmp_path):
+    """Create a temporary YAML config file."""
+    file_path = tmp_path / "config.yaml"
+    with open(file_path, "w") as f:
+        yaml.dump(config_dict, f)
+    return file_path
+
+
+def _assert_waveform_generator(generator):
+    """Helper function to assert common properties of a waveform generator."""
+    assert isinstance(generator, WaveformGenerator)
+    assert generator._waveform_gen_params.approximant == "IMRPhenomPv2"
+    assert generator._waveform_gen_params.f_ref == 20.0
+    assert generator._waveform_gen_params.spin_conversion_phase == 0.0
+    assert isinstance(generator._waveform_gen_params.domain, FrequencyDomain)
+    assert generator._waveform_gen_params.domain.f_min == 20.0
+    assert generator._waveform_gen_params.domain.f_max == 1024.0
+    assert generator._waveform_gen_params.domain.delta_f == 0.125
 
 
 def test_build_waveform_generator_from_dict(domain):
@@ -80,22 +86,6 @@ def test_build_waveform_generator_from_dict(domain):
     _assert_waveform_generator(generator)
 
 
-def _assert_waveform_generator(generator):
-    """Helper function to assert common properties of a waveform generator."""
-    assert isinstance(generator, WaveformGenerator)
-    assert generator._waveform_gen_params.approximant == "IMRPhenomPv2"
-    assert generator._waveform_gen_params.f_ref == 20.0
-    assert generator._waveform_gen_params.spin_conversion_phase == 0.0
-    assert isinstance(generator, WaveformGenerator)
-    assert generator._waveform_gen_params.approximant == "IMRPhenomPv2"
-    assert generator._waveform_gen_params.f_ref == 20.0
-    assert generator._waveform_gen_params.spin_conversion_phase == 0.0
-    assert isinstance(generator._waveform_gen_params.domain, FrequencyDomain)
-    assert generator._waveform_gen_params.domain.f_min == 20.0
-    assert generator._waveform_gen_params.domain.f_max == 1024.0
-    assert generator._waveform_gen_params.domain.delta_f == 0.125
-
-
 def test_build_waveform_generator_from_json_file(config_file_json):
     """Test building a waveform generator from a JSON file."""
     generator = build_waveform_generator(config_file_json)
@@ -105,6 +95,12 @@ def test_build_waveform_generator_from_json_file(config_file_json):
 def test_build_waveform_generator_from_toml_file(config_file_toml):
     """Test building a waveform generator from a TOML file."""
     generator = build_waveform_generator(config_file_toml)
+    _assert_waveform_generator(generator)
+
+
+def test_build_waveform_generator_from_yaml_file(config_file_yaml):
+    """Test building a waveform generator from a YAML file."""
+    generator = build_waveform_generator(config_file_yaml)
     _assert_waveform_generator(generator)
 
 
@@ -121,7 +117,7 @@ def test_build_waveform_generator_missing_keys(tmp_path):
     file_path = tmp_path / "config.json"
     with open(file_path, "w") as f:
         json.dump({"domain": {}}, f)
-    with pytest.raises(KeyError, match="Missing required key"):
+    with pytest.raises(ValueError):
         build_waveform_generator(file_path)
 
 

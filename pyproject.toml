@@ -32,6 +32,7 @@ dependencies = [
     "scipy-stubs[scipy]",
     "multipledispatch",
     "tomli",
+    "toml",
     "dingo-gw"
 ]
 
