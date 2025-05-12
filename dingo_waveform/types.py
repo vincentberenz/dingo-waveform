@@ -29,7 +29,6 @@ Modes: TypeAlias = Tuple[Mode, Mode]
 Tuple of two modes (the degree of the spherical harmonic mode and the order of the spherical harmonic mode)
 """
 
-
 GWSignalsGenerators = Union[
     pyseobnr_model.SEOBNRv5HM,
     pyseobnr_model.SEOBNRv5EHM,

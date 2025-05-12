@@ -22,7 +22,7 @@ from bilby.gw.conversion import (
 from bilby.gw.prior import BBHPriorDict
 
 from .imports import read_file
-from .logging import TableStr
+from .logs import TableStr
 from .waveform_parameters import WaveformParameters
 
 

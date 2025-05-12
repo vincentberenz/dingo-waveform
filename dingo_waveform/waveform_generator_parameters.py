@@ -8,7 +8,7 @@ import tomli
 
 from .approximant import Approximant
 from .domains import Domain, build_domain
-from .logging import TableStr
+from .logs import TableStr
 from .polarizations import Polarization
 from .types import Modes
 

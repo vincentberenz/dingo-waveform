@@ -5,7 +5,7 @@ import lal
 import lalsimulation as LS
 import numpy as np
 
-from .logging import TableStr
+from .logs import TableStr
 from .types import FrequencySeries, Mode, Modes
 
 

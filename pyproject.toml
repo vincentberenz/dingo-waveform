@@ -25,16 +25,20 @@ dependencies = [
     "lalsuite>=7.15",
     "matplotlib",
     "numpy",
-    "torch",
     "nptyping",
-    "rich",
-    "scipy>=1.13.0,<1.14.0",
-    "scipy-stubs[scipy]",
     "multipledispatch",
-    "tomli",
+    "pyseobnr",
+    "rich",
+    "scipy", 
+    "scipy-stubs[scipy]",
     "toml",
-    "dingo-gw"
+    "tomli",
+    "torch",
+    #"dingo-gw"
 ]
+
+[project.scripts]
+dingo-waveform-compare = "dingo_waveform.compare:main"
 
 #[tool.setuptools]
 #package-data = {

@@ -8,7 +8,7 @@ import lalsimulation as LS
 from ..approximant import Approximant, get_approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters
-from ..logging import TableStr
+from ..logs import TableStr
 from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
 from ..spins import Spins
 from ..types import FrequencySeries, Iota, Mode, Modes

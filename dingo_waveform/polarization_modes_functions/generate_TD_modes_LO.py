@@ -69,7 +69,7 @@ class _GenerateTDModesLO(GwSignalParameters):
 
         key: SpinWeightedSphericalHarmonicMode
         value: Union[gwpy.timeseries.TimeSeries, gwpy.frequencyseries.FrequencySeries]
-        hlm_td: GravitationalWaveModes = waveform.GenerateFDModes(params, generator)
+        hlm_td: GravitationalWaveModes = waveform.GenerateTDModes(params, generator)
 
         hlms_lal: Dict[Modes, lal.CreateCOMPLEX16TimeSeries] = {}
 

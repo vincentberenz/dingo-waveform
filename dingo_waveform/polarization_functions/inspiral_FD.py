@@ -12,7 +12,7 @@ from nptyping import Float32, NDArray, Shape
 from ..approximant import Approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters, FrequencyDomain
-from ..logging import TableStr
+from ..logs import TableStr
 from ..polarization_modes_functions.inspiral_choose_FD_modes import (
     _InspiralChooseFDModesParameters,
 )

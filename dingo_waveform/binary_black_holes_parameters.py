@@ -10,7 +10,7 @@ from bilby.gw.conversion import (
     convert_to_lal_binary_black_hole_parameters,
 )
 
-from .logging import TableStr, to_table
+from .logs import TableStr, to_table
 from .spins import Spins
 from .waveform_parameters import WaveformParameters
 

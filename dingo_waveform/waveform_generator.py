@@ -1,17 +1,14 @@
-import json
 import logging
-from pathlib import Path, PosixPath
-from typing import Callable, Dict, List, Optional, TypeAlias, Union, cast
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple, TypeAlias, Union, cast
 
 import lal
-import numpy as np
-import tomli
 from multipledispatch import dispatch
 
 from . import polarization_functions, polarization_modes_functions
-from .approximant import Approximant, get_approximant
+from .approximant import Approximant
 from .domains import Domain, FrequencyDomain, TimeDomain, build_domain
-from .imports import check_function_signature, import_entity, import_function, read_file
+from .imports import check_function_signature, import_function, read_file
 from .lal_params import get_lal_params
 from .polarizations import Polarization, polarizations_to_table
 from .types import Mode, Modes
@@ -83,6 +80,17 @@ PolarizationModesFunctions: Dict[str, PolarizationModesFunction] = {
 }
 """
 Exhaustive list of PolarizationModesFunctions implemented by the dingo-waveform package.
+"""
+
+polarization_modes_approximants: Tuple[Approximant, ...] = (
+    Approximant("SEOBNRv4PHM"),
+    Approximant("IMRPhenomXPHM"),
+    Approximant("SEOBNRv5PHM"),
+    Approximant("SEOBNRv5HM"),
+)
+"""
+Exhaustive list of approximants supported by the WaveformGenerator.generate_hplus_hcross_m
+function.
 """
 
 
@@ -341,10 +349,7 @@ class WaveformGenerator:
         ):
             return polarization_modes_functions.generate_TD_modes_LO_cond_extra_time
 
-        # "new" interface
-        # any other approximant
-        # (calling gwsignal_get_waveform_generator and GenerateFDModes)
-        return polarization_modes_functions.generate_TD_modes_LO
+        raise ValueError(f"Approximant {approximant} not supported")
 
     def _generate_hplus_hcross_m_checks(
         self, waveform_parameters: WaveformParameters

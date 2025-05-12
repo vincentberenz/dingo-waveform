@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 import lal
 
-from .logging import TableStr
+from .logs import TableStr
 
 
 @dataclass

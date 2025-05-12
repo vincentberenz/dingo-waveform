@@ -9,7 +9,7 @@ from ..approximant import Approximant, get_approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters
 from ..lal_params import lal
-from ..logging import TableStr
+from ..logs import TableStr
 from ..polarizations import Polarization
 from ..spins import Spins
 from ..waveform_generator_parameters import WaveformGeneratorParameters

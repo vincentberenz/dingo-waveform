@@ -1,3 +1,4 @@
+import logging
 from dataclasses import Field, fields, is_dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, Optional, Protocol, Union, cast
@@ -198,3 +199,24 @@ class TableStr:
         if header is None:
             return to_table(self._console, self)  # type: ignore
         return header + "\n" + to_table(self, console=self._console)  # type: ignore
+
+
+def reset_logging():
+    # Get the root logger
+    root = logging.getLogger()
+
+    # Remove all handlers from all loggers
+    # Use list() to avoid modifying the dictionary during iteration
+    for name in list(logging.Logger.manager.loggerDict.keys()):
+        logger = logging.Logger.manager.loggerDict[name]
+        if isinstance(logger, logging.Logger):
+            logger.handlers.clear()
+            logger.level = logging.NOTSET
+            logger.propagate = True
+            logger.disabled = False
+
+    # Reset root logger
+    root.handlers.clear()
+    root.level = logging.NOTSET
+
+    return root

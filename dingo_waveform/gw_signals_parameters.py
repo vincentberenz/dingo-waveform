@@ -10,7 +10,7 @@ from astropy.units import Quantity
 
 from .binary_black_holes_parameters import BinaryBlackHoleParameters
 from .domains import DomainParameters
-from .logging import TableStr
+from .logs import TableStr
 from .spins import Spins
 from .types import Mode
 from .waveform_parameters import WaveformParameters
