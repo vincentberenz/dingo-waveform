@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import tempfile
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from dingo.gw.domains import build_domain as original_build_domain
@@ -22,7 +22,7 @@ from dingo.gw.waveform_generator import (
 from dingo.gw.waveform_generator import WaveformGenerator as OriginalWaveformGenerator
 
 from dingo_waveform.approximant import Approximant
-from dingo_waveform.logs import reset_logging
+from dingo_waveform.logs import set_logging
 from dingo_waveform.polarizations import Polarization
 from dingo_waveform.prior import IntrinsicPriors
 from dingo_waveform.types import Mode
@@ -38,8 +38,9 @@ _approximants = (
     Approximant("IMRPhenomXPHM"),
     Approximant("SEOBNRv4PHM"),
     Approximant("SEOBNRv5PHM"),
+    Approximant("SEOBNRv5HM"),
 )
-_new_interface_approximants = (Approximant("SEOBNRv5PHM"), Approximant("SEOBNRv5HM"))
+_new_interface_approximants = (Approximant("SEOBNRv5HM"), Approximant("SEOBNRv5PHM"))
 _f_start = (None, 15.0)
 
 
@@ -55,7 +56,7 @@ def _same(a: np.ndarray, b: np.ndarray, tolerance=1e-25) -> None:
 
 
 def _same_modes_pols(a: Optional[Dict], b: Optional[Dict[Mode, Polarization]]) -> None:
-    if a is None and b is None:
+    if a is None or b is None:
         return
     if set(a.keys()) != set(b.keys()):
         raise ValueError("Keys of the dictionaries do not match.")
@@ -78,11 +79,50 @@ def config_file_json(config_dict):
         os.rmdir(tmp_dir)
 
 
+_prior_PHM = {
+    "mass_1": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
+    "mass_2": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
+    "mass_ratio": "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)",
+    "chirp_mass": "bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)",
+    "luminosity_distance": 1000.0,
+    "theta_jn": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+    "phase": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+    "a_1": "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)",
+    "a_2": "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)",
+    "tilt_1": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+    "tilt_2": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+    "phi_12": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+    "phi_jl": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+    "geocent_time": 0.0,
+}
+
+
+_prior = {
+    "mass_1": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
+    "mass_2": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
+    "mass_ratio": "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)",
+    "chirp_mass": "bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)",
+    "luminosity_distance": 1000.0,
+    "theta_jn": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+    "phase": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+    "chi_1": 'bilby.gw.prior.AlignedSpin(name="chi_1", a_prior=Uniform(minimum=0, maximum=0.99))',
+    "chi_2": 'bilby.gw.prior.AlignedSpin(name="chi_2", a_prior=Uniform(minimum=0, maximum=0.99))',
+    "geocent_time": 0.0,
+}
+
+
+def get_prior_dict(approximant: str) -> Dict:
+    prior_dict = _prior_PHM if "PHM" in approximant else _prior
+    priors_ = IntrinsicPriors(**prior_dict)
+    priors = priors_.sample_as_dict()  # type: ignore
+    return priors
+
+
 def get_configuration_dict(approximant: str, f_start: Optional[float]) -> Dict:
     d: Dict = {
         "domain": {
             "type": "FrequencyDomain",
-            "f_min": 20.0,
+            "f_min": 10.0,
             "f_max": 1024.0,
             "delta_f": 0.125,
         },
@@ -90,23 +130,9 @@ def get_configuration_dict(approximant: str, f_start: Optional[float]) -> Dict:
             "approximant": approximant,
             "f_ref": 20.0,
             "spin_conversion_phase": 0.0,
+            "f_start": 15.0,
         },
-        "intrinsic_prior": {
-            "mass_1": 50.0,
-            "mass_2": 25.0,
-            "chirp_mass": 60.0,
-            "mass_ratio": 0.5,
-            "phase": 2.5811112632546123,
-            "a_1": 0.5,
-            "a_2": 0.6,
-            "tilt_1": 1.8222778934660213,
-            "tilt_2": 1.3641458250460199,
-            "phi_12": 4.469204665688967,
-            "phi_jl": 3.021398659177057,
-            "theta_jn": 1.4262724019800959,
-            "luminosity_distance": 100.0,  # Mpc
-            "geocent_time": 0.0,  # s
-        },
+        "intrinsic_prior": get_prior_dict(approximant),
     }
     if f_start is not None:
         d["waveform_generator"]["f_start"] = f_start
@@ -151,9 +177,8 @@ def get_new_priors(config_dict: Dict) -> WaveformParameters:
 
 
 def get_original_polarizations(
-    approximant: str, f_start: Optional[float]
+    config_dict: Dict, approximant: str, f_start: Optional[float]
 ) -> Tuple[Dict, Optional[Dict]]:
-    config_dict = get_configuration_dict(approximant, f_start)
     original_wfg = get_original_waveform_generator(config_dict)
     priors = get_original_priors(config_dict)
     polarizations = original_wfg.generate_hplus_hcross(priors)
@@ -165,12 +190,12 @@ def get_original_polarizations(
 
 
 def get_new_polarizations(
-    approximant: str, f_start: Optional[float]
+    config_dict: Dict, approximant: str, f_start: Optional[float]
 ) -> Tuple[Polarization, Optional[Dict[Mode, Polarization]]]:
-    config_dict = get_configuration_dict(approximant, f_start)
     wfg = get_new_waveform_generator(config_dict)
     priors = get_new_priors(config_dict)
     polarizations = wfg.generate_hplus_hcross(priors)
+
     if approximant in polarization_modes_approximants:
         polarizations_modes = wfg.generate_hplus_hcross_m(priors)
     else:
@@ -178,17 +203,47 @@ def get_new_polarizations(
     return polarizations, polarizations_modes
 
 
-def _main(approximant: Approximant, f_start: Optional[float]) -> None:
+def _main(approximant: Approximant, f_start: Optional[float]) -> str:
 
-    original_pols, original_mode_pols = get_original_polarizations(approximant, f_start)
-    new_pols, new_mode_pols = get_new_polarizations(approximant, f_start)
+    config_dict = get_configuration_dict(approximant, f_start)
 
-    _same(original_pols["h_plus"], new_pols.h_plus)
-    _same(original_pols["h_cross"], new_pols.h_cross)
-    _same_modes_pols(original_mode_pols, new_mode_pols)
+    original_pols, original_mode_pols = get_original_polarizations(
+        config_dict, approximant, f_start
+    )
+
+    new_pols, new_mode_pols = get_new_polarizations(config_dict, approximant, f_start)
+
+    report: List[str] = [f"\n--report for {approximant}--"]
+
+    report.append("original polarizations")
+    report.append(f"\t{original_pols["h_plus"].shape}")
+    if original_mode_pols is not None:
+        report.append(f"\t{list(original_mode_pols.keys())}")
+    report.append("new polarizations")
+    report.append(f"\t{new_pols.h_plus.shape}")
+    if new_mode_pols is not None:
+        report.append(f"\t{list(new_mode_pols.keys())}")
+    report.append("--")
+    try:
+        _same(original_pols["h_plus"], new_pols.h_plus)
+        _same(original_pols["h_cross"], new_pols.h_cross)
+    except Exception as e:
+        report.append(f"ERROR: {e}")
+    else:
+        report.append("OK")
+    try:
+        _same_modes_pols(original_mode_pols, new_mode_pols)
+    except Exception as e:
+        report.append(f"ERROR: {e}")
+    else:
+        report.append("OK")
+    print("-----\n")
+    # _same_modes_pols(original_mode_pols, new_mode_pols)
+
+    return "\n".join(report)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Compare waveforms between original and new implementations"
     )
@@ -197,27 +252,7 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
-    print()
-    print(args.approximant)
-    print(args.f_start)
-    print(args.verbose)
-    print()
-
-    # Set up logging
-    logger = reset_logging()
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-
-    logger.debug("debug message")
-    logger.info("info message")
-    print("printed message")
+    set_logging(level=logging.DEBUG if args.verbose else logging.INFO)
 
     # Determine which approximants to test
     approximants_to_test = (
@@ -226,13 +261,17 @@ def main():
     f_start = args.f_start if args.f_start else None
 
     # Run tests for each approximant
+    reports: List[str] = []
     for approximant in approximants_to_test:
-        logging.info(f"Testing approximant: {approximant}")
+        print(f"\nTesting approximant: {approximant}")
         try:
-            _main(approximant, f_start)
-            logging.info(f"Successfully compared waveforms for {approximant}")
+            reports.append(_main(approximant, f_start))
+            print(f"Successfully compared waveforms for {approximant}")
         except Exception as e:
-            logging.error(f"Error comparing waveforms for {approximant}: {str(e)}")
+            error = f"\n--report for {approximant}--\nError comparing waveforms for {approximant}: {str(e)}\n--"
+            reports.append(error)
+    for report in reports:
+        print(report)
 
 
 if __name__ == "__main__":

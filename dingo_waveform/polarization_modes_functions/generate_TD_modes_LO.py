@@ -134,7 +134,6 @@ def generate_TD_modes_LO(
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.f_ref,
             waveform_gen_params.f_start,
-            waveform_gen_params.convert_to_SI,
         ),
     )
 

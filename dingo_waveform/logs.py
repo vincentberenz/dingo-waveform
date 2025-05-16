@@ -1,7 +1,7 @@
 import logging
 from dataclasses import Field, fields, is_dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional, Protocol, Union, cast
+from typing import Any, Callable, Dict, Iterable, Optional, Protocol, Union, cast
 
 import astropy
 import numpy as np
@@ -197,11 +197,18 @@ class TableStr:
         The table.
         """
         if header is None:
-            return to_table(self._console, self)  # type: ignore
+            return to_table(self, console=self._console)  # type: ignore
         return header + "\n" + to_table(self, console=self._console)  # type: ignore
 
 
-def reset_logging():
+def set_logging(
+    handlers: Iterable[logging.Handler] = (logging.StreamHandler(),),
+    formatter: logging.Formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    ),
+    level: int = logging.INFO,
+    numba_level: Optional[int] = logging.ERROR,
+) -> logging.Logger:
     # Get the root logger
     root = logging.getLogger()
 
@@ -218,5 +225,17 @@ def reset_logging():
     # Reset root logger
     root.handlers.clear()
     root.level = logging.NOTSET
+
+    for handler in handlers:
+        handler.setFormatter(formatter)
+    root.addHandler(handler)
+    root.setLevel(level)
+
+    # by default, numba will output a lot of info when
+    # set to warning level, which is likely to obfuscate
+    # dingo-waveform logs. Turning them off here.
+    if numba_level is not None:
+        numba_logger = logging.getLogger("numba")
+        numba_logger.setLevel(numba_level)
 
     return root

@@ -110,12 +110,10 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
             self.spin2y,
             self.spin2z,
         )
-        convert_to_SI = True
         hlm_fd___: Dict[Modes, FrequencySeries] = spins.convert_J_to_L0_frame(
             hlm_fd__,
             self.mass1,
             self.mass2,
-            convert_to_SI,
             self.f22_ref,
             spin_conversion_phase,
         )
@@ -172,7 +170,6 @@ def generate_FD_modes_LO(
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.f_ref,
             waveform_gen_params.f_start,
-            waveform_gen_params.convert_to_SI,
         ),
     )
 

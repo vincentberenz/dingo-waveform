@@ -5,6 +5,8 @@ from typing import Callable, Dict, List, Optional, Tuple, TypeAlias, Union, cast
 import lal
 from multipledispatch import dispatch
 
+from dingo_waveform import approximant
+
 from . import polarization_functions, polarization_modes_functions
 from .approximant import Approximant
 from .domains import Domain, FrequencyDomain, TimeDomain, build_domain
@@ -116,7 +118,6 @@ class WaveformGenerator:
         f_ref: float,
         f_start: Optional[float] = None,
         spin_conversion_phase: Optional[float] = None,
-        convert_to_SI: Optional[bool] = None,
         mode_list: Optional[List[Modes]] = None,
         transform: Optional[Union[str, Callable[[Polarization], Polarization]]] = None,
         polarization_function: Optional[Union[str, PolarizationFunction]] = None,
@@ -139,8 +140,6 @@ class WaveformGenerator:
             Starting frequency for the waveform generation
         spin_conversion_phase :
             Phase angle used for converting spins
-        convert_to_SI :
-            Flag indicating whether to perform unit conversions to SI system
         mode_list :
             List of (ell, m) tuples specifying the spherical harmonic modes
         transform :
@@ -190,7 +189,6 @@ class WaveformGenerator:
             f_ref=f_ref,
             f_start=f_start,
             spin_conversion_phase=spin_conversion_phase,
-            convert_to_SI=convert_to_SI,
             mode_list=mode_list,
             lal_params=lal_params,
             transform=transform,
@@ -292,7 +290,8 @@ class WaveformGenerator:
         # logging the waveform parameters as a nice looking table
         _logger.info(
             waveform_parameters.to_table(
-                f"generating waveforms using function {polarization_method.__name__} "
+                f"starting to generate waveforms for approximant {self._waveform_gen_params.approximant} "
+                f"using function {polarization_method.__name__} "
                 f"and waveform parameters (f_ref={self._waveform_gen_params.f_ref}):"
             )
         )
@@ -395,13 +394,6 @@ class WaveformGenerator:
         h+ and h× polarizations
         """
 
-        # printing in the log the waveform parameters
-        _logger.info(
-            waveform_parameters.to_table(
-                f"generate hplus/hcross m with waveform parameters (f_ref={self._waveform_gen_params.f_ref})"
-            )
-        )
-
         # checking the configuration is suitable for calling generate_hplus_hcross_m.
         # A ValueError will be raised if not.
         # In a separate method for readability only.
@@ -419,10 +411,17 @@ class WaveformGenerator:
                 self._waveform_gen_params.approximant
             )
 
-        # generating the waveforms
+        # printing in the log the waveform parameters
         _logger.info(
-            f"waveform generator: generating waveforms using function {polarization_modes_function.__name__}"
+            waveform_parameters.to_table(
+                f"starting to generate waveforms (separated by modes) "
+                f"for approximant {self._waveform_gen_params.approximant} "
+                f"using {polarization_modes_function.__name__} "
+                f"with waveform parameters (f_ref={self._waveform_gen_params.f_ref}):"
+            )
         )
+
+        # generating the waveforms
         polarization_modes: Dict[Mode, Polarization] = polarization_modes_function(
             self._waveform_gen_params, waveform_parameters
         )
@@ -455,10 +454,6 @@ def build_waveform_generator(params: Dict, domain: Domain) -> WaveformGenerator:
     if f_start is not None:
         f_start = float(f_start)
 
-    convert_to_SI = params.get("convert_to_SI", None)
-    if convert_to_SI is not None:
-        convert_to_SI = bool(convert_to_SI)
-
     mode_list = params.get("mode_list", None)
 
     transform = params.get("transform", None)
@@ -479,7 +474,6 @@ def build_waveform_generator(params: Dict, domain: Domain) -> WaveformGenerator:
         f_ref,
         f_start=f_start,
         spin_conversion_phase=spin_conversion_phase,
-        convert_to_SI=convert_to_SI,
         mode_list=mode_list,
         transform=transform,
         polarization_function=polarization_function,

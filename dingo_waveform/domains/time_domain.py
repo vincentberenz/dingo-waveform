@@ -31,6 +31,12 @@ class TimeDomain(Domain):
         self._time_duration = time_duration
         self._sampling_rate = sampling_rate
 
+    def __str__(self) -> str:
+        return str(
+            f"time domain (time duration: {self._time_duration:.2f}, "
+            f"sampling rate: {self._sampling_rate:.2f})"
+        )
+
     @override
     def update(self) -> None:
         """

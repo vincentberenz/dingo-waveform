@@ -1,6 +1,8 @@
 import logging
+from copy import deepcopy
 from dataclasses import asdict, astuple, dataclass
 from typing import Dict, Optional, cast
+from venv import logger
 
 import lal
 import lalsimulation as LS
@@ -53,9 +55,8 @@ class _InspiralChooseFDModesParameters(TableStr):
         self, hlm_J: Dict[Modes, FrequencySeries]
     ) -> Dict[Modes, FrequencySeries]:
 
-        converted_to_SI = True
         return self.get_spins().convert_J_to_L0_frame(
-            hlm_J, self.mass_1, self.mass_2, converted_to_SI, self.f_ref, self.phase
+            hlm_J, self.mass_1, self.mass_2, self.f_ref, self.phase
         )
 
     @classmethod
@@ -95,7 +96,6 @@ class _InspiralChooseFDModesParameters(TableStr):
         cls,
         waveform_parameters: WaveformParameters,
         f_ref: float,
-        convert_to_SI: Optional[bool],
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
@@ -104,7 +104,7 @@ class _InspiralChooseFDModesParameters(TableStr):
         # Creates an instance from waveform parameters.
 
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
-            waveform_parameters, f_ref, convert_to_SI
+            waveform_parameters, f_ref
         )
         return cls.from_binary_black_hole_parameters(
             bbh_parameters,
@@ -114,16 +114,21 @@ class _InspiralChooseFDModesParameters(TableStr):
             approximant,
         )
 
-    def apply(self, phase: float) -> Dict[Mode, Polarization]:
+    def apply(self) -> Dict[Mode, Polarization]:
 
+        # for SimInspiralChooseFDModes, SI units are required
+        params: "_InspiralChooseFDModesParameters" = deepcopy(self)
+        params.mass_1 *= lal.MSUN_SI
+        params.mass_2 *= lal.MSUN_SI
+        params.r *= 1e6 * lal.PC_SI
+
+        # informing the user which arguments we pass to the function
         _logger.debug(
-            self.to_table(
-                "generating modes / polarizations using lalsimulation.SimInspiralChooseFDModes"
-            )
+            params.to_table(f"calling LS.SimInspiralChooseFDModes with arguments:")
         )
 
         # Calling the lal simulation method
-        arguments = list(astuple(self))
+        arguments = list(astuple(params))
         hlm_fd___: LS.SphHarmFrequencySeries = LS.SimInspiralChooseFDModes(*arguments)
 
         # "Converting" to frequency series
@@ -137,7 +142,7 @@ class _InspiralChooseFDModesParameters(TableStr):
         # "Converting" to L0 frame
         hlm_fd: Dict[Modes, FrequencySeries] = self.convert_J_to_L0_frame(hlm_fd_)
 
-        return get_polarizations_from_fd_modes_m(hlm_fd, self.iota, phase)
+        return get_polarizations_from_fd_modes_m(hlm_fd, self.iota, self.phase)
 
 
 def inspiral_choose_FD_modes(
@@ -174,7 +179,6 @@ def inspiral_choose_FD_modes(
         _InspiralChooseFDModesParameters.from_waveform_parameters(
             waveform_params,
             waveform_gen_params.f_ref,
-            waveform_gen_params.convert_to_SI,
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.spin_conversion_phase,
             waveform_gen_params.lal_params,
@@ -182,4 +186,4 @@ def inspiral_choose_FD_modes(
         ),
     )
 
-    return instance.apply(waveform_params.phase)
+    return instance.apply()

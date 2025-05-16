@@ -80,7 +80,7 @@ def test_mean_std():
     _test_mean_std(mean_exact, std_exact, mean_approx, std_approx)
 
     # same test using ExtrinsicPriors as a wrapper over BBHExtrinsicPriorDict
-    ep = ExtrinsicPriors()
+    ep = ExtrinsicPriors(**default_extrinsic_dict)
     mean_exact, std_exact = ep.mean_std(keys)
     mean_approx, std_approx = ep.mean_std(
         keys, sample_size=num_samples, force_numerical=True

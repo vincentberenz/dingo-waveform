@@ -152,6 +152,17 @@ class FrequencyDomain(Domain):
             f_min, f_max, delta_f
         )
 
+    def __str__(self) -> str:
+        wf = (
+            f", window_factor: {self._window_factor}"
+            if self._window_factor is not None
+            else ""
+        )
+        return str(
+            f"frequency domain (f_min {self._f_min:.2f}, f_max {self._f_max:.2f}, "
+            f"delta_f {self._delta_f:.2f}{wf})"
+        )
+
     @override
     def get_parameters(self) -> DomainParameters:
         """

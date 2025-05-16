@@ -85,7 +85,7 @@ class Spins(TableStr):
     s2z: float
 
     def get_JL0_euler_angles(
-        self, m1: float, m2: float, converted_to_SI: bool, f_ref: float, phase: float
+        self, m1: float, m2: float, f_ref: float, phase: float
     ) -> Tuple[float, float, float]:
         """
         Calculate the Euler angles for the transformation from the J frame to the L0 frame.
@@ -107,9 +107,6 @@ class Spins(TableStr):
         -------
         The Euler angles (alpha_0, beta_0, gamma_0).
         """
-        if converted_to_SI:
-            m1 = m1 / lal.MSUN_SI
-            m2 = m2 / lal.MSUN_SI
 
         m = m1 + m2
         eta = m1 * m2 / m**2
@@ -199,7 +196,6 @@ class Spins(TableStr):
         hlm_J: Dict[Modes, FrequencySeries],
         m1: float,
         m2: float,
-        converted_to_SI: bool,
         f_ref: float,
         phase: float,
     ) -> Dict[Modes, FrequencySeries]:
@@ -225,9 +221,7 @@ class Spins(TableStr):
         -------
         Waveform modes in the L0 frame.
         """
-        alpha_0, beta_0, gamma_0 = self.get_JL0_euler_angles(
-            m1, m2, converted_to_SI, f_ref, phase
-        )
+        alpha_0, beta_0, gamma_0 = self.get_JL0_euler_angles(m1, m2, f_ref, phase)
 
         hlm_L0: Dict[Modes, FrequencySeries] = {}
         for (l, m), hlm in hlm_J.items():

@@ -107,7 +107,6 @@ class _InspiralFDParameters(TableStr):
         cls,
         waveform_parameters: WaveformParameters,
         f_ref: float,
-        convert_to_SI: Optional[bool],
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
@@ -115,7 +114,7 @@ class _InspiralFDParameters(TableStr):
     ) -> "_InspiralFDParameters":
 
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
-            waveform_parameters, f_ref, convert_to_SI
+            waveform_parameters, f_ref
         )
         return cls.from_binary_black_hole_parameters(
             bbh_parameters,
@@ -149,6 +148,9 @@ class _InspiralFDParameters(TableStr):
         LS.SimInspiralWaveformParamsInsertPhenomXHMThresholdMband(lal_params, 0)
         LS.SimInspiralWaveformParamsInsertPhenomXPHMThresholdMband(lal_params, 0)
         params: "_InspiralFDParameters" = deepcopy(self)
+        params.mass_1 *= lal.MSUN_SI
+        params.mass_2 *= lal.MSUN_SI
+        params.r *= 1e6 * lal.PC_SI
         params.lal_params = lal_params
         # arguments = list(astuple(params))
         #  The above would not always work, because lal.Dict can not be deep copied.
@@ -173,14 +175,20 @@ class _InspiralFDParameters(TableStr):
         delta_f_tolerance: float = 1e-6,
     ) -> Polarization:
 
+        # SimInspiralFD requires kg, converting here
+        params: "_InspiralFDParameters" = deepcopy(self)
+        params.mass_1 *= lal.MSUN_SI
+        params.mass_2 *= lal.MSUN_SI
+        params.r *= 1e6 * lal.PC_SI
+
         _logger.debug(
-            self.to_table("generating polarization using lalsimulation.SimInspiralFD")
+            params.to_table("generating polarization using lalsimulation.SimInspiralFD")
         )
 
         hp: lal.COMPLEX16FrequencySeries
         hc: lal.COMPLEX16FrequencySeries
 
-        arguments = list(astuple(self))
+        arguments = list(astuple(params))
         hp, hc = LS.SimInspiralFD(*arguments)
 
         if auto_turn_off_multibanding:
@@ -265,7 +273,6 @@ def inspiral_FD(
     inspiral_fd_params = _InspiralFDParameters.from_waveform_parameters(
         waveform_params,
         waveform_gen_params.f_ref,
-        waveform_gen_params.convert_to_SI,
         waveform_gen_params.domain.get_parameters(),
         waveform_gen_params.spin_conversion_phase,
         waveform_gen_params.lal_params,

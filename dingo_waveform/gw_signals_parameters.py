@@ -132,7 +132,6 @@ class GwSignalParameters(TableStr):
         f_ref: float,
         spin_conversion_phase: Optional[float] = None,
         f_start: Optional[float] = None,
-        convert_to_SI: Optional[bool] = False,
     ) -> "GwSignalParameters":
         """
         Create an instance of GwSignalParameters from waveform parameters.
@@ -142,7 +141,7 @@ class GwSignalParameters(TableStr):
         conversion process:
 
         1. First converts WaveformParameters to BinaryBlackHoleParameters using the
-        reference frequency f_ref and unit conversion flag convert_to_SI
+        reference frequency f_ref
         2. Then creates GwSignalParameters using the previously documented
         from_binary_black_hole_parameters method
 
@@ -161,9 +160,6 @@ class GwSignalParameters(TableStr):
             Phase angle used for converting spins (default: None)
         f_start
             Starting frequency for waveform generation (default: None)
-        convert_to_SI
-            Flag indicating whether to perform unit conversions to SI system
-            (default: True)
 
         Returns
         -------
@@ -171,14 +167,7 @@ class GwSignalParameters(TableStr):
             An instance containing all necessary parameters for gravitational wave signal generation
         """
 
-        # for "new" interface, we do not convert by default
-        # to the masses to SI
-        if convert_to_SI is None:
-            convert_to_SI = False
-
-        bbh = BinaryBlackHoleParameters.from_waveform_parameters(
-            waveform_params, f_ref, convert_to_SI
-        )
+        bbh = BinaryBlackHoleParameters.from_waveform_parameters(waveform_params, f_ref)
         instance = cls.from_binary_black_hole_parameters(
             bbh,
             domain_params,

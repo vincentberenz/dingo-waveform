@@ -1,4 +1,5 @@
 import logging
+from copy import deepcopy
 from dataclasses import InitVar, asdict, astuple, dataclass
 from typing import Dict, Optional, cast
 
@@ -88,7 +89,6 @@ class _InspiralChooseTDModesParameters(TableStr):
         cls,
         waveform_params: WaveformParameters,
         f_ref: float,
-        convert_to_SI: Optional[bool],
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
@@ -97,7 +97,7 @@ class _InspiralChooseTDModesParameters(TableStr):
         # Creates an instance from waveform parameters.
 
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
-            waveform_params, f_ref, convert_to_SI
+            waveform_params, f_ref
         )
         return cls.from_binary_black_hole_parameters(
             bbh_parameters,
@@ -108,15 +108,22 @@ class _InspiralChooseTDModesParameters(TableStr):
         )
 
     def apply(self, domain: FrequencyDomain, phase: float) -> Dict[Mode, Polarization]:
+
+        # for SimInspiralChooseFDModes, SI units are required
+        params: "_InspiralChooseTDModesParameters" = deepcopy(self)
+        params.mass_1 *= lal.MSUN_SI
+        params.mass_2 *= lal.MSUN_SI
+        params.distance *= 1e6 * lal.PC_SI
+
+        # informing the user which arguments we pass to the function
         _logger.debug(
-            "calling LS.SimInspiralChooseTDModes with arguments:"
-            f"{', '.join([str(v) for v in astuple(self)])}"
+            params.to_table("calling LS.SimInspiralChooseTDModes with arguments:")
         )
 
         # Note: because self.iota is an "InitVar", it is excluded
         #   from the 'astuple' function.
         hlm__: LS.SphHarmFrequencySeries = LS.SimInspiralChooseTDModes(
-            *list(astuple(self))
+            *list(astuple(params))
         )
 
         # Convert linked list of modes into dictionary with keys (l,m)
@@ -178,7 +185,6 @@ def inspiral_choose_TD_modes(
         _InspiralChooseTDModesParameters.from_waveform_parameters(
             waveform_params,
             waveform_gen_params.f_ref,
-            waveform_gen_params.convert_to_SI,
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.spin_conversion_phase,
             waveform_gen_params.lal_params,

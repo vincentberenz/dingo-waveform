@@ -64,7 +64,6 @@ class BinaryBlackHoleParameters(TableStr):
         cls,
         waveform_params: WaveformParameters,
         f_ref: float,
-        convert_to_SI: Optional[bool],
     ) -> "BinaryBlackHoleParameters":
         """
         Create a BinaryBlackHoleParameters instance from WaveformParameters.
@@ -75,21 +74,11 @@ class BinaryBlackHoleParameters(TableStr):
             The waveform parameters (i.e. user config for waveform generation) to convert.
         f_ref:
             The reference frequency.
-        convert_to_SI:
-            Whether to convert to SI units.
 
         Returns
         -------
         A BinaryBlackHoleParameters instance.
         """
-        # By default we convert masses to SI
-        # NOTE: for methods using the "new" interface,
-        #  i.e. lalsimulation.gwsignal, convert_to_SI
-        #  will be set to False before from_waveform_parameters
-        #  is called. See:
-        #  gw_signals_parameters.GwSignalParameters.from_waveform_parameters
-        if convert_to_SI is None:
-            convert_to_SI = True
 
         # Convert the waveform parameters to a dictionary
         params = asdict(waveform_params)
@@ -105,12 +94,6 @@ class BinaryBlackHoleParameters(TableStr):
         for k, v in converted_params.items():
             converted_params[k] = convert_to_float(v) if v is not None else None
 
-        # If conversion to SI units is required, perform the conversion
-        if convert_to_SI:
-            _logger.debug("converting to SI units")
-            converted_params["mass_1"] *= lal.MSUN_SI
-            converted_params["mass_2"] *= lal.MSUN_SI
-            converted_params["luminosity_distance"] *= 1e6 * lal.PC_SI
         instance = cls(**converted_params)
 
         # Log the generated binary black hole parameters
@@ -148,7 +131,12 @@ class BinaryBlackHoleParameters(TableStr):
         )
 
         # Extract the values of the parameters from the instance using the keys.
-        args: List[float] = [getattr(self, k) for k in keys]
+        # We use solar masses unit, but bilby_to_lalsimulation_spins requires kg:
+        # mass_1 and mass_2 are converted.
+        kwargs = {k: getattr(self, k) for k in keys}
+        kwargs["mass_1"] *= lal.MSUN_SI
+        kwargs["mass_2"] *= lal.MSUN_SI
+        args: List[float] = [kwargs[k] for k in keys]
 
         # If a specific spin conversion phase is provided, use it instead of the default phase.
         if spin_conversion_phase is not None:

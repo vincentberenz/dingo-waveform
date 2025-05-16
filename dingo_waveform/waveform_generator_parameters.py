@@ -30,8 +30,6 @@ class WaveformGeneratorParameters(TableStr):
         Starting frequency for the waveform generation
     spin_conversion_phase :
         Phase angle used for converting spins
-    convert_to_SI :
-        Flag indicating whether to perform unit conversions to SI system
     mode_list :
         List of (ell, m) tuples specifying the spherical harmonic modes to include
         in the waveform calculation
@@ -46,7 +44,6 @@ class WaveformGeneratorParameters(TableStr):
     f_ref: float
     f_start: Optional[float]
     spin_conversion_phase: Optional[float]
-    convert_to_SI: Optional[bool]
     mode_list: Optional[List[Modes]]
     lal_params: Optional[lal.Dict]
     transform: Optional[Callable[[Polarization], Polarization]] = None

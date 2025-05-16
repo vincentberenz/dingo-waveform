@@ -114,23 +114,44 @@ class BBHExtrinsicPriorDict(BBHPriorDict):
         return mean, std
 
 
+def _get_prior_dict(
+    prior_instance: Union["ExtrinsicPriors", "IntrinsicPriors"],
+) -> Dict[str, Union[str, float]]:
+    # 1. User creates an instance of Priors (ExtrinsicPriors or IntrinsicPriors), setting either
+    #    a value (float or str) or "default" for each field he/she want to specify.
+    # 2. Fields for which no value was given by the user still has a "None" value. Fields
+    #    set to "default" by user still has "default" as value
+    # 3. This function will be called by the "sample" function of the prior instance
+    #    to "remove" the None value and set the default value properly.
+    # This function assumes the prior class has a static method "default_priors" which
+    # provides the proper default value for all fields (this is indeed the case for
+    # ExtrinsicPriors and IntrincicPriors)
+    d = {}
+    default_priors = prior_instance.default_priors()
+    for k, v in asdict(prior_instance).items():
+        if v is not None:
+            v_ = v if v != "default" else default_priors[k]
+            d[k] = v_
+    return d
+
+
 @dataclass
 class ExtrinsicPriors(TableStr):
-    dec: Union[str, float] = (
-        "bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)"
-    )
-    ra: Union[str, float] = (
-        'bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")'
-    )
-    geocent_time: Union[str, float] = (
-        "bilby.core.prior.Uniform(minimum=-0.1, maximum=0.1)"
-    )
-    psi: Union[str, float] = (
-        'bilby.core.prior.Uniform(minimum=0.0, maximum=np.pi, boundary="periodic")'
-    )
-    luminosity_distance: Union[str, float] = (
-        "bilby.core.prior.Uniform(minimum=100.0, maximum=6000.0)"
-    )
+    dec: Optional[Union[str, float]] = None
+    ra: Optional[Union[str, float]] = None
+    geocent_time: Optional[Union[str, float]] = None
+    psi: Optional[Union[str, float]] = None
+    luminosity_distance: Optional[Union[str, float]] = None
+
+    @staticmethod
+    def default_priors() -> Dict[str, Union[str, float]]:
+        return {
+            "dec": "bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)",
+            "ra": 'bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")',
+            "geocent_time": "bilby.core.prior.Uniform(minimum=-0.1, maximum=0.1)",
+            "psi": 'bilby.core.prior.Uniform(minimum=0.0, maximum=np.pi, boundary="periodic")',
+            "luminosity_distance": "bilby.core.prior.Uniform(minimum=100.0, maximum=6000.0)",
+        }
 
     def mean_std(self, keys: List[str], sample_size=50000, force_numerical=False):
         """
@@ -182,7 +203,7 @@ class ExtrinsicPriors(TableStr):
         # type ignore:
         # I could not find how to specify this mixin could be superclass
         # only for dataclass. (I tried to use Protocol, but no success)
-        bbh_prior_dict = BBHExtrinsicPriorDict(asdict(self))  # type: ignore
+        bbh_prior_dict = BBHExtrinsicPriorDict(_get_prior_dict(self))  # type: ignore
         return [
             WaveformParameters(**bbh_prior_dict.sample()) for _ in range(nb_samples)
         ]
@@ -190,39 +211,63 @@ class ExtrinsicPriors(TableStr):
 
 @dataclass
 class IntrinsicPriors(TableStr):
-    mass_1: Union[str, float] = (
-        "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)"
-    )
-    mass_2: Union[str, float] = (
-        "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)"
-    )
-    mass_ratio: Union[str, float] = (
-        "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)"
-    )
-    chirp_mass: Union[str, float] = (
-        "bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)"
-    )
-    luminosity_distance: Union[str, float] = 1000.0
-    theta_jn: Union[str, float] = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
-    phase: Union[str, float] = (
-        'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
-    )
-    a_1: Union[str, float] = "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)"
-    a_2: Union[str, float] = "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)"
-    tilt_1: Union[str, float] = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
-    tilt_2: Union[str, float] = "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)"
-    phi_12: Union[str, float] = (
-        'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
-    )
-    phi_jl: Union[str, float] = (
-        'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")'
-    )
+    mass_1: Optional[Union[str, float]] = None
+    mass_2: Optional[Union[str, float]] = None
+    mass_ratio: Optional[Union[str, float]] = None
+    chirp_mass: Optional[Union[str, float]] = None
+    luminosity_distance: Optional[Union[str, float]] = None
+    theta_jn: Optional[Union[str, float]] = None
+    phase: Optional[Union[str, float]] = None
+    a_1: Optional[Union[str, float]] = None
+    a_2: Optional[Union[str, float]] = None
+    tilt_1: Optional[Union[str, float]] = None
+    tilt_2: Optional[Union[str, float]] = None
+    phi_12: Optional[Union[str, float]] = None
+    phi_jl: Optional[Union[str, float]] = None
+    chi_1: Optional[Union[str, float]] = None
+    chi_2: Optional[Union[str, float]] = None
     geocent_time: Union[str, float] = 0.0
+
+    @staticmethod
+    def default_priors() -> Dict[str, Union[str, float]]:
+        return {
+            "mass_1": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
+            "mass_2": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
+            "mass_ratio": "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)",
+            "chirp_mass": "bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)",
+            "luminosity_distance": 1000.0,
+            "theta_jn": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+            "phase": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+            "a_1": "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)",
+            "a_2": "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)",
+            "tilt_1": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+            "tilt_2": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+            "phi_12": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+            "phi_jl": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+            "chi_1": 'bilby.gw.prior.AlignedSpin(name="chi_1", a_prior=Uniform(minimum=0, maximum=0.99))',
+            "chi_2": 'bilby.gw.prior.AlignedSpin(name="chi_2", a_prior=Uniform(minimum=0, maximum=0.99))',
+            "geocent_time": 0.0,
+        }
 
     @classmethod
     def from_file(cls, file_path: Union[str, Path]) -> "IntrinsicPriors":
         parameters = read_file(file_path)
         return cls(**parameters)
+
+    def sample_as_dict(self) -> Dict[str, float]:
+        """
+        Sample, but returns a dictionary (as opposed to
+        the 'sample' function which returns an instance
+        of WaveformParameters)
+        Returns:
+            Dict[str, float]: sample of priors
+        """
+        # type ignore:
+        # I could not find how to specify this mixin could be superclass
+        # only for dataclass. (I tried to use Protocol, but no success)
+        d = _get_prior_dict(self)
+        bbh_prior_dict = BBHPriorDict(d)  # type: ignore
+        return bbh_prior_dict.sample()
 
     def sample(self) -> WaveformParameters:
         """
@@ -250,7 +295,7 @@ class IntrinsicPriors(TableStr):
         # type ignore:
         # I could not find how to specify this mixin could be superclass
         # only for dataclass. (I tried to use Protocol, but no success)
-        bbh_prior_dict = BBHPriorDict(asdict(self))  # type: ignore
+        bbh_prior_dict = BBHPriorDict(_get_prior_dict(self))  # type: ignore
         return [
             WaveformParameters(**bbh_prior_dict.sample()) for _ in range(nb_samples)
         ]
@@ -452,23 +497,41 @@ def build_prior_with_defaults(
     """
     prior_settings_: IntrinsicPriors
     if isinstance(prior_settings, dict):
-        prior_settings = {
-            k: v for k, v in prior_settings.items() if v is not None and v != "default"
-        }
         prior_settings_ = IntrinsicPriors(**prior_settings)
     else:
         prior_settings_ = cast(IntrinsicPriors, prior_settings)
-    return BBHPriorDict(asdict(prior_settings_))
+    return BBHPriorDict(_get_prior_dict(prior_settings_))
 
 
-default_extrinsic_dict = asdict(ExtrinsicPriors())
+default_extrinsic_dict = {
+    "dec": "bilby.core.prior.Cosine(minimum=-np.pi/2, maximum=np.pi/2)",
+    "ra": 'bilby.core.prior.Uniform(minimum=0., maximum=2*np.pi, boundary="periodic")',
+    "geocent_time": "bilby.core.prior.Uniform(minimum=-0.1, maximum=0.1)",
+    "psi": 'bilby.core.prior.Uniform(minimum=0.0, maximum=np.pi, boundary="periodic")',
+    "luminosity_distance": "bilby.core.prior.Uniform(minimum=100.0, maximum=6000.0)",
+}
 """
 Default extrinsic priors dictionary.
 
 This dictionary contains the default prior settings for extrinsic parameters.
 """
 
-default_intrinsic_dict = asdict(IntrinsicPriors())
+default_intrinsic_dict = {
+    "mass_1": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
+    "mass_2": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
+    "mass_ratio": "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)",
+    "chirp_mass": "bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)",
+    "luminosity_distance": 1000.0,
+    "theta_jn": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+    "phase": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+    "a_1": "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)",
+    "a_2": "bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)",
+    "tilt_1": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+    "tilt_2": "bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)",
+    "phi_12": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+    "phi_jl": 'bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary="periodic")',
+    "geocent_time": 0.0,
+}
 """
 Default intrinsic priors dictionary.
 
