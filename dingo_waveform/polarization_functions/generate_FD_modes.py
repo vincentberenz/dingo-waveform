@@ -33,7 +33,8 @@ _Generators = Union[
 
 @dataclass
 class _GenerateFDModesParameters(GwSignalParameters):
-    # For the list of Fields, see the superclass GwSignalParameter
+    # For the list of Fields, see the superclass GwSignalParameter.
+    #
     # This class is private to this module, see generate_FD_modes
     # at the bottom if this file.
 

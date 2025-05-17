@@ -152,6 +152,7 @@ def get_original_waveform_generator(
             "approximant": waveform_generator_params["approximant"],
             "domain": domain,
             "f_ref": waveform_generator_params["f_ref"],
+            "f_start": waveform_generator_params["f_start"],
             "spin_conversion_phase": waveform_generator_params["spin_conversion_phase"],
         }
         return NewInterfaceOriginalWaveformGenerator(**kwargs)
@@ -160,6 +161,7 @@ def get_original_waveform_generator(
             waveform_generator_params["approximant"],
             domain,
             waveform_generator_params["f_ref"],
+            f_start=waveform_generator_params["f_start"],
             spin_conversion_phase=waveform_generator_params["spin_conversion_phase"],
         )
 

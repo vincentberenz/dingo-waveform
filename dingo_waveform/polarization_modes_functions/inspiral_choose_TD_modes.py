@@ -60,6 +60,7 @@ class _InspiralChooseTDModesParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
+        f_start: Optional[float],
         l_max_default: int = 5,
     ) -> "_InspiralChooseTDModesParameters":
         # Creates an instance from binary black hole parameters.
@@ -69,6 +70,8 @@ class _InspiralChooseTDModesParameters(TableStr):
         params["phiRef"] = 0.0
         for attr in ("delta_t", "f_min"):
             params[attr] = getattr(domain_params, attr)
+        if f_start is not None:
+            params["f_min"] = f_start
         params["f_ref"] = bbh_parameters.f_ref
         params["distance"] = bbh_parameters.luminosity_distance
         params["l_max"] = (
@@ -89,6 +92,7 @@ class _InspiralChooseTDModesParameters(TableStr):
         cls,
         waveform_params: WaveformParameters,
         f_ref: float,
+        f_start: Optional[float],
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
@@ -105,6 +109,7 @@ class _InspiralChooseTDModesParameters(TableStr):
             spin_conversion_phase,
             lal_params,
             approximant,
+            f_start,
         )
 
     def apply(self, domain: FrequencyDomain, phase: float) -> Dict[Mode, Polarization]:
@@ -185,6 +190,7 @@ def inspiral_choose_TD_modes(
         _InspiralChooseTDModesParameters.from_waveform_parameters(
             waveform_params,
             waveform_gen_params.f_ref,
+            waveform_gen_params.f_start,
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.spin_conversion_phase,
             waveform_gen_params.lal_params,

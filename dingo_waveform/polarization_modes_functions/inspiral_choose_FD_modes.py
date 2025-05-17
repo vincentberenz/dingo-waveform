@@ -67,6 +67,7 @@ class _InspiralChooseFDModesParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
+        f_start: Optional[float],
     ) -> "_InspiralChooseFDModesParameters":
         # Creates an instance from binary black hole parameters.
 
@@ -80,6 +81,8 @@ class _InspiralChooseFDModesParameters(TableStr):
         domain_dict = asdict(domain_params)
         for k in ("delta_f", "f_min", "f_max"):
             parameters[k] = domain_dict[k]
+        if f_start is not None:
+            parameters["f_min"] = f_start
         # other params
         parameters["f_ref"] = bbh_parameters.f_ref
         parameters["r"] = bbh_parameters.luminosity_distance
@@ -100,6 +103,7 @@ class _InspiralChooseFDModesParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
+        f_start: Optional[float],
     ) -> "_InspiralChooseFDModesParameters":
         # Creates an instance from waveform parameters.
 
@@ -112,6 +116,7 @@ class _InspiralChooseFDModesParameters(TableStr):
             spin_conversion_phase,
             lal_params,
             approximant,
+            f_start,
         )
 
     def apply(self) -> Dict[Mode, Polarization]:
@@ -183,6 +188,7 @@ def inspiral_choose_FD_modes(
             waveform_gen_params.spin_conversion_phase,
             waveform_gen_params.lal_params,
             waveform_gen_params.approximant,
+            waveform_gen_params.f_start,
         ),
     )
 

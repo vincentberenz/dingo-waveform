@@ -83,6 +83,7 @@ class _InspiralFDParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
+        f_start: Optional[float],
     ) -> "_InspiralFDParameters":
 
         inspiral_choose_fd_modes_parameters = (
@@ -92,6 +93,7 @@ class _InspiralFDParameters(TableStr):
                 spin_conversion_phase,
                 lal_params,
                 approximant,
+                f_start,
             )
         )
         d = asdict(inspiral_choose_fd_modes_parameters)
@@ -111,6 +113,7 @@ class _InspiralFDParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
+        f_start: Optional[float],
     ) -> "_InspiralFDParameters":
 
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
@@ -122,6 +125,7 @@ class _InspiralFDParameters(TableStr):
             spin_conversion_phase,
             lal_params,
             approximant,
+            f_start,
         )
 
     def _turn_off_multibanding(
@@ -276,7 +280,8 @@ def inspiral_FD(
         waveform_gen_params.domain.get_parameters(),
         waveform_gen_params.spin_conversion_phase,
         waveform_gen_params.lal_params,
-        approximant=waveform_gen_params.approximant,
+        waveform_gen_params.approximant,
+        waveform_gen_params.f_start,
     )
 
     frequency_array = waveform_gen_params.domain.sample_frequencies()
