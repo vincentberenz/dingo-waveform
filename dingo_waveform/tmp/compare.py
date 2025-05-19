@@ -7,6 +7,7 @@ import argparse
 import contextlib
 import json
 import logging
+import multiprocessing as mp
 import os
 import tempfile
 from dataclasses import dataclass, field
@@ -22,6 +23,10 @@ from dingo.gw.waveform_generator import (
     NewInterfaceWaveformGenerator as NewInterfaceOriginalWaveformGenerator,
 )
 from dingo.gw.waveform_generator import WaveformGenerator as OriginalWaveformGenerator
+from rich import print as rprint
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from dingo_waveform.approximant import Approximant
 from dingo_waveform.logs import set_logging
@@ -73,11 +78,33 @@ class _Reports:
     prior_PHM: Dict[str, Union[str, float]]
     reports: List[_Report] = field(default_factory=list)
 
+    @staticmethod
+    def _column_titles() -> List[str]:
+        return [
+            "approximant",
+            "f_start",
+            "spin_conversion_phase",
+            "error",
+            "waveforms",
+            "waveforms/modes",
+        ]
+
+    def _column_values(self, report: _Report) -> Dict[str, str]:
+        d: Dict[str, str] = {}
+        d["approximant"] = report.config.approximant
+        d["f_start"] = str(report.config.f_start)
+        d["spin_conversion_phase"] = str(report.config.spin_conversion_phase)
+        d["error"] = report.main_error if report.main_error is not None else " "
+        if report.main_error:
+            d["waveforms"] = " "
+            d["waveforms/modes"] = " "
+            return d
+        else:
+            d["waveforms"] = "✓" if report.error_waveforms is None else "x"
+            d["waveforms/modes"] = "✓" if report.error_waveforms_modes is None else "x"
+            return d
+
     def print(self) -> None:
-        from rich import print as rprint
-        from rich.console import Console
-        from rich.panel import Panel
-        from rich.table import Table
 
         console = Console()
 
@@ -98,44 +125,14 @@ class _Reports:
 
         # Create table for reports
         table = Table(title="Reports", show_header=True, header_style="bold magenta")
-        table.add_column("Approximant", style="cyan")
-        table.add_column("f_start", style="cyan")
-        table.add_column("spin_conversion_phase", style="cyan")
-        table.add_column("Main Error", style="red")
-        table.add_column("Modes", style="green")
-        table.add_column("waveforms", style="red")
-        table.add_column("waveforms/modes", style="yellow")
+        for column in self._column_titles():
+            table.add_column(column)
 
         for report in self.reports:
-            config = report.config
-            main_error = str(report.main_error) if report.main_error else ""
-            modes = "✓" if report.waveform_modes else "✗"
-            error_waveforms = (
-                str(report.error_waveforms) if report.error_waveforms else "✓"
-            )
-            error_modes = (
-                str(report.error_waveforms_modes)
-                if report.error_waveforms_modes
-                else "✓"
-            )
-
-            table.add_row(
-                str(config.approximant),
-                (
-                    str(config.f_start)
-                    if config.f_start is not None
-                    else str(_default_f_start)
-                ),
-                (
-                    str(config.spin_conversion_phase)
-                    if config.spin_conversion_phase is not None
-                    else "None"
-                ),
-                main_error,
-                modes,
-                error_waveforms,
-                error_modes,
-            )
+            column_values = self._column_values(report)
+            values = [column_values[coln] for coln in self._column_titles()]
+            row_style = "red" if report.main_error is not None else "green"
+            table.add_row(*values, style=row_style)
 
         console.print(table)
 
@@ -350,7 +347,15 @@ _f_start = (None, 15.0)
 _spin_conversion_phase = (0.0, 0.2)
 
 
+def _process_config(config: _Config) -> _Report:
+    try:
+        return _main(config)
+    except Exception as e:
+        return _Report(config, None, False, None, main_error=str(e))
+
+
 def main() -> None:
+
     parser = argparse.ArgumentParser(
         description="Compare waveforms between original and new implementations"
     )
@@ -362,9 +367,15 @@ def main() -> None:
         "--scp", type=float, help="Specific spin conversion phase value to test"
     )
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "--n-processes",
+        type=int,
+        default=mp.cpu_count() - 1,
+        help="Number of processes to use for parallel execution",
+    )
     args = parser.parse_args()
 
-    set_logging(level=logging.DEBUG if args.verbose else logging.INFO)
+    set_logging(level=logging.ERROR if args.verbose else logging.INFO)
 
     # Determine which approximants to test
     approximants = (
@@ -375,18 +386,13 @@ def main() -> None:
 
     configs = _get_configs(approximants, f_starts, scp)
 
-    # Run tests for each approximant
+    # Run tests in parallel using multiprocessing
     reports = _Reports(prior=_prior, prior_PHM=_prior_PHM)
-    for config in configs:
-        print(
-            f"\nTesting: {config.approximant} f_start: {config.f_start} spin conversion phase: {config.spin_conversion_phase}"
-        )
-        report: _Report
-        try:
-            report = _main(config)
-        except Exception as e:
-            report = _Report(config, None, False, None, main_error=str(e))
-        reports.reports.append(report)
+
+    # Move process_config outside of main() to make it picklable
+    with mp.Pool(processes=args.n_processes) as pool:
+        results = pool.map(_process_config, configs)
+        reports.reports.extend(results)
 
     reports.print()
 
