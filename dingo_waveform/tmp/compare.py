@@ -9,7 +9,9 @@ import json
 import logging
 import os
 import tempfile
-from typing import Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass, field
+from itertools import product
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 from dingo.gw.domains import build_domain as original_build_domain
@@ -24,7 +26,7 @@ from dingo.gw.waveform_generator import WaveformGenerator as OriginalWaveformGen
 from dingo_waveform.approximant import Approximant
 from dingo_waveform.logs import set_logging
 from dingo_waveform.polarizations import Polarization
-from dingo_waveform.prior import IntrinsicPriors
+from dingo_waveform.prior import IntrinsicPriors, Priors
 from dingo_waveform.types import Mode
 from dingo_waveform.waveform_generator import (
     WaveformGenerator,
@@ -33,15 +35,109 @@ from dingo_waveform.waveform_generator import (
 )
 from dingo_waveform.waveform_parameters import WaveformParameters
 
-_approximants = (
-    Approximant("IMRPhenomPv2"),
-    Approximant("IMRPhenomXPHM"),
-    Approximant("SEOBNRv4PHM"),
-    Approximant("SEOBNRv5PHM"),
-    Approximant("SEOBNRv5HM"),
-)
 _new_interface_approximants = (Approximant("SEOBNRv5HM"), Approximant("SEOBNRv5PHM"))
-_f_start = (None, 15.0)
+_default_f_start = 10.0
+
+
+@dataclass
+class _Config:
+    approximant: Approximant
+    f_start: Optional[float]
+    spin_conversion_phase: Optional[float]
+
+    def __str__(self):
+        f_start = f"{self.f_start:.2f}" if self.f_start is not None else "None"
+        spin_conversion_phase = (
+            f"{self.spin_conversion_phase:.2f}"
+            if self.spin_conversion_phase is not None
+            else "None"
+        )
+        return str(
+            f"({self.approximant} f start: {f_start} "
+            f"spin conversion_phase: {spin_conversion_phase})"
+        )
+
+
+@dataclass
+class _Report:
+    config: _Config
+    error_waveforms: Optional[str]
+    waveform_modes: bool
+    error_waveforms_modes: Optional[str]
+    main_error: Optional[str] = None
+
+
+@dataclass
+class _Reports:
+    prior: Dict[str, Union[str, float]]
+    prior_PHM: Dict[str, Union[str, float]]
+    reports: List[_Report] = field(default_factory=list)
+
+    def print(self) -> None:
+        from rich import print as rprint
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.table import Table
+
+        console = Console()
+
+        # Print priors in panels
+        prior_panel = Panel.fit(
+            "\n".join(f"{key}: {value}" for key, value in self.prior.items()),
+            title="Prior",
+            border_style="blue",
+        )
+        prior_phm_panel = Panel.fit(
+            "\n".join(f"{key}: {value}" for key, value in self.prior_PHM.items()),
+            title="Prior PHM",
+            border_style="blue",
+        )
+
+        console.print(prior_panel)
+        console.print(prior_phm_panel)
+
+        # Create table for reports
+        table = Table(title="Reports", show_header=True, header_style="bold magenta")
+        table.add_column("Approximant", style="cyan")
+        table.add_column("f_start", style="cyan")
+        table.add_column("spin_conversion_phase", style="cyan")
+        table.add_column("Main Error", style="red")
+        table.add_column("Modes", style="green")
+        table.add_column("waveforms", style="red")
+        table.add_column("waveforms/modes", style="yellow")
+
+        for report in self.reports:
+            config = report.config
+            main_error = str(report.main_error) if report.main_error else ""
+            modes = "✓" if report.waveform_modes else "✗"
+            error_waveforms = (
+                str(report.error_waveforms) if report.error_waveforms else "✓"
+            )
+            error_modes = (
+                str(report.error_waveforms_modes)
+                if report.error_waveforms_modes
+                else "✓"
+            )
+
+            table.add_row(
+                str(config.approximant),
+                (
+                    str(config.f_start)
+                    if config.f_start is not None
+                    else str(_default_f_start)
+                ),
+                (
+                    str(config.spin_conversion_phase)
+                    if config.spin_conversion_phase is not None
+                    else "None"
+                ),
+                main_error,
+                modes,
+                error_waveforms,
+                error_modes,
+            )
+
+        console.print(table)
 
 
 def _same(a: np.ndarray, b: np.ndarray, tolerance=1e-25) -> None:
@@ -55,14 +151,15 @@ def _same(a: np.ndarray, b: np.ndarray, tolerance=1e-25) -> None:
         raise ValueError("Arrays are not close enough within the given tolerance.")
 
 
-def _same_modes_pols(a: Optional[Dict], b: Optional[Dict[Mode, Polarization]]) -> None:
+def _same_modes_pols(a: Optional[Dict], b: Optional[Dict[Mode, Polarization]]) -> bool:
     if a is None or b is None:
-        return
+        return False
     if set(a.keys()) != set(b.keys()):
         raise ValueError("Keys of the dictionaries do not match.")
     for mode in a.keys():
         _same(a[mode]["h_plus"], b[mode].h_plus)
         _same(a[mode]["h_cross"], b[mode].h_cross)
+    return True
 
 
 @contextlib.contextmanager
@@ -79,7 +176,7 @@ def config_file_json(config_dict):
         os.rmdir(tmp_dir)
 
 
-_prior_PHM = {
+_prior_PHM: Dict[str, Union[str, float]] = {
     "mass_1": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
     "mass_2": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
     "mass_ratio": "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)",
@@ -97,7 +194,7 @@ _prior_PHM = {
 }
 
 
-_prior = {
+_prior: Dict[str, Union[str, float]] = {
     "mass_1": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
     "mass_2": "bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)",
     "mass_ratio": "bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)",
@@ -118,7 +215,7 @@ def get_prior_dict(approximant: str) -> Dict:
     return priors
 
 
-def get_configuration_dict(approximant: str, f_start: Optional[float]) -> Dict:
+def get_configuration_dict(config: _Config) -> Dict:
     d: Dict = {
         "domain": {
             "type": "FrequencyDomain",
@@ -127,15 +224,15 @@ def get_configuration_dict(approximant: str, f_start: Optional[float]) -> Dict:
             "delta_f": 0.125,
         },
         "waveform_generator": {
-            "approximant": approximant,
+            "approximant": config.approximant,
             "f_ref": 20.0,
-            "spin_conversion_phase": 0.0,
-            "f_start": 15.0,
+            "f_start": _default_f_start,
+            "spin_conversion_phase": config.spin_conversion_phase,
         },
-        "intrinsic_prior": get_prior_dict(approximant),
+        "intrinsic_prior": get_prior_dict(config.approximant),
     }
-    if f_start is not None:
-        d["waveform_generator"]["f_start"] = f_start
+    if config.f_start is not None:
+        d["waveform_generator"]["f_start"] = config.f_start
     return d
 
 
@@ -179,7 +276,7 @@ def get_new_priors(config_dict: Dict) -> WaveformParameters:
 
 
 def get_original_polarizations(
-    config_dict: Dict, approximant: str, f_start: Optional[float]
+    config_dict: Dict, approximant: str
 ) -> Tuple[Dict, Optional[Dict]]:
     original_wfg = get_original_waveform_generator(config_dict)
     priors = get_original_priors(config_dict)
@@ -192,7 +289,7 @@ def get_original_polarizations(
 
 
 def get_new_polarizations(
-    config_dict: Dict, approximant: str, f_start: Optional[float]
+    config_dict: Dict, approximant: str
 ) -> Tuple[Polarization, Optional[Dict[Mode, Polarization]]]:
     wfg = get_new_waveform_generator(config_dict)
     priors = get_new_priors(config_dict)
@@ -205,44 +302,52 @@ def get_new_polarizations(
     return polarizations, polarizations_modes
 
 
-def _main(approximant: Approximant, f_start: Optional[float]) -> str:
+def _main(config: _Config) -> _Report:
 
-    config_dict = get_configuration_dict(approximant, f_start)
+    config_dict = get_configuration_dict(config)
 
     original_pols, original_mode_pols = get_original_polarizations(
-        config_dict, approximant, f_start
+        config_dict, config.approximant
     )
 
-    new_pols, new_mode_pols = get_new_polarizations(config_dict, approximant, f_start)
+    new_pols, new_mode_pols = get_new_polarizations(config_dict, config.approximant)
 
-    report: List[str] = [f"\n--report for {approximant}--"]
-
-    report.append("original polarizations")
-    report.append(f"\t{original_pols["h_plus"].shape}")
-    if original_mode_pols is not None:
-        report.append(f"\t{list(original_mode_pols.keys())}")
-    report.append("new polarizations")
-    report.append(f"\t{new_pols.h_plus.shape}")
-    if new_mode_pols is not None:
-        report.append(f"\t{list(new_mode_pols.keys())}")
-    report.append("--")
+    error_waveforms: Optional[str] = None
     try:
         _same(original_pols["h_plus"], new_pols.h_plus)
         _same(original_pols["h_cross"], new_pols.h_cross)
     except Exception as e:
-        report.append(f"ERROR: {e}")
-    else:
-        report.append("OK")
-    try:
-        _same_modes_pols(original_mode_pols, new_mode_pols)
-    except Exception as e:
-        report.append(f"ERROR: {e}")
-    else:
-        report.append("OK")
-    print("-----\n")
-    # _same_modes_pols(original_mode_pols, new_mode_pols)
+        error_waveforms = str(e)
 
-    return "\n".join(report)
+    error_waveforms_modes: Optional[str] = None
+    try:
+        waveform_modes: bool = _same_modes_pols(original_mode_pols, new_mode_pols)
+    except Exception as e:
+        error_waveforms_modes = str(e)
+
+    return _Report(config, error_waveforms, waveform_modes, error_waveforms_modes)
+
+
+def _get_configs(
+    approximants: Iterable[Approximant],
+    f_start: Iterable[Optional[float]],
+    spin_conversion_phase: Iterable[Optional[float]],
+) -> List[_Config]:
+    return [
+        _Config(a, f, s)
+        for a, f, s in product(approximants, f_start, spin_conversion_phase)
+    ]
+
+
+_approximants = (
+    Approximant("IMRPhenomPv2"),
+    Approximant("IMRPhenomXPHM"),
+    Approximant("SEOBNRv4PHM"),
+    Approximant("SEOBNRv5PHM"),
+    Approximant("SEOBNRv5HM"),
+)
+_f_start = (None, 15.0)
+_spin_conversion_phase = (0.0, 0.2)
 
 
 def main() -> None:
@@ -250,30 +355,40 @@ def main() -> None:
         description="Compare waveforms between original and new implementations"
     )
     parser.add_argument("--approximant", type=str, help="Specific approximant to test")
-    parser.add_argument("--f-start", type=float, help="Starting frequency")
+    parser.add_argument(
+        "--fstart", type=float, help="Specific frequency start value to test"
+    )
+    parser.add_argument(
+        "--scp", type=float, help="Specific spin conversion phase value to test"
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
     set_logging(level=logging.DEBUG if args.verbose else logging.INFO)
 
     # Determine which approximants to test
-    approximants_to_test = (
+    approximants = (
         [Approximant(args.approximant)] if args.approximant else _approximants
     )
-    f_start = args.f_start if args.f_start else None
+    f_starts = [args.fstart] if args.fstart else _f_start
+    scp = [args.scp] if args.scp is not None else _spin_conversion_phase
+
+    configs = _get_configs(approximants, f_starts, scp)
 
     # Run tests for each approximant
-    reports: List[str] = []
-    for approximant in approximants_to_test:
-        print(f"\nTesting approximant: {approximant}")
+    reports = _Reports(prior=_prior, prior_PHM=_prior_PHM)
+    for config in configs:
+        print(
+            f"\nTesting: {config.approximant} f_start: {config.f_start} spin conversion phase: {config.spin_conversion_phase}"
+        )
+        report: _Report
         try:
-            reports.append(_main(approximant, f_start))
-            print(f"Successfully compared waveforms for {approximant}")
+            report = _main(config)
         except Exception as e:
-            error = f"\n--report for {approximant}--\nError comparing waveforms for {approximant}: {str(e)}\n--"
-            reports.append(error)
-    for report in reports:
-        print(report)
+            report = _Report(config, None, False, None, main_error=str(e))
+        reports.reports.append(report)
+
+    reports.print()
 
 
 if __name__ == "__main__":

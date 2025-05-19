@@ -8,6 +8,7 @@ import tomli
 
 from .approximant import Approximant
 from .domains import Domain, build_domain
+from .imports import read_file
 from .logs import TableStr
 from .polarizations import Polarization
 from .types import Modes
@@ -52,15 +53,6 @@ class WaveformGeneratorParameters(TableStr):
     def from_file(
         cls, file_path: Union[str, Path], domain: Domain
     ) -> "WaveformGeneratorParameters":
-        if str(file_path).lower().endswith(".json"):
-            with open(file_path, "r") as f:
-                params = json.load(f)
-        elif str(file_path).lower().endswith(".toml"):
-            with open(file_path, "rb") as f:
-                params = tomli.load(f)
-        else:
-            raise ValueError(
-                f"Unsupported file format: {file_path}. Only .json and .toml files are supported."
-            )
+        params = read_file(file_path)
         params["domain"] = domain
         return cls(**params)

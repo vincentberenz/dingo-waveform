@@ -448,7 +448,7 @@ def build_waveform_generator(params: Dict, domain: Domain) -> WaveformGenerator:
 
     spin_conversion_phase = params.get("spin_conversion_phase", None)
     if spin_conversion_phase is not None:
-        spin_conversion_phase = bool(spin_conversion_phase)
+        spin_conversion_phase = float(spin_conversion_phase)
 
     f_start = params.get("f_start", None)
     if f_start is not None:
@@ -499,7 +499,7 @@ def build_waveform_generator(params: Dict) -> WaveformGenerator:
 @dispatch(Path)
 def build_waveform_generator(file_path: Path) -> WaveformGenerator:
     params = read_file(file_path)
-    return build_waveform_generator(params)
+    build_waveform_generator(params)
 
 
 @dispatch(str)
