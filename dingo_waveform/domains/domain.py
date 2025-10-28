@@ -26,7 +26,7 @@ class DomainParameters:
     the proper domain class.
     """
 
-    f_max: Optional[float]
+    f_max: Optional[float] = None
     delta_t: Optional[float] = None
     f_min: Optional[float] = None
     delta_f: Optional[float] = None
@@ -34,6 +34,10 @@ class DomainParameters:
     time_duration: Optional[float] = None
     sampling_rate: Optional[float] = None
     type: Optional[str] = None
+    # MultibandedFrequencyDomain specific parameters
+    nodes: Optional[list] = None
+    delta_f_initial: Optional[float] = None
+    base_domain: Optional[Union[Dict, "DomainParameters"]] = None
 
     @classmethod
     def from_file(cls, file_path: Union[str, Path]) -> "DomainParameters":
@@ -162,9 +166,16 @@ class Domain(ABC):
 
     @property
     @abstractmethod
-    def noise_std(self) -> float:
+    def noise_std(self) -> Union[float, np.ndarray]:
         """
         Standard deviation of the noise distribution.
+
+        Returns
+        -------
+        Union[float, np.ndarray]
+            For uniform domains, returns a scalar float.
+            For non-uniform domains (e.g., MultibandedFrequencyDomain),
+            returns an array with different values per bin.
         """
         raise NotImplementedError
 
@@ -244,7 +255,7 @@ def build_domain(domain_parameters: DomainParameters) -> Domain:
     return instance
 
 
-@dispatch(dict)
+@dispatch(dict)  # type: ignore[no-redef]
 def build_domain(domain_parameters: Dict) -> Domain:
     """
     Build an instance of domain based on a dictionary with domain parameters.
@@ -268,7 +279,7 @@ def build_domain(domain_parameters: Dict) -> Domain:
     return build_domain(domain_parameters)
 
 
-@dispatch((str, Path))
+@dispatch((str, Path))  # type: ignore[no-redef]
 def build_domain(domain_parameters: Union[str, Path]) -> Domain:
     """
     Build an instance of domain based on a path to a TOML/JSON file.

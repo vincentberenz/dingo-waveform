@@ -57,6 +57,7 @@ dev = [
     "mypy",
     "pylint",
     "pytest",
-    "types-PyYAML"
+    "types-PyYAML",
+    "types-toml"
 ]
 

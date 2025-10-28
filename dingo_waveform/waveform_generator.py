@@ -499,7 +499,7 @@ def build_waveform_generator(params: Dict) -> WaveformGenerator:
 @dispatch(Path)
 def build_waveform_generator(file_path: Path) -> WaveformGenerator:
     params = read_file(file_path)
-    build_waveform_generator(params)
+    return build_waveform_generator(params)
 
 
 @dispatch(str)
