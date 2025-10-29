@@ -11,7 +11,8 @@ from ..domains import Domain, build_domain
 from ..prior import build_prior_with_defaults
 from ..waveform_generator import WaveformGenerator, build_waveform_generator
 from ..waveform_parameters import WaveformParameters
-from .settings import DatasetSettings
+from .polarizations import Polarizations
+from .dataset_settings import DatasetSettings
 from .waveform_dataset import WaveformDataset
 
 _logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ def _generate_single_waveform(
 def generate_waveforms_sequential(
     waveform_generator: WaveformGenerator,
     parameters: pd.DataFrame,
-) -> Dict[str, np.ndarray]:
+) -> Polarizations:
     """
     Generate waveforms sequentially (single process).
 
@@ -77,7 +78,7 @@ def generate_waveforms_sequential(
 
     Returns
     -------
-    Dict with 'h_plus' and 'h_cross' arrays of shape (num_samples, frequency_bins).
+    Polarizations with h_plus and h_cross arrays of shape (num_samples, frequency_bins).
     """
     h_plus_list = []
     h_cross_list = []
@@ -97,17 +98,17 @@ def generate_waveforms_sequential(
             h_plus_list.append(np.full(domain_length, np.nan, dtype=complex))
             h_cross_list.append(np.full(domain_length, np.nan, dtype=complex))
 
-    return {
-        "h_plus": np.array(h_plus_list),
-        "h_cross": np.array(h_cross_list),
-    }
+    return Polarizations(
+        h_plus=np.array(h_plus_list),
+        h_cross=np.array(h_cross_list),
+    )
 
 
 def generate_waveforms_parallel(
     waveform_generator: WaveformGenerator,
     parameters: pd.DataFrame,
     num_processes: int = 4,
-) -> Dict[str, np.ndarray]:
+) -> Polarizations:
     """
     Generate waveforms in parallel using ProcessPoolExecutor.
 
@@ -122,7 +123,7 @@ def generate_waveforms_parallel(
 
     Returns
     -------
-    Dict with 'h_plus' and 'h_cross' arrays of shape (num_samples, frequency_bins).
+    Polarizations with h_plus and h_cross arrays of shape (num_samples, frequency_bins).
     """
     if num_processes == 1:
         return generate_waveforms_sequential(waveform_generator, parameters)
@@ -170,10 +171,10 @@ def generate_waveforms_parallel(
         h_plus_list.append(results[idx]["h_plus"])
         h_cross_list.append(results[idx]["h_cross"])
 
-    return {
-        "h_plus": np.array(h_plus_list),
-        "h_cross": np.array(h_cross_list),
-    }
+    return Polarizations(
+        h_plus=np.array(h_plus_list),
+        h_cross=np.array(h_cross_list),
+    )
 
 
 def generate_parameters_and_polarizations(
@@ -181,7 +182,7 @@ def generate_parameters_and_polarizations(
     prior: Dict,
     num_samples: int,
     num_processes: int = 1,
-) -> Tuple[pd.DataFrame, Dict[str, np.ndarray]]:
+) -> Tuple[pd.DataFrame, Polarizations]:
     """
     Generate dataset of waveforms based on parameters drawn from prior.
 
@@ -198,7 +199,7 @@ def generate_parameters_and_polarizations(
 
     Returns
     -------
-    Tuple of (parameters DataFrame, polarizations dict).
+    Tuple of (parameters DataFrame, Polarizations dataclass).
     If some waveforms fail, only successful ones are returned.
     """
     _logger.info(f"Generating dataset of size {num_samples}")
@@ -215,11 +216,14 @@ def generate_parameters_and_polarizations(
         polarizations = generate_waveforms_sequential(waveform_generator, parameters)
 
     # Find cases where waveform generation failed
-    wf_failed = np.any(np.isnan(polarizations["h_plus"]), axis=1)
+    wf_failed = np.any(np.isnan(polarizations.h_plus), axis=1)
     if wf_failed.any():
         idx_failed = np.where(wf_failed)[0]
         idx_ok = np.where(~wf_failed)[0]
-        polarizations_ok = {k: v[idx_ok] for k, v in polarizations.items()}
+        polarizations_ok = Polarizations(
+            h_plus=polarizations.h_plus[idx_ok],
+            h_cross=polarizations.h_cross[idx_ok],
+        )
         parameters_ok = parameters.iloc[idx_ok].reset_index(drop=True)
         failed_percent = 100 * len(idx_failed) / len(parameters)
         _logger.warning(
@@ -258,7 +262,9 @@ def generate_waveform_dataset(
     _logger.info("Building domain, prior, and waveform generator...")
     domain = build_domain(settings.domain)
     prior = build_prior_with_defaults(settings.intrinsic_prior)
-    waveform_generator = build_waveform_generator(settings.waveform_generator, domain)
+    # Convert WaveformGeneratorSettings to dict for build_waveform_generator
+    wfg_dict = settings.waveform_generator.to_dict()
+    waveform_generator = build_waveform_generator(wfg_dict, domain)
 
     # Generate waveforms
     parameters, polarizations = generate_parameters_and_polarizations(
@@ -269,7 +275,7 @@ def generate_waveform_dataset(
     dataset = WaveformDataset(
         parameters=parameters,
         polarizations=polarizations,
-        settings=settings.to_dict(),
+        settings=settings,
     )
 
     _logger.info(f"Dataset generated successfully with {len(parameters)} samples.")

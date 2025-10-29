@@ -1,12 +1,16 @@
 """Waveform dataset class for storing and managing generated waveforms."""
 
 import logging
+from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, Optional, Union
 
 import h5py
 import numpy as np
 import pandas as pd
+
+from .polarizations import Polarizations
+from .dataset_settings import DatasetSettings
 
 _logger = logging.getLogger(__name__)
 
@@ -19,17 +23,17 @@ class WaveformDataset:
     ----------
     parameters : pd.DataFrame
         DataFrame containing waveform parameters (one row per waveform).
-    polarizations : Dict[str, np.ndarray]
-        Dictionary with 'h_plus' and 'h_cross' arrays of shape (num_samples, frequency_bins).
-    settings : Dict
-        Dictionary containing the settings used to generate the dataset.
+    polarizations : Polarizations
+        Dataclass containing 'h_plus' and 'h_cross' arrays of shape (num_samples, frequency_bins).
+    settings : Optional[DatasetSettings]
+        Settings used to generate the dataset.
     """
 
     def __init__(
         self,
         parameters: pd.DataFrame,
-        polarizations: Dict[str, np.ndarray],
-        settings: Optional[Dict] = None,
+        polarizations: Union[Polarizations, Dict[str, np.ndarray]],
+        settings: Optional[Union[DatasetSettings, Dict]] = None,
     ):
         """
         Initialize a WaveformDataset.
@@ -39,13 +43,32 @@ class WaveformDataset:
         parameters
             DataFrame of waveform parameters.
         polarizations
-            Dictionary with 'h_plus' and 'h_cross' polarization arrays.
+            Polarizations dataclass or dictionary with 'h_plus' and 'h_cross' arrays.
+            Dictionary support maintained for backward compatibility.
         settings
-            Optional dictionary of generation settings.
+            Optional DatasetSettings or dictionary of generation settings.
+            Dictionary support maintained for backward compatibility.
         """
         self.parameters = parameters
-        self.polarizations = polarizations
-        self.settings = settings or {}
+
+        # Convert dict to Polarizations if needed (backward compatibility)
+        if isinstance(polarizations, dict):
+            self.polarizations = Polarizations(
+                h_plus=polarizations["h_plus"],
+                h_cross=polarizations["h_cross"],
+            )
+        else:
+            self.polarizations = polarizations
+
+        # Convert dict to DatasetSettings if needed (backward compatibility)
+        if settings is None:
+            self.settings = None
+        elif isinstance(settings, dict):
+            # Store as dict for now, but log a deprecation-style warning
+            self.settings = settings
+            _logger.debug("Received settings as dict; consider using DatasetSettings dataclass")
+        else:
+            self.settings = settings
 
         # Validate consistency
         self._validate()
@@ -60,16 +83,11 @@ class WaveformDataset:
             If polarizations and parameters have inconsistent sizes.
         """
         num_params = len(self.parameters)
-        num_h_plus = len(self.polarizations.get("h_plus", []))
-        num_h_cross = len(self.polarizations.get("h_cross", []))
+        num_polarizations = len(self.polarizations)
 
-        if num_h_plus != num_params:
+        if num_polarizations != num_params:
             raise ValueError(
-                f"Mismatch: {num_params} parameter rows but {num_h_plus} h_plus waveforms"
-            )
-        if num_h_cross != num_params:
-            raise ValueError(
-                f"Mismatch: {num_params} parameter rows but {num_h_cross} h_cross waveforms"
+                f"Mismatch: {num_params} parameter rows but {num_polarizations} waveforms in polarizations"
             )
 
         _logger.debug(f"Dataset validated: {num_params} waveforms")
@@ -83,7 +101,7 @@ class WaveformDataset:
         return (
             f"WaveformDataset(num_waveforms={len(self)}, "
             f"num_parameters={len(self.parameters.columns)}, "
-            f"waveform_length={self.polarizations['h_plus'].shape[-1]})"
+            f"waveform_length={self.polarizations.num_frequency_bins})"
         )
 
     def save(self, file_path: Union[str, Path]) -> None:
@@ -100,8 +118,8 @@ class WaveformDataset:
 
         with h5py.File(file_path, "w") as f:
             # Save polarizations
-            for key, data in self.polarizations.items():
-                f.create_dataset(key, data=data, compression="gzip")
+            f.create_dataset("h_plus", data=self.polarizations.h_plus, compression="gzip")
+            f.create_dataset("h_cross", data=self.polarizations.h_cross, compression="gzip")
 
             # Save parameters as a group with individual datasets
             params_group = f.create_group("parameters")
@@ -110,7 +128,13 @@ class WaveformDataset:
 
             # Save settings as attributes (flattened)
             settings_group = f.create_group("settings")
-            self._save_dict_to_group(settings_group, self.settings)
+            if self.settings is not None:
+                # Convert DatasetSettings to dict if needed
+                if isinstance(self.settings, DatasetSettings):
+                    settings_dict = self.settings.to_dict()
+                else:
+                    settings_dict = self.settings
+                self._save_dict_to_group(settings_group, settings_dict)
 
         _logger.info(f"Dataset saved successfully ({len(self)} waveforms)")
 
@@ -134,18 +158,18 @@ class WaveformDataset:
 
         with h5py.File(file_path, "r") as f:
             # Load polarizations
-            polarizations = {
-                "h_plus": f["h_plus"][:],
-                "h_cross": f["h_cross"][:],
-            }
+            polarizations = Polarizations(
+                h_plus=f["h_plus"][:],
+                h_cross=f["h_cross"][:],
+            )
 
             # Load parameters
             params_group = f["parameters"]
             param_dict = {key: params_group[key][:] for key in params_group.keys()}
             parameters = pd.DataFrame(param_dict)
 
-            # Load settings
-            settings = cls._load_dict_from_group(f["settings"])
+            # Load settings (keep as dict for now, could be converted to DatasetSettings later)
+            settings = cls._load_dict_from_group(f["settings"]) if "settings" in f else None
 
         _logger.info(f"Dataset loaded successfully ({len(parameters)} waveforms)")
         return cls(parameters, polarizations, settings)

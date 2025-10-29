@@ -56,12 +56,12 @@ def intrinsic_prior_config():
 @pytest.fixture
 def basic_settings(domain_config, waveform_generator_config, intrinsic_prior_config):
     """Fixture providing basic dataset settings."""
-    return DatasetSettings(
-        domain=domain_config,
-        waveform_generator=waveform_generator_config,
-        intrinsic_prior=intrinsic_prior_config,
-        num_samples=5,
-    )
+    return DatasetSettings.from_dict({
+        "domain": domain_config,
+        "waveform_generator": waveform_generator_config,
+        "intrinsic_prior": intrinsic_prior_config,
+        "num_samples": 5,
+    })
 
 
 class TestDatasetSettings:
@@ -70,8 +70,9 @@ class TestDatasetSettings:
     def test_creation(self, basic_settings):
         """Test basic creation of settings."""
         assert basic_settings.num_samples == 5
-        assert isinstance(basic_settings.domain, dict)
-        assert basic_settings.domain["type"] == "FrequencyDomain"
+        from dingo_waveform.domains import DomainParameters
+        assert isinstance(basic_settings.domain, DomainParameters)
+        assert "FrequencyDomain" in basic_settings.domain.type
 
     def test_validation_success(self, basic_settings):
         """Test that validation passes for valid settings."""
@@ -81,27 +82,25 @@ class TestDatasetSettings:
         self, waveform_generator_config, intrinsic_prior_config
     ):
         """Test validation fails with missing domain type."""
-        with pytest.raises(ValueError, match="type"):
-            settings = DatasetSettings(
-                domain={},  # Empty dict, no 'type' field
-                waveform_generator=waveform_generator_config,
-                intrinsic_prior=intrinsic_prior_config,
-                num_samples=10,
-            )
-            settings.validate()
+        with pytest.raises(ValueError, match="type.*should not be None"):
+            settings = DatasetSettings.from_dict({
+                "domain": {},  # Empty dict, no 'type' field
+                "waveform_generator": waveform_generator_config,
+                "intrinsic_prior": intrinsic_prior_config,
+                "num_samples": 10,
+            })
 
     def test_validation_invalid_num_samples(
         self, domain_config, waveform_generator_config, intrinsic_prior_config
     ):
         """Test validation fails with invalid num_samples."""
         with pytest.raises(ValueError, match="num_samples.*positive"):
-            settings = DatasetSettings(
-                domain=domain_config,
-                waveform_generator=waveform_generator_config,
-                intrinsic_prior=intrinsic_prior_config,
-                num_samples=0,
-            )
-            settings.validate()
+            settings = DatasetSettings.from_dict({
+                "domain": domain_config,
+                "waveform_generator": waveform_generator_config,
+                "intrinsic_prior": intrinsic_prior_config,
+                "num_samples": 0,
+            })
 
     def test_to_dict(self, basic_settings):
         """Test conversion to dictionary."""
@@ -144,14 +143,16 @@ class TestWaveformDataset:
         """Test validation fails when h_plus length doesn't match parameters."""
         bad_polarizations = sample_polarizations.copy()
         bad_polarizations["h_plus"] = bad_polarizations["h_plus"][:2]  # Only 2 rows
-        with pytest.raises(ValueError, match="Mismatch.*h_plus"):
+        # Now catches error in Polarizations constructor, not WaveformDataset validator
+        with pytest.raises(ValueError, match="same shape"):
             WaveformDataset(sample_parameters, bad_polarizations)
 
     def test_validation_mismatch_h_cross(self, sample_parameters, sample_polarizations):
         """Test validation fails when h_cross length doesn't match parameters."""
         bad_polarizations = sample_polarizations.copy()
         bad_polarizations["h_cross"] = bad_polarizations["h_cross"][:2]  # Only 2 rows
-        with pytest.raises(ValueError, match="Mismatch.*h_cross"):
+        # Now catches error in Polarizations constructor, not WaveformDataset validator
+        with pytest.raises(ValueError, match="same shape"):
             WaveformDataset(sample_parameters, bad_polarizations)
 
     def test_repr(self, sample_parameters, sample_polarizations):
@@ -182,8 +183,8 @@ class TestWaveformDataset:
             loaded = WaveformDataset.load(temp_path)
             assert len(loaded) == len(dataset)
             assert loaded.parameters.shape == dataset.parameters.shape
-            assert np.allclose(loaded.polarizations["h_plus"], dataset.polarizations["h_plus"])
-            assert np.allclose(loaded.polarizations["h_cross"], dataset.polarizations["h_cross"])
+            assert np.allclose(loaded.polarizations.h_plus, dataset.polarizations.h_plus)
+            assert np.allclose(loaded.polarizations.h_cross, dataset.polarizations.h_cross)
             assert loaded.settings == dataset.settings
 
         finally:
@@ -221,15 +222,15 @@ class TestGenerateWaveformDataset:
 
         assert isinstance(dataset, WaveformDataset)
         assert len(dataset) <= basic_settings.num_samples  # May be less if some fail
-        assert "h_plus" in dataset.polarizations
-        assert "h_cross" in dataset.polarizations
-        assert dataset.polarizations["h_plus"].shape[0] == len(dataset)
-        assert dataset.polarizations["h_cross"].shape[0] == len(dataset)
+        assert hasattr(dataset.polarizations, "h_plus")
+        assert hasattr(dataset.polarizations, "h_cross")
+        assert dataset.polarizations.h_plus.shape[0] == len(dataset)
+        assert dataset.polarizations.h_cross.shape[0] == len(dataset)
 
         # Check that waveforms are not all zeros (actual generation happened)
         # Use max absolute value since GW strains are very small (~ 1e-23)
-        assert np.abs(dataset.polarizations["h_plus"]).max() > 0.0
-        assert np.abs(dataset.polarizations["h_cross"]).max() > 0.0
+        assert np.abs(dataset.polarizations.h_plus).max() > 0.0
+        assert np.abs(dataset.polarizations.h_cross).max() > 0.0
 
     def test_generate_parallel(self, basic_settings):
         """Test generating dataset with parallel execution."""
@@ -237,12 +238,12 @@ class TestGenerateWaveformDataset:
 
         assert isinstance(dataset, WaveformDataset)
         assert len(dataset) <= basic_settings.num_samples
-        assert "h_plus" in dataset.polarizations
-        assert "h_cross" in dataset.polarizations
+        assert hasattr(dataset.polarizations, "h_plus")
+        assert hasattr(dataset.polarizations, "h_cross")
 
         # Check that waveforms are not all zeros (actual generation happened)
-        assert np.abs(dataset.polarizations["h_plus"]).max() > 0.0
-        assert np.abs(dataset.polarizations["h_cross"]).max() > 0.0
+        assert np.abs(dataset.polarizations.h_plus).max() > 0.0
+        assert np.abs(dataset.polarizations.h_cross).max() > 0.0
 
     def test_waveform_shapes(self, basic_settings):
         """Test that generated waveforms have correct shapes."""
@@ -252,8 +253,8 @@ class TestGenerateWaveformDataset:
             basic_settings.domain["f_max"] / basic_settings.domain["delta_f"]
         ) + 1
 
-        assert dataset.polarizations["h_plus"].shape == (len(dataset), expected_length)
-        assert dataset.polarizations["h_cross"].shape == (len(dataset), expected_length)
+        assert dataset.polarizations.h_plus.shape == (len(dataset), expected_length)
+        assert dataset.polarizations.h_cross.shape == (len(dataset), expected_length)
 
     def test_parameter_columns(self, basic_settings):
         """Test that generated parameters have expected columns."""
@@ -272,9 +273,9 @@ class TestGenerateWaveformDataset:
         dataset = generate_waveform_dataset(basic_settings, num_processes=1)
 
         assert dataset.settings is not None
-        assert "domain" in dataset.settings
-        assert "waveform_generator" in dataset.settings
-        assert "num_samples" in dataset.settings
+        assert hasattr(dataset.settings, "domain") or "domain" in dataset.settings
+        assert hasattr(dataset.settings, "waveform_generator") or "waveform_generator" in dataset.settings
+        assert hasattr(dataset.settings, "num_samples") or "num_samples" in dataset.settings
 
     def test_round_trip_save_load(self, basic_settings):
         """Test generating, saving, and loading a dataset."""
@@ -288,8 +289,8 @@ class TestGenerateWaveformDataset:
             loaded = WaveformDataset.load(temp_path)
 
             assert len(loaded) == len(dataset)
-            assert np.allclose(loaded.polarizations["h_plus"], dataset.polarizations["h_plus"])
-            assert np.allclose(loaded.polarizations["h_cross"], dataset.polarizations["h_cross"])
+            assert np.allclose(loaded.polarizations.h_plus, dataset.polarizations.h_plus)
+            assert np.allclose(loaded.polarizations.h_cross, dataset.polarizations.h_cross)
             # Column order may differ after save/load, so check columns match
             pd.testing.assert_frame_equal(
                 loaded.parameters.sort_index(axis=1),

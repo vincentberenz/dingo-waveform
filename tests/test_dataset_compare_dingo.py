@@ -120,8 +120,8 @@ class TestCompareWithDingo:
 
         # Compare waveforms
         for i, h_dingo in enumerate(polarizations_dingo):
-            h_plus_new = dataset_new.polarizations["h_plus"][i]
-            h_cross_new = dataset_new.polarizations["h_cross"][i]
+            h_plus_new = dataset_new.polarizations.h_plus[i]
+            h_cross_new = dataset_new.polarizations.h_cross[i]
 
             h_plus_dingo = h_dingo["h_plus"]
             h_cross_dingo = h_dingo["h_cross"]
@@ -184,8 +184,8 @@ class TestCompareWithDingo:
 
         # Compare waveforms
         for i, h_dingo in enumerate(polarizations_dingo):
-            h_plus_new = dataset_new.polarizations["h_plus"][i]
-            h_cross_new = dataset_new.polarizations["h_cross"][i]
+            h_plus_new = dataset_new.polarizations.h_plus[i]
+            h_cross_new = dataset_new.polarizations.h_cross[i]
 
             h_plus_dingo = h_dingo["h_plus"]
             h_cross_dingo = h_dingo["h_cross"]
@@ -250,8 +250,8 @@ class TestCompareWithDingo:
 
         # Compare waveforms
         for i, h_dingo in enumerate(polarizations_dingo):
-            h_plus_new = dataset_new.polarizations["h_plus"][i]
-            h_cross_new = dataset_new.polarizations["h_cross"][i]
+            h_plus_new = dataset_new.polarizations.h_plus[i]
+            h_cross_new = dataset_new.polarizations.h_cross[i]
 
             h_plus_dingo = h_dingo["h_plus"]
             h_cross_dingo = h_dingo["h_cross"]
@@ -314,8 +314,8 @@ class TestCompareWithDingo:
 
         # Compare waveforms
         for i, h_dingo in enumerate(polarizations_dingo):
-            h_plus_new = dataset_new.polarizations["h_plus"][i]
-            h_cross_new = dataset_new.polarizations["h_cross"][i]
+            h_plus_new = dataset_new.polarizations.h_plus[i]
+            h_cross_new = dataset_new.polarizations.h_cross[i]
 
             h_plus_dingo = h_dingo["h_plus"]
             h_cross_dingo = h_dingo["h_cross"]
@@ -384,8 +384,8 @@ class TestCompareWithDingo:
 
         # Compare waveforms
         for i, h_dingo in enumerate(polarizations_dingo):
-            h_plus_new = dataset_new.polarizations["h_plus"][i]
-            h_cross_new = dataset_new.polarizations["h_cross"][i]
+            h_plus_new = dataset_new.polarizations.h_plus[i]
+            h_cross_new = dataset_new.polarizations.h_cross[i]
 
             h_plus_dingo = h_dingo["h_plus"]
             h_cross_dingo = h_dingo["h_cross"]
