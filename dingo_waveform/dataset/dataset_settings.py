@@ -1,9 +1,9 @@
 """Settings dataclass for waveform dataset generation."""
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Dict, Optional, Union
 
-from ..domains import DomainParameters
+from ..domains import DomainParameters, build_domain
 from ..prior import IntrinsicPriors
 from .compression_settings import CompressionSettings, SVDSettings
 from .waveform_generator_settings import WaveformGeneratorSettings
@@ -49,7 +49,6 @@ class DatasetSettings:
             Dictionary representation of settings with all nested dataclasses converted.
         """
         # Convert domain to dict
-        from dataclasses import is_dataclass
         if is_dataclass(self.domain):
             domain_dict = asdict(self.domain)
         else:
@@ -80,8 +79,6 @@ class DatasetSettings:
         DatasetSettings
             Instance created from dictionary with all nested structures properly typed.
         """
-        from ..domains import build_domain
-
         # Build domain from dict
         domain = build_domain(settings_dict["domain"])
         domain_params = domain.get_parameters()

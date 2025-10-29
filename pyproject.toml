@@ -58,6 +58,9 @@ dev = [
     "pylint",
     "pytest",
     "types-PyYAML",
-    "types-toml"
+    "types-toml",
+    "marimo>=0.9.0",
+    "plotly>=5.0.0",
+    "pyyaml>=6.0"
 ]
 
