@@ -19,7 +19,7 @@
     },
     {
       "id": "Hbol",
-      "code_hash": "1d0db38904205bec4d6f6f6a1f6cec3e",
+      "code_hash": "f57aacec9a2ab2fc199a0ef94a7531b8",
       "outputs": [
         {
           "type": "data",
@@ -45,12 +45,12 @@
     },
     {
       "id": "bkHC",
-      "code_hash": "3736503748dddf39881312f553de4492",
+      "code_hash": "9b2e6ca86d780d26cb40d6781eb5affc",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-ui-element object-id='bkHC-0' random-id='568fd85d-386e-d68b-1ccf-1764bb593278'><marimo-text-area data-initial-value='&quot;{&#92;n  &#92;&quot;domain&#92;&quot;: {&#92;n    &#92;&quot;type&#92;&quot;: &#92;&quot;FrequencyDomain&#92;&quot;,&#92;n    &#92;&quot;f_min&#92;&quot;: 20.0,&#92;n    &#92;&quot;f_max&#92;&quot;: 1024.0,&#92;n    &#92;&quot;delta_f&#92;&quot;: 0.125&#92;n  },&#92;n  &#92;&quot;waveform_generator&#92;&quot;: {&#92;n    &#92;&quot;approximant&#92;&quot;: &#92;&quot;IMRPhenomD&#92;&quot;,&#92;n    &#92;&quot;f_ref&#92;&quot;: 20.0&#92;n  },&#92;n  &#92;&quot;intrinsic_prior&#92;&quot;: {&#92;n    &#92;&quot;mass_1&#92;&quot;: &#92;&quot;bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)&#92;&quot;,&#92;n    &#92;&quot;mass_2&#92;&quot;: &#92;&quot;bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)&#92;&quot;,&#92;n    &#92;&quot;mass_ratio&#92;&quot;: &#92;&quot;bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)&#92;&quot;,&#92;n    &#92;&quot;chirp_mass&#92;&quot;: &#92;&quot;bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)&#92;&quot;,&#92;n    &#92;&quot;luminosity_distance&#92;&quot;: 1000.0,&#92;n    &#92;&quot;theta_jn&#92;&quot;: &#92;&quot;bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)&#92;&quot;,&#92;n    &#92;&quot;phase&#92;&quot;: &#92;&quot;bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary=&#x27;periodic&#x27;)&#92;&quot;,&#92;n    &#92;&quot;chi_1&#92;&quot;: &#92;&quot;bilby.gw.prior.AlignedSpin(name=&#x27;chi_1&#x27;, a_prior=Uniform(minimum=0, maximum=0.99))&#92;&quot;,&#92;n    &#92;&quot;chi_2&#92;&quot;: &#92;&quot;bilby.gw.prior.AlignedSpin(name=&#x27;chi_2&#x27;, a_prior=Uniform(minimum=0, maximum=0.99))&#92;&quot;,&#92;n    &#92;&quot;geocent_time&#92;&quot;: 0.0&#92;n  },&#92;n  &#92;&quot;num_samples&#92;&quot;: 1&#92;n}&quot;' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Edit configuration (JSON format):&lt;/span&gt;&lt;/span&gt;&quot;' data-placeholder='&quot;&quot;' data-disabled='false' data-debounce='true' data-full-width='true' data-rows='30'></marimo-text-area></marimo-ui-element>"
+            "text/html": "<marimo-ui-element object-id='bkHC-0' random-id='2fbc60a7-ab6f-011b-684f-f77809e11fcf'><marimo-text-area data-initial-value='&quot;{&#92;n  &#92;&quot;domain&#92;&quot;: {&#92;n    &#92;&quot;type&#92;&quot;: &#92;&quot;FrequencyDomain&#92;&quot;,&#92;n    &#92;&quot;f_min&#92;&quot;: 20.0,&#92;n    &#92;&quot;f_max&#92;&quot;: 1024.0,&#92;n    &#92;&quot;delta_f&#92;&quot;: 0.125&#92;n  },&#92;n  &#92;&quot;waveform_generator&#92;&quot;: {&#92;n    &#92;&quot;approximant&#92;&quot;: &#92;&quot;IMRPhenomD&#92;&quot;,&#92;n    &#92;&quot;f_ref&#92;&quot;: 20.0&#92;n  },&#92;n  &#92;&quot;intrinsic_prior&#92;&quot;: {&#92;n    &#92;&quot;mass_1&#92;&quot;: &#92;&quot;bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)&#92;&quot;,&#92;n    &#92;&quot;mass_2&#92;&quot;: &#92;&quot;bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)&#92;&quot;,&#92;n    &#92;&quot;mass_ratio&#92;&quot;: &#92;&quot;bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)&#92;&quot;,&#92;n    &#92;&quot;chirp_mass&#92;&quot;: &#92;&quot;bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=100.0)&#92;&quot;,&#92;n    &#92;&quot;luminosity_distance&#92;&quot;: 1000.0,&#92;n    &#92;&quot;theta_jn&#92;&quot;: &#92;&quot;bilby.core.prior.Sine(minimum=0.0, maximum=np.pi)&#92;&quot;,&#92;n    &#92;&quot;phase&#92;&quot;: &#92;&quot;bilby.core.prior.Uniform(minimum=0.0, maximum=2*np.pi, boundary=&#x27;periodic&#x27;)&#92;&quot;,&#92;n    &#92;&quot;chi_1&#92;&quot;: &#92;&quot;bilby.gw.prior.AlignedSpin(name=&#x27;chi_1&#x27;, a_prior=Uniform(minimum=0, maximum=0.99))&#92;&quot;,&#92;n    &#92;&quot;chi_2&#92;&quot;: &#92;&quot;bilby.gw.prior.AlignedSpin(name=&#x27;chi_2&#x27;, a_prior=Uniform(minimum=0, maximum=0.99))&#92;&quot;,&#92;n    &#92;&quot;geocent_time&#92;&quot;: 0.0&#92;n  },&#92;n  &#92;&quot;num_samples&#92;&quot;: 1&#92;n}&quot;' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Edit configuration (JSON format):&lt;/span&gt;&lt;/span&gt;&quot;' data-placeholder='&quot;&quot;' data-disabled='false' data-debounce='true' data-full-width='true' data-rows='30'></marimo-text-area></marimo-ui-element>"
           }
         }
       ],
@@ -89,7 +89,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-ui-element object-id='Xref-0' random-id='23fd9994-0815-5941-be02-b0d160730ffe'><marimo-button data-initial-value='0' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Generate Waveform&lt;/span&gt;&lt;/span&gt;&quot;' data-kind='&quot;neutral&quot;' data-disabled='false' data-full-width='false'></marimo-button></marimo-ui-element>"
+            "text/html": "<marimo-ui-element object-id='Xref-0' random-id='8d2f0c2c-b181-8f3c-2149-605e57541ab5'><marimo-button data-initial-value='0' data-label='&quot;&lt;span class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&gt;&lt;span class=&#92;&quot;paragraph&#92;&quot;&gt;Generate Waveform&lt;/span&gt;&lt;/span&gt;&quot;' data-kind='&quot;neutral&quot;' data-disabled='false' data-full-width='false'></marimo-button></marimo-ui-element>"
           }
         }
       ],
@@ -97,7 +97,7 @@
     },
     {
       "id": "SFPL",
-      "code_hash": "ecef50a3973723b5d8bccae2a52bebd5",
+      "code_hash": "7e95b94fefc9370755247b7e02eaed2e",
       "outputs": [
         {
           "type": "data",
@@ -110,7 +110,7 @@
     },
     {
       "id": "BYtC",
-      "code_hash": "7e78242b152eceb14fd41947af1f37a4",
+      "code_hash": "2503aced5f70c310a6b38fac94faca3b",
       "outputs": [
         {
           "type": "data",
@@ -123,7 +123,20 @@
     },
     {
       "id": "RGSE",
-      "code_hash": null,
+      "code_hash": "983a19d8bb98c2dca0970e0b7b3e2a7b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "b0e75b2ebb1a52916eb6935473f4a3e1",
       "outputs": [
         {
           "type": "data",
