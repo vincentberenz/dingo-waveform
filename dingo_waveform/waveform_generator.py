@@ -207,7 +207,7 @@ class WaveformGenerator:
         # - str: it is assumed to be the import path of a function to be imported and
         #        used by generate_hplus_hcross
         # - a callable: it is assumed to be the function to be used b generate_hplus_hcross
-        # The output the import_function will either be either None or the function
+        # The output the import_function will either be None or the function
         # to call (imported if required)
         self._polarization_function: Optional[PolarizationFunction] = import_function(
             polarization_function,

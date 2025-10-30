@@ -209,47 +209,68 @@ def _viz_display_waveform_info(waveform_data, asdict, mo, np, logger):
 
 
 @app.cell
-def _viz_plot_magnitude(waveform_data, go, mo, np, logger):
-    """Create magnitude visualization - only runs when waveform_data is valid"""
-    logger.info("Creating waveform magnitude visualization")
+def _viz_plot_components(waveform_data, go, mo, np, logger):
+    """Create real/imag component visualization - only runs when waveform_data is valid"""
+    logger.info("Creating waveform real/imag component visualization")
 
     frequencies = waveform_data['domain'].sample_frequencies()
+    h_plus = waveform_data['h_plus']
+    h_cross = waveform_data['h_cross']
 
-    # Calculate magnitudes
-    h_plus_mag = np.abs(waveform_data['h_plus'])
-    h_cross_mag = np.abs(waveform_data['h_cross'])
+    logger.debug(f"Frequency array shape: {frequencies.shape}, h_plus shape: {h_plus.shape}, h_cross shape: {h_cross.shape}")
 
-    logger.debug(f"Frequency array shape: {frequencies.shape}, h_plus magnitude shape: {h_plus_mag.shape}")
+    # Create plot of real and imaginary parts for both polarizations
+    fig_components = go.Figure()
 
-    # Create magnitude plot
-    fig_mag = go.Figure()
-    fig_mag.add_trace(go.Scatter(
+    # h_plus: real and imaginary
+    fig_components.add_trace(go.Scatter(
         x=frequencies,
-        y=h_plus_mag,
-        name='|h_plus(f)|',
+        y=np.real(h_plus),
+        name='Re(h_plus)',
         mode='lines',
-        line=dict(color='blue')
+        line=dict(color='blue', width=2, dash='solid'),
+        legendgroup='h_plus'
     ))
-    fig_mag.add_trace(go.Scatter(
+    fig_components.add_trace(go.Scatter(
         x=frequencies,
-        y=h_cross_mag,
-        name='|h_cross(f)|',
+        y=np.imag(h_plus),
+        name='Im(h_plus)',
         mode='lines',
-        line=dict(color='red')
+        line=dict(color='blue', width=2, dash='dash'),
+        legendgroup='h_plus'
     ))
-    fig_mag.update_layout(
-        title="Waveform Magnitude in Frequency Domain",
+
+    # h_cross: real and imaginary
+    fig_components.add_trace(go.Scatter(
+        x=frequencies,
+        y=np.real(h_cross),
+        name='Re(h_cross)',
+        mode='lines',
+        line=dict(color='red', width=2, dash='solid'),
+        legendgroup='h_cross'
+    ))
+    fig_components.add_trace(go.Scatter(
+        x=frequencies,
+        y=np.imag(h_cross),
+        name='Im(h_cross)',
+        mode='lines',
+        line=dict(color='red', width=2, dash='dash'),
+        legendgroup='h_cross'
+    ))
+
+    fig_components.update_layout(
+        title="Waveform Components in Frequency Domain",
         xaxis_title="Frequency (Hz)",
-        yaxis_title="Magnitude",
+        yaxis_title="Strain components",
         xaxis_type="log",
-        yaxis_type="log",
         height=500,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
     )
 
-    logger.debug("Magnitude plot created successfully")
+    logger.debug("Real/imag component plot created successfully")
     mo.vstack([
         mo.md("## Frequency-Domain Visualizations"),
-        mo.ui.plotly(fig_mag)
+        mo.ui.plotly(fig_components)
     ])
     return
 
@@ -296,6 +317,113 @@ def _viz_plot_phase(waveform_data, go, mo, np, logger):
     output_phase = mo.ui.plotly(fig_phase)
     output_phase
     return
+
+@app.cell
+def _viz_gwpy_frequency_diagnostics(waveform_data, mo, go, np, logger):
+    """GWpy-based frequency-domain diagnostics rendered with Plotly.
+
+    This cell:
+      - Wraps |h_plus(f)| and |h_cross(f)| in GWpy FrequencySeries with f0, df metadata
+      - Plots |h(f)| and characteristic strain h_c(f) = 2 f |h(f)|
+      - Uses Plotly for interactive rendering inside marimo
+    """
+    logger.info("Creating GWpy-based frequency-domain diagnostics")
+
+    # Try to import GWpy; if unavailable, guide the user
+    try:
+        from gwpy.frequencyseries import FrequencySeries
+    except Exception as e:
+        logger.warning(f"GWpy import failed: {e}")
+        mo.vstack([
+            mo.md("## GWpy Diagnostics"),
+            mo.md(
+                "❌ GWpy is not available. Install with `pip install gwpy` to enable this cell."
+            ),
+        ])
+        mo.stop("GWpy not installed")
+
+    # Extract data
+    freqs = waveform_data["domain"].sample_frequencies()
+    h_plus_ = waveform_data["h_plus"]
+    h_cross_ = waveform_data["h_cross"]
+
+    # Compute basic derived quantities
+    abs_hp = np.abs(h_plus_)
+    abs_hx = np.abs(h_cross_)
+
+    # Characteristic strain: h_c(f) = 2 f |h(f)|
+    hc_hp = 2.0 * freqs * abs_hp
+    hc_hx = 2.0 * freqs * abs_hx
+
+    # Build GWpy FrequencySeries with metadata (f0, df)
+    # Use the first frequency as f0 and mean spacing as df, assuming uniform grid
+    if freqs.size < 2:
+        mo.stop("Insufficient frequency samples for GWpy FrequencySeries")
+    f0 = float(freqs[0])
+    df = float(np.mean(np.diff(freqs)))
+
+    hp_abs_fs = FrequencySeries(abs_hp, f0=f0, df=df)
+    hx_abs_fs = FrequencySeries(abs_hx, f0=f0, df=df)
+    hp_hc_fs = FrequencySeries(hc_hp, f0=f0, df=df)
+    hx_hc_fs = FrequencySeries(hc_hx, f0=f0, df=df)
+
+    # Prepare for log plotting: avoid zeros by flooring to a tiny positive value
+    # This stabilizes Plotly's log-scale rendering
+    tiny = 1e-300
+    y_abs_hp = np.maximum(hp_abs_fs.value, tiny)
+    y_abs_hx = np.maximum(hx_abs_fs.value, tiny)
+    y_hc_hp = np.maximum(hp_hc_fs.value, tiny)
+    y_hc_hx = np.maximum(hx_hc_fs.value, tiny)
+
+    # Plot 1: |h(f)| for both polarizations
+    fig_abs = go.Figure()
+    fig_abs.add_trace(go.Scatter(
+        x=freqs, y=y_abs_hp, mode="lines", name="|h_plus(f)|", line=dict(color="blue")
+    ))
+    fig_abs.add_trace(go.Scatter(
+        x=freqs, y=y_abs_hx, mode="lines", name="|h_cross(f)|", line=dict(color="red")
+    ))
+    fig_abs.update_layout(
+        title="GWpy FrequencySeries: |h(f)|",
+        xaxis_title="Frequency (Hz)",
+        yaxis_title="|h(f)| (dimensionless strain)",
+        xaxis_type="log",
+        yaxis_type="log",
+        height=450,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+    )
+
+    # Plot 2: Characteristic strain h_c(f) = 2 f |h(f)|
+    fig_hc = go.Figure()
+    fig_hc.add_trace(go.Scatter(
+        x=freqs, y=y_hc_hp, mode="lines", name="h_c, plus", line=dict(color="blue", dash="solid")
+    ))
+    fig_hc.add_trace(go.Scatter(
+        x=freqs, y=y_hc_hx, mode="lines", name="h_c, cross", line=dict(color="red", dash="solid")
+    ))
+    fig_hc.update_layout(
+        title="Characteristic Strain: h_c(f) = 2 f |h(f)|",
+        xaxis_title="Frequency (Hz)",
+        yaxis_title="h_c(f) (dimensionless)",
+        xaxis_type="log",
+        yaxis_type="log",
+        height=450,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+    )
+
+    logger.info("GWpy diagnostics created successfully")
+
+    mo.vstack([
+        mo.md("## GWpy Frequency-Domain Diagnostics"),
+        mo.md(
+            "- This view wraps arrays into GWpy FrequencySeries with f0, df metadata for domain-aware handling. "
+            "Plots show |h(f)| and characteristic strain h_c(f) for quick validation before export."
+        ),
+        mo.ui.plotly(fig_abs),
+        mo.ui.plotly(fig_hc),
+    ])
+    return
+
 
 
 if __name__ == "__main__":

@@ -2,20 +2,18 @@
 requires = ["setuptools>=62.0", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
-
 [project]
 name = "dingo-waveform"
 description = "temporary package for refactor of dingo's waveform generator"
 readme = "README.md"
 requires-python = ">=3.8"
 dynamic = ["version"]
-
+license = {text = "MIT"}
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent"
 ]
 
@@ -29,25 +27,17 @@ dependencies = [
     "multipledispatch",
     "pyseobnr",
     "rich",
-    "scipy", 
+    "scipy",
     "scipy-stubs[scipy]",
     "toml",
     "tomli",
     "torch",
+    "gwpy"
     #"dingo-gw"
 ]
 
 [project.scripts]
 dingo-waveform-compare = "dingo_waveform.compare:main"
-
-#[tool.setuptools]
-#package-data = {
-#    "" = ["py.typed"]
-#}
-
-#[tool.setuptools.packages.find]
-#include = ["dingo_waveform"]
-#namespaces = false
 
 [project.optional-dependencies]
 dev = [
@@ -64,3 +54,15 @@ dev = [
     "pyyaml>=6.0"
 ]
 
+# Configure setuptools_scm for version management
+[tool.setuptools_scm]
+write_to = "dingo_waveform/_version.py"
+
+# Configure package discovery to exclude notebooks
+[tool.setuptools.packages.find]
+include = ["dingo_waveform*"]
+exclude = ["notebooks*", "tests*", "docs*"]
+
+# Optional: Configure package data if needed
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
