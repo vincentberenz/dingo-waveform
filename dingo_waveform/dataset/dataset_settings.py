@@ -35,7 +35,22 @@ class DatasetSettings:
     compression: Optional[CompressionSettings] = None
 
     def __post_init__(self):
-        """Validate settings after initialization."""
+        """Validate settings after initialization and coerce types if needed."""
+        # Coerce waveform_generator dict to WaveformGeneratorSettings
+        if isinstance(self.waveform_generator, dict):
+            from .waveform_generator_settings import WaveformGeneratorSettings as _WGS
+            self.waveform_generator = _WGS(
+                approximant=self.waveform_generator.get("approximant"),
+                f_ref=self.waveform_generator.get("f_ref"),
+                spin_conversion_phase=self.waveform_generator.get("spin_conversion_phase"),
+                f_start=self.waveform_generator.get("f_start"),
+            )
+        # Coerce intrinsic_prior dict to IntrinsicPriors
+        if isinstance(self.intrinsic_prior, dict):
+            from ..prior import IntrinsicPriors as _IP
+            self.intrinsic_prior = _IP(**self.intrinsic_prior)
+        # Domain can be a dict or DomainParameters; both are supported by build_domain
+        # Validate num_samples
         if self.num_samples <= 0:
             raise ValueError(f"num_samples must be positive, got {self.num_samples}")
 

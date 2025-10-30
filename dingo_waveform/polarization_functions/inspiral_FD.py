@@ -11,7 +11,7 @@ from nptyping import Float32, NDArray, Shape
 
 from ..approximant import Approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
-from ..domains import DomainParameters, FrequencyDomain
+from ..domains import DomainParameters, BaseFrequencyDomain, MultibandedFrequencyDomain
 from ..logs import TableStr
 from ..polarization_modes_functions.inspiral_choose_FD_modes import (
     _InspiralChooseFDModesParameters,
@@ -268,9 +268,9 @@ def inspiral_FD(
       turning off the multibanding is detected
     """
 
-    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+    if not isinstance(waveform_gen_params.domain, BaseFrequencyDomain):
         raise ValueError(
-            "inspiral_fd can only be applied using on a FrequencyDomain "
+            "inspiral_fd can only be applied using on a BaseFrequencyDomain "
             f"(got {type(waveform_gen_params.domain)})"
         )
 

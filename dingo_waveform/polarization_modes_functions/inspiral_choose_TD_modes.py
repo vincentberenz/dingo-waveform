@@ -8,7 +8,7 @@ import lalsimulation as LS
 
 from ..approximant import Approximant, get_approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
-from ..domains import DomainParameters, FrequencyDomain
+from ..domains import DomainParameters, BaseFrequencyDomain
 from ..lal_params import lal
 from ..logs import TableStr
 from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
@@ -112,7 +112,7 @@ class _InspiralChooseTDModesParameters(TableStr):
             f_start,
         )
 
-    def apply(self, domain: FrequencyDomain, phase: float) -> Dict[Mode, Polarization]:
+    def apply(self, domain: BaseFrequencyDomain, phase: float) -> Dict[Mode, Polarization]:
 
         # for SimInspiralChooseFDModes, SI units are required
         params: "_InspiralChooseTDModesParameters" = deepcopy(self)
@@ -174,9 +174,9 @@ def inspiral_choose_TD_modes(
       - if the phase parameter is not specified
     """
 
-    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+    if not isinstance(waveform_gen_params.domain, BaseFrequencyDomain):
         raise ValueError(
-            "inspiral_choose_TD_modes can only be applied using on a FrequencyDomain "
+            "inspiral_choose_TD_modes can only be applied using on a BaseFrequencyDomain "
             f"(got {type(waveform_gen_params.domain)})"
         )
 

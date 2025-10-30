@@ -14,7 +14,7 @@ from lalsimulation.gwsignal.models import (
 
 from ..approximant import Approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
-from ..domains import DomainParameters, FrequencyDomain
+from ..domains import DomainParameters, BaseFrequencyDomain
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization
 from ..types import WaveformGenerationError
@@ -62,7 +62,7 @@ class _GenerateFDModesParameters(GwSignalParameters):
         return cls(**asdict(gw_signal_params))
 
     def apply(
-        self, domain: FrequencyDomain, approximant: Approximant, ref_tol
+        self, domain: BaseFrequencyDomain, approximant: Approximant, ref_tol
     ) -> Polarization:
 
         self.lmax_nyquist = 2
@@ -148,9 +148,9 @@ def generate_FD_modes(
 
     approximant = waveform_gen_params.approximant
 
-    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+    if not isinstance(waveform_gen_params.domain, BaseFrequencyDomain):
         raise ValueError(
-            "generate_FD_modes can only be applied using on a FrequencyDomain "
+            "generate_FD_modes can only be applied using on a BaseFrequencyDomain "
             f"(got {type(waveform_gen_params.domain)})"
         )
 

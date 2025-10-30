@@ -56,15 +56,17 @@ class _InspiralTDParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
+        f_ref: float,
     ) -> "_InspiralTDParameters":
         # Creates an instance from binary black hole parameters.
 
         spins: Spins = bbh_parameters.get_spins(spin_conversion_phase)
         params = asdict(spins)
-        for attr in ("longAscNode", "eccentricity", "meanPerAny"):
+        for attr in ("longAscNode", "eccentricity", "meanPerAno"):
             params[attr] = 0.0
-        for attr in ("delta_t", "f_min", "f_ref"):
+        for attr in ("delta_t", "f_min"):
             params[attr] = asdict(domain_params)[attr]
+        params["f_ref"] = f_ref
         params["phase"] = bbh_parameters.phase
         params["lal_params"] = lal_params
         params["approximant"] = get_approximant(approximant)
@@ -93,6 +95,7 @@ class _InspiralTDParameters(TableStr):
             spin_conversion_phase,
             lal_params,
             approximant,
+            f_ref,
         )
 
     def apply(self) -> Polarization:

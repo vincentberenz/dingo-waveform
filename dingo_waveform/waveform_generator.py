@@ -9,7 +9,7 @@ from dingo_waveform import approximant
 
 from . import polarization_functions, polarization_modes_functions
 from .approximant import Approximant
-from .domains import Domain, FrequencyDomain, TimeDomain, build_domain
+from .domains import Domain, BaseFrequencyDomain, FrequencyDomain, TimeDomain, build_domain
 from .imports import check_function_signature, import_function, read_file
 from .lal_params import get_lal_params
 from .polarizations import Polarization, polarizations_to_table
@@ -254,7 +254,7 @@ class WaveformGenerator:
 
         # For now only frequency and time domains are supported
         if not isinstance(
-            self._waveform_gen_params.domain, FrequencyDomain
+            self._waveform_gen_params.domain, BaseFrequencyDomain
         ) and not isinstance(self._waveform_gen_params.domain, TimeDomain):
             raise ValueError(
                 "generate_hplus_hcross: domain must be an instance of FrequencyDomain or TimeDomain "
@@ -276,14 +276,14 @@ class WaveformGenerator:
         ):
             polarization_method = (
                 polarization_functions.generate_FD_modes
-                if isinstance(self._waveform_gen_params.domain, FrequencyDomain)
+                if isinstance(self._waveform_gen_params.domain, BaseFrequencyDomain)
                 else polarization_functions.generate_TD_modes
             )
         # "old" interface (any other approximant)
         else:
             polarization_method = (
                 polarization_functions.inspiral_FD
-                if isinstance(self._waveform_gen_params.domain, FrequencyDomain)
+                if isinstance(self._waveform_gen_params.domain, BaseFrequencyDomain)
                 else polarization_functions.inspiral_TD
             )
 
@@ -359,9 +359,9 @@ class WaveformGenerator:
         # - the phase field of the waveform parameters is None
 
         # for now, only frequency domain is supported
-        if not isinstance(self._waveform_gen_params.domain, FrequencyDomain):
+        if not isinstance(self._waveform_gen_params.domain, BaseFrequencyDomain):
             raise ValueError(
-                "generate_hplus_hcross_m: only FrequencyDomain are supported "
+                "generate_hplus_hcross_m: only frequency-domain types are supported "
                 f"({type(self._waveform_gen_params.domain)} not supported)"
             )
 

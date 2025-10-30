@@ -296,13 +296,32 @@ def build_domain(domain_parameters: Union[str, Path]) -> Domain:
     An instance of the domain.
     """
     try:
-        domain_parameters_ = DomainParameters.from_file(domain_parameters)
+        # Load raw dict from file
+        if str(domain_parameters).lower().endswith((".json", ".toml")):
+            # Use DomainParameters.from_file to parse, but we need the raw dict to check nested "domain"
+            # So re-open the file to get the dict
+            dp = DomainParameters.from_file(domain_parameters)
+            # Try to detect if the original file contained a nested 'domain' dict by checking attribute presence
+            # Since DomainParameters doesn't have a 'domain' field, we re-load the raw file here
+            import json as _json
+            import tomli as _tomli
+            with open(domain_parameters, "rb") as f:
+                raw = _tomli.load(f) if str(domain_parameters).lower().endswith(".toml") else _json.load(open(domain_parameters, "r"))
+        else:
+            dp = DomainParameters.from_file(domain_parameters)
+            raw = None
     except Exception as e:
         raise ValueError(
             f"Constructing domain: failed to load parameters from file "
             f"{repr(domain_parameters)}. {type(e)}: {e}"
         ) from e
-    try:
-        return build_domain(domain_parameters_["domain"])
-    except KeyError:
-        return build_domain(domain_parameters_)
+
+    # If the file had a top-level 'domain' key, use its value
+    params_dict = None
+    if isinstance(raw, dict) and "domain" in raw:
+        params_dict = raw["domain"]
+    if params_dict is None:
+        # Fall back to the parsed DomainParameters instance
+        return build_domain(dp)
+    else:
+        return build_domain(params_dict)

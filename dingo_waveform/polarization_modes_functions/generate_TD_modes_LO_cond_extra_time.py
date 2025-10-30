@@ -23,7 +23,7 @@ from lalsimulation.gwsignal.models import gwsignal_get_waveform_generator
 
 from ..approximant import Approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
-from ..domains import DomainParameters, FrequencyDomain
+from ..domains import DomainParameters, BaseFrequencyDomain
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
 from ..types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
@@ -159,7 +159,7 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
         )
 
     def apply(
-        self, approximant: Approximant, domain: FrequencyDomain, phase: float
+        self, approximant: Approximant, domain: BaseFrequencyDomain, phase: float
     ) -> Dict[Mode, Polarization]:
         SEOBRNRv5_conditioning: _SEOBRNRv5Conditioning = (
             self._get_starting_frequency_for_SEOBRNRv5_conditioning()
@@ -232,9 +232,9 @@ def generate_TD_modes_LO_cond_extra_time(
             f"{approximant}. Supported: {' '.join(supported_approximants)}"
         )
 
-    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+    if not isinstance(waveform_gen_params.domain, BaseFrequencyDomain):
         raise ValueError(
-            "generate_TD_modes_LO_cond_extra_time can only be applied using on a FrequencyDomain "
+            "generate_TD_modes_LO_cond_extra_time can only be applied using on a BaseFrequencyDomain "
             f"(got {type(waveform_gen_params.domain)})"
         )
 

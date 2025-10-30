@@ -7,7 +7,8 @@ import torch
 from multipledispatch import dispatch
 from typing_extensions import override
 
-from .domain import Domain, DomainParameters
+from .domain import DomainParameters
+from .frequency_base import BaseFrequencyDomain
 
 _module_import_path = "dingo_waveform.domains"
 
@@ -111,7 +112,7 @@ def _reinit_cached_sample_frequencies(func):
     return wrapper
 
 
-class FrequencyDomain(Domain):
+class FrequencyDomain(BaseFrequencyDomain):
     """
     Represents a frequency domain with uniform bins.
 
@@ -620,68 +621,3 @@ class FrequencyDomain(Domain):
         data[tuple(sl)] = low_value
         return data
 
-    @staticmethod
-    @dispatch(np.ndarray, np.ndarray)
-    def add_phase(data: np.ndarray, phase: np.ndarray) -> np.ndarray:
-        """
-        Add frequency-dependent phase to complex data (NumPy implementation).
-
-        Parameters
-        ----------
-        data
-            Complex-valued frequency series.
-        phase
-            Phase array to apply.
-
-        Returns
-        -------
-        np.ndarray
-            Data with applied phase shift.
-
-        Raises
-        ------
-        TypeError
-            If data is not complex.
-        """
-        if not np.iscomplexobj(data):
-            raise TypeError("Numpy data must be complex array")
-        return data * np.exp(-1j * phase)
-
-    # type ignore: mypy does not catch that add_phase is managed by multipledispatch
-    @staticmethod  # type: ignore
-    @dispatch(torch.Tensor, torch.Tensor)
-    def add_phase(data: torch.Tensor, phase: torch.Tensor) -> torch.Tensor:
-        """
-        Add frequency-dependent phase to complex data (PyTorch implementation).
-
-        Parameters
-        ----------
-        data
-            Complex-valued frequency series.
-        phase
-            Phase tensor to apply.
-
-        Returns
-        -------
-        torch.Tensor
-            Data with applied phase shift.
-        """
-        if torch.is_complex(data):
-            while phase.dim() < data.dim():
-                phase = phase[..., None, :]
-            return data * torch.exp(-1j * phase)
-        else:
-            while phase.dim() < data.dim() - 1:
-                phase = phase[..., None, :]
-            cos_phase = torch.cos(phase)
-            sin_phase = torch.sin(phase)
-            result = torch.empty_like(data)
-            result[..., 0, :] = (
-                data[..., 0, :] * cos_phase + data[..., 1, :] * sin_phase
-            )
-            result[..., 1, :] = (
-                data[..., 1, :] * cos_phase - data[..., 0, :] * sin_phase
-            )
-            if data.shape[-2] > 2:
-                result[..., 2:, :] = data[..., 2:, :]
-            return result

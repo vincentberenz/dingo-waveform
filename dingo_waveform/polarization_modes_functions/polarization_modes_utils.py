@@ -4,7 +4,7 @@ import lal
 import lalsimulation as LS
 import numpy as np
 
-from ..domains.frequency_domain import FrequencyDomain
+from ..domains import BaseFrequencyDomain
 from ..types import FrequencySeries, Modes
 
 
@@ -81,7 +81,7 @@ def taper_td_modes_in_place(
 
 def td_modes_to_fd_modes(
     hlm_td: Dict[Modes, lal.COMPLEX16FrequencySeries],
-    domain: FrequencyDomain,
+    domain: BaseFrequencyDomain,
 ) -> Dict[Modes, FrequencySeries]:
     """
     Transform dict of td modes to dict of fd modes via FFT. The td modes are expected

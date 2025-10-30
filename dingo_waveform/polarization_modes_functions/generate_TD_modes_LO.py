@@ -20,7 +20,7 @@ from lalsimulation.gwsignal.models import gwsignal_get_waveform_generator
 
 from ..approximant import Approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
-from ..domains import DomainParameters, FrequencyDomain
+from ..domains import DomainParameters, BaseFrequencyDomain
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
 from ..types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
@@ -55,7 +55,7 @@ class _GenerateTDModesLO(GwSignalParameters):
         return cls(**asdict(gw_signal_params))
 
     def apply(
-        self, approximant: Approximant, domain: FrequencyDomain, phase: float
+        self, approximant: Approximant, domain: BaseFrequencyDomain, phase: float
     ) -> Dict[Mode, Polarization]:
 
         _logger.debug(
@@ -118,9 +118,9 @@ def generate_TD_modes_LO(
       - if the phase parameter is not specified
     """
 
-    if not isinstance(waveform_gen_params.domain, FrequencyDomain):
+    if not isinstance(waveform_gen_params.domain, BaseFrequencyDomain):
         raise ValueError(
-            "generate_TD_modes can only be applied using on a FrequencyDomain "
+            "generate_TD_modes can only be applied using on a BaseFrequencyDomain "
             f"(got {type(waveform_gen_params.domain)})"
         )
 

@@ -8,13 +8,14 @@ import numpy as np
 import torch
 from typing_extensions import override
 
-from .domain import Domain, DomainParameters, build_domain
+from .domain import DomainParameters, build_domain
 from .frequency_domain import FrequencyDomain
+from .frequency_base import BaseFrequencyDomain
 
 _module_import_path = "dingo_waveform.domains"
 
 
-class MultibandedFrequencyDomain(Domain):
+class MultibandedFrequencyDomain(BaseFrequencyDomain):
     r"""
     Defines a non-uniform frequency domain that is made up of a sequence of
     uniform-frequency domain bands. Each subsequent band in the sequence has double the
