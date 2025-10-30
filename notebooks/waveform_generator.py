@@ -5,7 +5,9 @@ app = marimo.App(width="medium")
 
 
 @app.cell
-def _():
+def _init_imports():
+    """Initialize all required imports for the notebook"""
+    import sys
     import marimo as mo
     import json
     import logging
@@ -15,12 +17,39 @@ def _():
     from dingo_waveform.dataset.dataset_settings import DatasetSettings
     from dingo_waveform.domains import build_domain
     from dingo_waveform.waveform_generator import build_waveform_generator
-    return DatasetSettings, asdict, build_domain, build_waveform_generator, go, json, logging, mo, np
+    return DatasetSettings, asdict, build_domain, build_waveform_generator, go, json, logging, mo, np, sys
 
 
 @app.cell
-def _():
-    # Default configuration for waveform generation
+def _init_logging(logging, sys):
+    """Initialize logging system - runs once on startup"""
+    logger = logging.getLogger('gravitational_waveform_notebook')
+    logger.setLevel(logging.DEBUG)
+
+    logger.handlers.clear()
+
+    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+
+    logger.addHandler(console_handler)
+
+    dingo_logger = logging.getLogger('dingo_waveform')
+    dingo_logger.setLevel(logging.INFO)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    logger.info("Logging system initialized for gravitational waveform notebook")
+
+    return (logger,)
+
+
+@app.cell
+def _init_default_configuration():
+    """Initialize default waveform configuration - runs once on startup"""
     default_config = {
         "domain": {
             "type": "FrequencyDomain",
@@ -50,14 +79,15 @@ def _():
 
 
 @app.cell
-def _(mo):
-    # Display configuration as editable JSON
+def _ui_display_header(mo):
+    """Display configuration section header"""
     mo.md("## Waveform Generation Configuration")
     return
 
 
 @app.cell
-def _(default_config, json, mo):
+def _ui_create_config_editor(default_config, json, mo):
+    """Create interactive JSON configuration editor"""
     config_editor = mo.ui.text_area(
         value=json.dumps(default_config, indent=2),
         label="Edit configuration (JSON format):",
@@ -69,115 +99,97 @@ def _(default_config, json, mo):
 
 
 @app.cell
-def _(config_editor, json, mo):
-    # Parse the edited configuration
+def _react_validate_config(config_editor, json, mo, logger):
+    """Validate JSON configuration"""
     try:
         edited_config = json.loads(config_editor.value)
-        mo.md(f"✅ Configuration is valid JSON")
+        logger.info("Configuration JSON validation successful")
+        validation_status = mo.md(f"✅ Configuration is valid JSON")
     except json.JSONDecodeError as e:
         edited_config = None
-        mo.md(f"❌ Invalid JSON: {e}")
+        logger.error(f"Configuration JSON validation failed: {e}")
+        validation_status = mo.md(f"❌ Invalid JSON: {e}")
+
+    validation_status
     return (edited_config,)
 
 
 @app.cell
-def _(edited_config, mo):
-    # Display the parsed configuration
-    if edited_config is not None:
-        mo.md("### Current Configuration:")
-        mo.tree(edited_config)
-    return
+def _ui_create_generate_button(edited_config, mo):
+    """Create waveform generation button - only when config is valid"""
+    if edited_config is None:
+        mo.stop("Configuration is invalid - cannot create generate button")
 
-
-@app.cell
-def _(edited_config, mo):
-    # Button to generate waveform
     generate_button = mo.ui.run_button(label="Generate Waveform")
     generate_button
     return (generate_button,)
 
 
 @app.cell
-def _(DatasetSettings, build_domain, build_waveform_generator, edited_config, generate_button, logging, mo):
-    import sys
+def _compute_generate_waveform(generate_button, edited_config, DatasetSettings, build_domain, build_waveform_generator,
+                               mo, logger):
+    """Generate waveform - only runs when user clicks generate button"""
 
-    # Configure root logger to capture all logs including from dingo_waveform package
-    _root_logger = logging.getLogger()
-    _root_logger.setLevel(logging.INFO)
+    # Stop execution if button hasn't been clicked - this is the key fix!
+    mo.stop(not generate_button.value, "Click 'Generate Waveform' to proceed")
 
-    # Add handler to root logger if it doesn't have one already
-    if not _root_logger.handlers:
-        _handler = logging.StreamHandler(sys.stderr)
-        _handler.setLevel(logging.INFO)
-        _formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        _handler.setFormatter(_formatter)
-        _root_logger.addHandler(_handler)
+    # Also ensure config is valid
+    if edited_config is None:
+        mo.stop("Configuration is invalid")
 
-    # Also configure dingo_waveform logger specifically
-    _dingo_logger = logging.getLogger('dingo_waveform')
-    _dingo_logger.setLevel(logging.INFO)
+    logger.info("Starting waveform generation process")
 
-    _logger = logging.getLogger(__name__)
+    try:
+        # Build settings from config
+        logger.info("Building dataset settings from configuration")
+        settings = DatasetSettings.from_dict(edited_config)
 
-    # Generate waveform when button is clicked
-    if generate_button.value and edited_config is not None:
-        try:
-            _logger.info("Starting waveform generation...")
+        # Build domain and waveform generator
+        logger.info("Building frequency domain")
+        domain = build_domain(edited_config["domain"])
 
-            # Build settings from config
-            _logger.info("Building settings from config")
-            settings = DatasetSettings.from_dict(edited_config)
+        wfg_params = {
+            "approximant": edited_config["waveform_generator"]["approximant"],
+            "f_ref": edited_config["waveform_generator"]["f_ref"],
+            "domain": domain,
+        }
+        logger.info(f"Building waveform generator with approximant: {wfg_params['approximant']}")
+        wfg = build_waveform_generator(wfg_params, domain)
 
-            # Build domain and waveform generator
-            _logger.info("Building domain")
-            domain = build_domain(edited_config["domain"])
-            wfg_params = {
-                "approximant": edited_config["waveform_generator"]["approximant"],
-                "f_ref": edited_config["waveform_generator"]["f_ref"],
-                "domain": domain,
-            }
-            _logger.info(f"Building waveform generator with approximant {wfg_params['approximant']}")
-            wfg = build_waveform_generator(wfg_params, domain)
+        # Sample parameters from prior
+        logger.info("Sampling physical parameters from prior distributions")
+        wf_params = settings.intrinsic_prior.sample()
+        logger.debug(f"Sampled parameters: {wf_params}")
 
-            # Sample parameters from prior
-            _logger.info("Sampling parameters from prior")
-            wf_params = settings.intrinsic_prior.sample()
+        # Generate waveform
+        logger.info("Generating gravitational waveform polarizations")
+        polarization = wfg.generate_hplus_hcross(wf_params)
 
-            # Generate waveform
-            _logger.info("Generating waveform polarizations")
-            polarization = wfg.generate_hplus_hcross(wf_params)
+        waveform_data = {
+            "h_plus": polarization.h_plus,
+            "h_cross": polarization.h_cross,
+            "domain": domain,
+            "parameters": wf_params,
+        }
 
-            waveform_data = {
-                "h_plus": polarization.h_plus,
-                "h_cross": polarization.h_cross,
-                "domain": domain,
-                "parameters": wf_params,
-            }
+        logger.info(f"Waveform generated successfully with shape: {polarization.h_plus.shape}")
+        status_msg = mo.md("✅ Waveform generated successfully!")
+        status_msg
 
-            _logger.info(f"Waveform generated successfully with shape {polarization.h_plus.shape}")
-            status_msg = mo.md("✅ Waveform generated successfully!")
+    except Exception as e:
+        logger.error(f"Error during waveform generation: {e}", exc_info=True)
+        mo.md(f"❌ Error generating waveform: {e}")
+        mo.stop("Waveform generation failed")
 
-        except Exception as e:
-            _logger.error(f"Error generating waveform: {e}", exc_info=True)
-            waveform_data = None
-            status_msg = mo.md(f"❌ Error generating waveform: {e}")
-    else:
-        waveform_data = None
-        status_msg = mo.md("")
-
-    status_msg
     return (waveform_data,)
 
 
 @app.cell
-def _(asdict, mo, np, waveform_data):
-    import sys
-    print(f"DEBUG: waveform_data is None = {waveform_data is None}", file=sys.stderr)
+def _viz_display_waveform_info(waveform_data, asdict, mo, np, logger):
+    """Display waveform information - only runs when waveform_data exists and is valid"""
+    logger.info("Displaying waveform information and properties")
 
-    if waveform_data is not None:
-        print("DEBUG: Displaying waveform info", file=sys.stderr)
-        # Display waveform properties
-        info = f"""
+    info = f"""
 ## Waveform Information
 
 ### Waveform Properties
@@ -189,100 +201,100 @@ def _(asdict, mo, np, waveform_data):
 ### Sampled Parameters
 """
 
-        mo.vstack([
-            mo.md(info),
-            mo.tree(asdict(waveform_data['parameters']))
-        ])
+    mo.vstack([
+        mo.md(info),
+        mo.tree(asdict(waveform_data['parameters']))
+    ])
     return
 
 
 @app.cell
-def _(go, mo, np, waveform_data):
-    import sys
-    print(f"DEBUG MAG: waveform_data is None = {waveform_data is None}", file=sys.stderr)
+def _viz_plot_magnitude(waveform_data, go, mo, np, logger):
+    """Create magnitude visualization - only runs when waveform_data is valid"""
+    logger.info("Creating waveform magnitude visualization")
 
-    if waveform_data is not None:
-        print("DEBUG MAG: Creating magnitude plot", file=sys.stderr)
-        # Get frequency array from domain
-        _domain = waveform_data['domain']
-        _frequencies = _domain.sample_frequencies()
+    frequencies = waveform_data['domain'].sample_frequencies()
 
-        # Calculate magnitudes
-        _h_plus_mag = np.abs(waveform_data['h_plus'])
-        _h_cross_mag = np.abs(waveform_data['h_cross'])
+    # Calculate magnitudes
+    h_plus_mag = np.abs(waveform_data['h_plus'])
+    h_cross_mag = np.abs(waveform_data['h_cross'])
 
-        print(f"DEBUG MAG: frequencies shape = {_frequencies.shape}, h_plus_mag shape = {_h_plus_mag.shape}", file=sys.stderr)
+    logger.debug(f"Frequency array shape: {frequencies.shape}, h_plus magnitude shape: {h_plus_mag.shape}")
 
-        # Create magnitude plot
-        _fig_mag = go.Figure()
-        _fig_mag.add_trace(go.Scatter(
-            x=_frequencies,
-            y=_h_plus_mag,
-            name='|h_plus(f)|',
-            mode='lines',
-            line=dict(color='blue')
-        ))
-        _fig_mag.add_trace(go.Scatter(
-            x=_frequencies,
-            y=_h_cross_mag,
-            name='|h_cross(f)|',
-            mode='lines',
-            line=dict(color='red')
-        ))
-        _fig_mag.update_layout(
-            title="Waveform Magnitude in Frequency Domain",
-            xaxis_title="Frequency (Hz)",
-            yaxis_title="Magnitude",
-            xaxis_type="log",
-            yaxis_type="log",
-            height=500,
-        )
+    # Create magnitude plot
+    fig_mag = go.Figure()
+    fig_mag.add_trace(go.Scatter(
+        x=frequencies,
+        y=h_plus_mag,
+        name='|h_plus(f)|',
+        mode='lines',
+        line=dict(color='blue')
+    ))
+    fig_mag.add_trace(go.Scatter(
+        x=frequencies,
+        y=h_cross_mag,
+        name='|h_cross(f)|',
+        mode='lines',
+        line=dict(color='red')
+    ))
+    fig_mag.update_layout(
+        title="Waveform Magnitude in Frequency Domain",
+        xaxis_title="Frequency (Hz)",
+        yaxis_title="Magnitude",
+        xaxis_type="log",
+        yaxis_type="log",
+        height=500,
+    )
 
-        print("DEBUG MAG: About to display plot", file=sys.stderr)
-        mo.vstack([
-            mo.md("## Frequency-Domain Visualizations"),
-            mo.ui.plotly(_fig_mag)
-        ])
+    logger.debug("Magnitude plot created successfully")
+    mo.vstack([
+        mo.md("## Frequency-Domain Visualizations"),
+        mo.ui.plotly(fig_mag)
+    ])
     return
 
 
 @app.cell
-def _(go, mo, np, waveform_data):
-    if waveform_data is not None:
-        # Get frequency array from domain
-        _domain_phase = waveform_data['domain']
-        _frequencies_phase = _domain_phase.sample_frequencies()
+def _viz_plot_phase(waveform_data, go, mo, np, logger):
+    """Create phase visualization - only runs when waveform_data is valid"""
+    logger.info("Creating waveform phase visualization")
 
-        # Calculate phases with unwrapping
-        _h_plus_phase = np.unwrap(np.angle(waveform_data['h_plus']))
-        _h_cross_phase = np.unwrap(np.angle(waveform_data['h_cross']))
+    domain_phase = waveform_data['domain']
+    frequencies_phase = domain_phase.sample_frequencies()
 
-        # Create phase plot
-        _fig_phase = go.Figure()
-        _fig_phase.add_trace(go.Scatter(
-            x=_frequencies_phase,
-            y=_h_plus_phase,
-            name='arg(h_plus)',
-            mode='lines',
-            line=dict(color='blue')
-        ))
-        _fig_phase.add_trace(go.Scatter(
-            x=_frequencies_phase,
-            y=_h_cross_phase,
-            name='arg(h_cross)',
-            mode='lines',
-            line=dict(color='red')
-        ))
-        _fig_phase.update_layout(
-            title="Waveform Phase in Frequency Domain (Unwrapped)",
-            xaxis_title="Frequency (Hz)",
-            yaxis_title="Phase (radians)",
-            xaxis_type="log",
-            height=500,
-        )
+    # Calculate phases with unwrapping
+    h_plus_phase = np.unwrap(np.angle(waveform_data['h_plus']))
+    h_cross_phase = np.unwrap(np.angle(waveform_data['h_cross']))
 
-        _output_phase = mo.ui.plotly(_fig_phase)
-        _output_phase
+    logger.debug(f"Phase calculation completed for {len(frequencies_phase)} frequency points")
+
+    # Create phase plot
+    fig_phase = go.Figure()
+    fig_phase.add_trace(go.Scatter(
+        x=frequencies_phase,
+        y=h_plus_phase,
+        name='arg(h_plus)',
+        mode='lines',
+        line=dict(color='blue')
+    ))
+    fig_phase.add_trace(go.Scatter(
+        x=frequencies_phase,
+        y=h_cross_phase,
+        name='arg(h_cross)',
+        mode='lines',
+        line=dict(color='red')
+    ))
+    fig_phase.update_layout(
+        title="Waveform Phase in Frequency Domain (Unwrapped)",
+        xaxis_title="Frequency (Hz)",
+        yaxis_title="Phase (radians)",
+        xaxis_type="log",
+        height=500,
+    )
+
+    logger.debug("Phase plot created successfully")
+    output_phase = mo.ui.plotly(fig_phase)
+    output_phase
     return
 
 
