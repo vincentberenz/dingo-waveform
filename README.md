@@ -2,6 +2,22 @@
 
 Temporary repository. For proposing a refactor of the dingo waveform generator.
 
+## Documentation
+
+Comprehensive HTML documentation is available. To build and view locally:
+
+```bash
+# Install documentation dependencies
+pip install -e ".[docs]"
+
+# Serve documentation with live reload
+mkdocs serve
+```
+
+Then open http://127.0.0.1:8000 in your browser.
+
+See `docs/README.md` for more details on building and contributing to documentation.
+
 ## Examples
 
 Interactive examples are available in the `examples/` directory:
