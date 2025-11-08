@@ -3,6 +3,47 @@ import marimo
 __generated_with = "0.17.2"
 app = marimo.App(width="medium")
 
+"""
+
+domain:
+  type: MultibandedFrequencyDomain
+  nodes: [20.0, 38.0, 50.0, 66.0, 82.0, 1810.0]
+  delta_f_initial: 0.125
+  base_delta_f: 0.125
+
+waveform_generator:
+  approximant: IMRPhenomXPHM
+  f_ref: 20.0
+  spin_conversion_phase: 0.0
+
+intrinsic_prior:
+  mass_1: bilby.core.prior.Constraint(minimum=10.0, maximum=120.0)
+  mass_2: bilby.core.prior.Constraint(minimum=10.0, maximum=120.0)
+  chirp_mass: bilby.gw.prior.UniformInComponentsChirpMass(minimum=15.0, maximum=150.0)
+  mass_ratio: bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)
+  a_1: bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)
+  a_2: bilby.core.prior.Uniform(minimum=0.0, maximum=0.99)
+  tilt_1: default
+  tilt_2: default
+  phi_12: default
+  phi_jl: default
+  theta_jn: default
+  phase: default
+  luminosity_distance: 100.0
+  geocent_time: 0.0
+
+num_samples: 1_000 #17_000 # 25_000_000
+
+compression:
+  whitening: aLIGO_ZERO_DET_high_P_asd.txt
+  svd:
+    size: 200
+    num_training_samples: 10000 #50000
+    num_validation_samples: 1000 #10000
+
+
+
+"""
 
 @app.cell
 def _init_imports():
@@ -52,7 +93,7 @@ def _init_default_configuration():
     """Initialize default waveform configuration - runs once on startup"""
     default_config = {
         "domain": {
-            "type": "FrequencyDomain",
+            "type": "UniformFrequencyDomain",
             "f_min": 20.0,
             "f_max": 1024.0,
             "delta_f": 0.125,

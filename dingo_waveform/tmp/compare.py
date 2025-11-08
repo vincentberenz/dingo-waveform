@@ -215,7 +215,7 @@ def get_prior_dict(approximant: str) -> Dict:
 def get_configuration_dict(config: _Config) -> Dict:
     d: Dict = {
         "domain": {
-            "type": "FrequencyDomain",
+            "type": "UniformFrequencyDomain",
             "f_min": 10.0,
             "f_max": 1024.0,
             "delta_f": 0.125,

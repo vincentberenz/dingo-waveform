@@ -12,14 +12,14 @@ from dingo_waveform.dataset import (
     WaveformDataset,
     generate_waveform_dataset,
 )
-from dingo_waveform.domains import FrequencyDomain
+from dingo_waveform.domains import UniformFrequencyDomain
 
 
 @pytest.fixture
 def domain_config():
     """Fixture providing basic domain configuration."""
     return {
-        "type": "FrequencyDomain",
+        "type": "UniformFrequencyDomain",
         "f_min": 20.0,
         "f_max": 512.0,
         "delta_f": 0.125,
@@ -72,7 +72,7 @@ class TestDatasetSettings:
         assert basic_settings.num_samples == 5
         from dingo_waveform.domains import DomainParameters
         assert isinstance(basic_settings.domain, DomainParameters)
-        assert "FrequencyDomain" in basic_settings.domain.type
+        assert "UniformFrequencyDomain" in basic_settings.domain.type
 
     def test_validation_success(self, basic_settings):
         """Test that validation passes for valid settings."""

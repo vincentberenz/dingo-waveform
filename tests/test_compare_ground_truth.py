@@ -20,7 +20,7 @@ from typing import Any, Dict, cast
 import numpy as np
 
 from dingo_waveform.approximant import Approximant
-from dingo_waveform.domains import FrequencyDomain
+from dingo_waveform.domains import UniformFrequencyDomain
 from dingo_waveform.polarization_functions import inspiral_FD
 from dingo_waveform.polarization_modes_functions import inspiral_choose_FD_modes
 from dingo_waveform.polarizations import Polarization, sum_contributions_m
@@ -62,7 +62,7 @@ def test_IMRPhenomXPHM_approximant() -> None:
 
     # waveform generation configuration
 
-    # domain settings (type: FrequencyDomain)
+    # domain settings (type: UniformFrequencyDomain)
     f_min = 10.0
     f_max = 2048.0
     delta_f = 0.125
@@ -85,7 +85,7 @@ def test_IMRPhenomXPHM_approximant() -> None:
     f_ref = 20.0
     f_start = 10.0
     spin_conversion_phase = 0.0
-    domain = FrequencyDomain(
+    domain = UniformFrequencyDomain(
         delta_f=delta_f,
         f_min=f_min,
         f_max=f_max,

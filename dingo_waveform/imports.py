@@ -80,11 +80,11 @@ def import_entity(import_path: str) -> Tuple[Any, str, str]:
     Example of usage:
 
     ```
-    domain_class, module_path, name = import_entity('dingo_waveform.domains.FrequencyDomain')
+    domain_class, module_path, name = import_entity('dingo_waveform.domains.UniformFrequencyDomain')
 
-    # domain_class: the FrequencyDomain class
+    # domain_class: the UniformFrequencyDomain class
     # module path: "dingo_waveform.domains"
-    # name: "FrequencyDomain"
+    # name: "UniformFrequencyDomain"
     ```
 
     Parameters

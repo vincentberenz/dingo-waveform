@@ -7,11 +7,11 @@ from dingo_waveform.polarizations import Polarization
 
 def test_import_entity() -> None:
 
-    # FrequencyDomain should be imported with success
-    d, module, d_name = import_entity("dingo_waveform.domains.FrequencyDomain")
-    assert d_name == "FrequencyDomain"
+    # UniformFrequencyDomain should be imported with success
+    d, module, d_name = import_entity("dingo_waveform.domains.UniformFrequencyDomain")
+    assert d_name == "UniformFrequencyDomain"
     assert module == "dingo_waveform.domains"
-    assert d.__name__ == "FrequencyDomain"
+    assert d.__name__ == "UniformFrequencyDomain"
 
     # get_approximant should be imported with success
     f, module, f_name = import_entity("dingo_waveform.approximant.get_approximant")

@@ -4,7 +4,7 @@ import pytest
 import toml
 import yaml
 
-from dingo_waveform.domains import FrequencyDomain
+from dingo_waveform.domains import UniformFrequencyDomain
 from dingo_waveform.waveform_generator import (
     WaveformGenerator,
     build_waveform_generator,
@@ -15,7 +15,7 @@ from dingo_waveform.waveform_generator_parameters import WaveformGeneratorParame
 @pytest.fixture
 def domain():
     """Create a test frequency domain."""
-    return FrequencyDomain(f_min=20.0, f_max=1024.0, delta_f=0.125)
+    return UniformFrequencyDomain(f_min=20.0, f_max=1024.0, delta_f=0.125)
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def config_dict():
     """Create a test configuration dictionary."""
     return {
         "domain": {
-            "type": "dingo_waveform.domains.FrequencyDomain",
+            "type": "dingo_waveform.domains.UniformFrequencyDomain",
             "f_min": 20.0,
             "f_max": 1024.0,
             "delta_f": 0.125,
@@ -69,7 +69,7 @@ def _assert_waveform_generator(generator):
     assert generator._waveform_gen_params.approximant == "IMRPhenomPv2"
     assert generator._waveform_gen_params.f_ref == 20.0
     assert generator._waveform_gen_params.spin_conversion_phase == 0.0
-    assert isinstance(generator._waveform_gen_params.domain, FrequencyDomain)
+    assert isinstance(generator._waveform_gen_params.domain, UniformFrequencyDomain)
     assert generator._waveform_gen_params.domain.f_min == 20.0
     assert generator._waveform_gen_params.domain.f_max == 1024.0
     assert generator._waveform_gen_params.domain.delta_f == 0.125

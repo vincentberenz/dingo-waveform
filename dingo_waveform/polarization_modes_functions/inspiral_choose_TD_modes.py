@@ -170,7 +170,7 @@ def inspiral_choose_TD_modes(
     Raises
     ------
     ValueError
-      - if the specified domain is not an instance of FrequencyDomain
+      - if the specified domain is not an instance of UniformFrequencyDomain
       - if the phase parameter is not specified
     """
 

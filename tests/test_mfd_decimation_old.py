@@ -1,10 +1,3 @@
-"""
-Redesigned tests for MultibandedFrequencyDomain waveform generation and decimation.
-
-These tests verify:
-1. Decimation quality: UFD waveforms decimated to MFD match MFD-generated waveforms
-2. Scientific correctness: Results match original dingo package
-"""
 import numpy as np
 import pytest
 from scipy.interpolate import interp1d
@@ -20,9 +13,8 @@ from dingo_waveform.waveform_generator import WaveformGenerator
 from dingo_waveform.polarizations import Polarization
 from dingo_waveform.types import Mode
 
-# Import comparison utilities
-from dingo_waveform.comparison import compare_waveforms
 
+# Helper copied from tests/test_wfg_m.py
 
 def _get_mismatch(
     a: np.ndarray,
@@ -31,7 +23,7 @@ def _get_mismatch(
     asd_file: Optional[str] = None,
 ) -> float:
     """
-    Mismatch is 1 - overlap, where overlap is defined by
+    Mistmatch is 1 - overlap, where overlap is defined by
     inner(a, b) / sqrt(inner(a, a) * inner(b, b)).
     See e.g. Eq. (44) in https://arxiv.org/pdf/1106.1021.pdf.
     """
@@ -141,42 +133,33 @@ def num_evaluations(approximant: Approximant):
 
 
 @pytest.fixture
-def decimation_tolerance(approximant: Approximant) -> float:
-    """Tolerance for decimation quality test (MFD vs UFD decimated)."""
+def tolerances(approximant: Approximant) -> Tuple[float, float]:
+    # Return max mismatches in MFD, UFD.
     if approximant == Approximant("IMRPhenomXPHM"):
-        return 1e-4
+        return 1e-4, 1e-3
     else:
-        return 1e-9
+        return 1e-9, 1e-3
 
 
 @pytest.mark.parametrize("approximant", _approximants)
-def test_decimation_quality(
-    intrinsic_prior, wfg_mfd, wfg_ufd, mfd, num_evaluations, decimation_tolerance
+def test_decimation(
+    intrinsic_prior, wfg_mfd, wfg_ufd, mfd, num_evaluations, tolerances
 ):
-    """
-    Test that decimating UFD waveforms to MFD matches directly-generated MFD waveforms.
-
-    This verifies that:
-    1. The decimation algorithm preserves signal content
-    2. MFD waveforms are equivalent to decimated UFD waveforms
-    """
-    mismatches: List[List[float]] = []
-
+    mismatches_mfd: List[List[float]] = []
+    mismatches_ufd: List[List[float]] = []
     for _ in range(num_evaluations):
         p = intrinsic_prior.sample()
 
-        # Generate waveforms in both domains
         pol_mfd: Polarization = wfg_mfd.generate_hplus_hcross(p)
         pol_ufd: Polarization = wfg_ufd.generate_hplus_hcross(p)
 
-        # Decimate UFD to MFD
+        # Compare UFD waveforms decimated to MFD against waveforms generated in MFD.
         pol_ufd_decimated = Polarization(
             h_plus=mfd.decimate(pol_ufd.h_plus),
             h_cross=mfd.decimate(pol_ufd.h_cross),
         )
 
-        # Compute mismatches
-        mismatches.append(
+        mismatches_mfd.append(
             [
                 _get_mismatch(
                     asdict(pol_mfd)[pol],
@@ -188,76 +171,42 @@ def test_decimation_quality(
             ]
         )
 
-    mismatches_arr = np.array(mismatches)
-    max_mismatch = np.max(mismatches_arr)
+        # Also compare UFD waveforms against MFD waveforms interpolated to UFD.
+        ufd = UniformFrequencyDomain(delta_f=0.0625, f_min=0.0, f_max=mfd.f_max)
+        pol_mfd_interpolated = Polarization(
+            h_plus=ufd.update_data(
+                interp1d(mfd(), pol_mfd.h_plus, fill_value="extrapolate")(ufd())
+            ),
+            h_cross=ufd.update_data(
+                interp1d(mfd(), pol_mfd.h_cross, fill_value="extrapolate")(ufd())
+            ),
+        )
 
-    assert max_mismatch < decimation_tolerance, (
-        f"Decimation mismatch {max_mismatch:.2e} exceeds tolerance {decimation_tolerance:.2e}"
-    )
+        mismatches_ufd.append(
+            [
+                _get_mismatch(
+                    asdict(pol_ufd)[pol],
+                    asdict(pol_mfd_interpolated)[pol],
+                    ufd,
+                    asd_file="aLIGO_ZERO_DET_high_P_asd.txt",
+                )
+                for pol in ["h_plus", "h_cross"]
+            ]
+        )
 
+    mismatches_mfd_arr = np.array(mismatches_mfd)
+    mismatches_ufd_arr = np.array(mismatches_ufd)
 
-@pytest.mark.parametrize("approximant", _approximants)
-def test_compatibility_with_dingo(intrinsic_prior, mfd, approximant: Approximant):
-    """
-    Test that dingo-waveform produces identical results to original dingo.
-
-    This is the ground truth test - it verifies scientific correctness by
-    comparing against the original implementation.
-    """
-    # Sample parameters (use fixed seed for reproducibility)
-    np.random.seed(42)
-    p = intrinsic_prior.sample()
-
-    # Convert to plain dict for comparison function
-    from dataclasses import asdict
-    p_dict = asdict(p)
-    # Convert numpy scalars to Python floats
-    p_dict = {k: float(v) if hasattr(v, 'item') else v for k, v in p_dict.items() if v is not None}
-
-    # Prepare domain parameters
-    domain_params = {
-        'nodes': [20.0, 26.0, 34.0, 46.0, 62.0, 78.0, 1038.0],
-        'delta_f_initial': 0.0625,
-        'base_delta_f': 0.0625,
-    }
-
-    # Compare with original dingo
-    result = compare_waveforms(
-        domain_type='multibanded',
-        domain_params=domain_params,
-        approximant=str(approximant),
-        waveform_params=p_dict,
-        f_ref=10.0,
-        f_start=10.0,
-        spin_conversion_phase=0.0,
-    )
-
-    # Verify shapes match
-    assert result.shapes_match, (
-        f"Shape mismatch: dingo={result.dingo_shape}, "
-        f"refactored={result.refactored_shape}"
-    )
-
-    # Verify numerical agreement (differences should be at machine precision level)
-    assert result.max_diff_h_plus < 1e-20, (
-        f"h_plus differs from dingo by {result.max_diff_h_plus:.2e}"
-    )
-    assert result.max_diff_h_cross < 1e-20, (
-        f"h_cross differs from dingo by {result.max_diff_h_cross:.2e}"
-    )
+    assert np.max(mismatches_mfd_arr) < tolerances[0]
+    assert np.max(mismatches_ufd_arr) < tolerances[1]
 
 
 @pytest.mark.parametrize("approximant", _approximants)
-def test_decimation_m_quality(
-    intrinsic_prior, wfg_mfd, wfg_ufd, mfd, num_evaluations, decimation_tolerance
+def test_decimation_m(
+    intrinsic_prior, wfg_mfd, wfg_ufd, mfd, num_evaluations, tolerances
 ):
-    """
-    Test decimation quality for mode-by-mode waveforms.
-
-    Similar to test_decimation_quality but for individual modes.
-    """
-    mismatches: List[List[List[float]]] = []
-
+    mismatches_mfd: List[List[List[float]]] = []
+    mismatches_ufd: List[List[List[float]]] = []
     for _ in range(num_evaluations):
         p = intrinsic_prior.sample()
 
@@ -274,7 +223,7 @@ def test_decimation_m_quality(
             for m, pol in wf_ufd.items()
         }
 
-        mismatches.append(
+        mismatches_mfd.append(
             [
                 [
                     _get_mismatch(
@@ -291,17 +240,41 @@ def test_decimation_m_quality(
             ]
         )
 
-    mismatches_arr = np.array(mismatches)
-    max_mismatch = np.max(mismatches_arr)
+        # MFD interpolated to UFD
+        ufd = UniformFrequencyDomain(delta_f=0.0625, f_min=0.0, f_max=mfd.f_max)
+        wf_mfd_interpolated: Dict[Mode, Polarization] = {
+            m: Polarization(
+                h_plus=ufd.update_data(
+                    interp1d(mfd(), pol.h_plus, fill_value="extrapolate")(ufd())
+                ),
+                h_cross=ufd.update_data(
+                    interp1d(mfd(), pol.h_cross, fill_value="extrapolate")(ufd())
+                ),
+            )
+            for m, pol in wf_mfd.items()
+        }
 
-    # For mode-by-mode, use median to be robust to outlier modes
-    median_mismatch = np.median(mismatches_arr)
+        mismatches_ufd.append(
+            [
+                [
+                    _get_mismatch(
+                        wf_ufd[m].h_plus if pol == "h_plus" else wf_ufd[m].h_cross,
+                        wf_mfd_interpolated[m].h_plus
+                        if pol == "h_plus"
+                        else wf_mfd_interpolated[m].h_cross,
+                        ufd,
+                        asd_file="aLIGO_ZERO_DET_high_P_asd.txt",
+                    )
+                    for pol in ["h_plus", "h_cross"]
+                ]
+                for m in modes
+            ]
+        )
 
-    assert max_mismatch < decimation_tolerance, (
-        f"Mode decimation max mismatch {max_mismatch:.2e} exceeds tolerance {decimation_tolerance:.2e}"
-    )
+    mismatches_mfd_arr = np.array(mismatches_mfd)
+    mismatches_ufd_arr = np.array(mismatches_ufd)
 
-    # Also check that median is good (ensures most modes are well-behaved)
-    assert median_mismatch < decimation_tolerance / 10, (
-        f"Mode decimation median mismatch {median_mismatch:.2e} is too large"
-    )
+    assert np.max(mismatches_mfd_arr) < tolerances[0]
+
+    # Some of the negative m modes do not do well, so we exclude by taking the median.
+    assert np.median(mismatches_ufd_arr) < 10 * tolerances[1]

@@ -63,7 +63,7 @@ def config_file_json(config_dict, tmp_path):
 def get_configuration_dict(approximant: str, f_start: Optional[float]) -> Dict:
     d: Dict = {
         "domain": {
-            "type": "FrequencyDomain",
+            "type": "UniformFrequencyDomain",
             "f_min": 20.0,
             "f_max": 1024.0,
             "delta_f": 0.125,

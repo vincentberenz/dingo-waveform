@@ -9,7 +9,7 @@ from dingo_waveform import approximant
 
 from . import polarization_functions, polarization_modes_functions
 from .approximant import Approximant
-from .domains import Domain, BaseFrequencyDomain, FrequencyDomain, TimeDomain, build_domain
+from .domains import Domain, BaseFrequencyDomain, UniformFrequencyDomain, TimeDomain, build_domain
 from .imports import check_function_signature, import_function, read_file
 from .lal_params import get_lal_params
 from .polarizations import Polarization, polarizations_to_table
@@ -232,7 +232,7 @@ class WaveformGenerator:
 
         This method selects the appropriate polarization function based on:
         - User-provided function (if specified)
-        - Domain type (FrequencyDomain or TimeDomain)
+        - Domain type (UniformFrequencyDomain or TimeDomain)
         - The approximant
 
         It also applies any specified transform to the result (if any)
@@ -249,7 +249,7 @@ class WaveformGenerator:
         Raises
         ------
         ValueError
-            If the domain is not FrequencyDomain or TimeDomain
+            If the domain is not UniformFrequencyDomain or TimeDomain
         """
 
         # For now only frequency and time domains are supported
@@ -257,7 +257,7 @@ class WaveformGenerator:
             self._waveform_gen_params.domain, BaseFrequencyDomain
         ) and not isinstance(self._waveform_gen_params.domain, TimeDomain):
             raise ValueError(
-                "generate_hplus_hcross: domain must be an instance of FrequencyDomain or TimeDomain "
+                "generate_hplus_hcross: domain must be an instance of UniformFrequencyDomain or TimeDomain "
                 f"{type(self._waveform_gen_params.domain)} not supported"
             )
 
@@ -300,6 +300,10 @@ class WaveformGenerator:
         polarization = polarization_method(
             self._waveform_gen_params, waveform_parameters
         )
+
+        # domain specific waveform transform
+        # (most domain: does nothing, MultibandedFrequencyDomain: decimate)
+        polarization = self._waveform_gen_params.domain.waveform_transform(polarization)
 
         # transforming the waveform using the user custom function
         # (if any)
@@ -355,7 +359,7 @@ class WaveformGenerator:
     ) -> None:
         # will be called by generate_hplus_hcross_m.
         # It raises an error if there is any configuration issue,
-        # - improper domain (only FrequencyDomain is supported)
+        # - improper domain (only UniformFrequencyDomain is supported)
         # - the phase field of the waveform parameters is None
 
         # for now, only frequency domain is supported

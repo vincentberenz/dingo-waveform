@@ -14,7 +14,7 @@ from lalsimulation.gwsignal.models import (
 
 from ..approximant import Approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
-from ..domains import DomainParameters, BaseFrequencyDomain
+from ..domains import DomainParameters, BaseFrequencyDomain, MultibandedFrequencyDomain
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization
 from ..types import WaveformGenerationError
@@ -94,8 +94,42 @@ class _GenerateFDModesParameters(GwSignalParameters):
                 "when you are using a native time-domain waveform model."
             )
 
-        h_plus = np.zeros_like((len(domain),), dtype=complex)
-        h_cross = np.zeros_like((len(domain),), dtype=complex)
+        # For multibanded domains, generate on the base uniform grid
+        # The domain's waveform_transform() method will handle decimation
+        if isinstance(domain, MultibandedFrequencyDomain):
+            # Create a base uniform domain for processing
+            # Start from f_min=0 to match the full frequency grid
+            from dingo_waveform.domains import UniformFrequencyDomain
+            base = UniformFrequencyDomain(
+                f_min=0.0,
+                f_max=domain.f_max,
+                delta_f=domain.base_delta_f,
+                window_factor=domain.window_factor,
+            )
+            # hp/hc are generated on a uniform grid with spacing hp.df.value, aligned to base domain
+            h_plus_full = hp.value
+            h_cross_full = hc.value
+            # Ensure arrays are at least as long as base domain; if longer, truncate
+            n_base = len(base)
+            if len(h_plus_full) < n_base:
+                # pad with zeros up to base length
+                pad = n_base - len(h_plus_full)
+                h_plus_full = np.pad(h_plus_full, (0, pad), mode="constant")
+                h_cross_full = np.pad(h_cross_full, (0, pad), mode="constant")
+            elif len(h_plus_full) > n_base:
+                h_plus_full = h_plus_full[:n_base]
+                h_cross_full = h_cross_full[:n_base]
+            # Time shift computed on base frequencies
+            dt = 1 / hp.df.value + hp.epoch.value
+            time_shift = np.exp(-1j * 2 * np.pi * dt * base())
+            h_plus_full = h_plus_full * time_shift
+            h_cross_full = h_cross_full * time_shift
+            # Return waveforms on base grid; domain.waveform_transform() will decimate
+            return Polarization(h_cross=h_cross_full, h_plus=h_plus_full)
+
+        # Uniform frequency domain case
+        h_plus = np.zeros((len(domain),), dtype=complex)
+        h_cross = np.zeros((len(domain),), dtype=complex)
 
         # Ensure that length of wf agrees with length of domain. Enforce by truncating frequencies beyond f_max
         if len(hp) > len(domain):

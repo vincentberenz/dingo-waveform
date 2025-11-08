@@ -22,7 +22,7 @@ from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
 
 from dingo_waveform.approximant import Approximant
-from dingo_waveform.domains import FrequencyDomain
+from dingo_waveform.domains import UniformFrequencyDomain
 from dingo_waveform.polarization_functions import inspiral_FD
 from dingo_waveform.polarization_modes_functions import inspiral_choose_FD_modes
 from dingo_waveform.polarizations import Polarization, sum_contributions_m
@@ -37,7 +37,7 @@ _approximants = ("IMRPhenomXPHM", "SEOBNRv4PHM", "SEOBNRv5PHM", "SEOBNRv5HM")
 def _get_mismatch(
     a: FrequencySeries,
     b: FrequencySeries,
-    domain: FrequencyDomain,
+    domain: UniformFrequencyDomain,
     asd_file: Optional[str] = None,
 ) -> float:
     """
@@ -79,8 +79,8 @@ def approximant(request):
     return request.param
 
 
-def get_uniform_fd_domain() -> FrequencyDomain:
-    return FrequencyDomain(
+def get_uniform_fd_domain() -> UniformFrequencyDomain:
+    return UniformFrequencyDomain(
         delta_f=0.125,
         f_min=10.0,
         f_max=2048.0,
@@ -193,7 +193,7 @@ def test_generate_hplus_hcross_m(approximant) -> None:
         p.phase += phase_shift
         pol_ref: Polarization = wfg.generate_hplus_hcross(p)
 
-        domain = cast(FrequencyDomain, wfg._waveform_gen_params.domain)
+        domain = cast(UniformFrequencyDomain, wfg._waveform_gen_params.domain)
 
         mismatches.append(
             [

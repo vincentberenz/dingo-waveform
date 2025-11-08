@@ -14,7 +14,7 @@ class BaseFrequencyDomain(Domain, ABC):
     """
     Abstract base class for frequency-domain-like domains.
 
-    It defines the shared interface between FrequencyDomain and
+    It defines the shared interface between UniformFrequencyDomain and
     MultibandedFrequencyDomain while delegating implementation details
     to concrete subclasses. This class does not add new behavior; it
     only documents and enforces the common API to enable type sharing

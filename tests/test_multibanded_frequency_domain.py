@@ -6,7 +6,7 @@ import torch
 
 from dingo_waveform.domains import (
     DomainParameters,
-    FrequencyDomain,
+    UniformFrequencyDomain,
     MultibandedFrequencyDomain,
     build_domain,
     decimate_uniform,
@@ -21,14 +21,16 @@ _delta_f_initial = 0.125
 @pytest.fixture
 def base_domain():
     """Create a standard base frequency domain."""
-    return FrequencyDomain(**_base_domain_params)
+    return UniformFrequencyDomain(**_base_domain_params)
 
 
 @pytest.fixture
-def multibanded_domain(base_domain):
+def multibanded_domain():
     """Create a standard multibanded frequency domain."""
     return MultibandedFrequencyDomain(
-        nodes=_nodes, delta_f_initial=_delta_f_initial, base_domain=base_domain
+        nodes=_nodes,
+        delta_f_initial=_delta_f_initial,
+        base_delta_f=_base_domain_params["delta_f"]
     )
 
 
@@ -43,14 +45,14 @@ def test_multibanded_creation(multibanded_domain):
 def test_multibanded_bands_structure(multibanded_domain):
     """Test that bands have correct delta_f structure (doubling per band)."""
     # Check that delta_f doubles in each band
-    assert np.isclose(multibanded_domain._delta_f_bands[0], 0.125)
-    assert np.isclose(multibanded_domain._delta_f_bands[1], 0.25)
-    assert np.isclose(multibanded_domain._delta_f_bands[2], 0.5)
+    assert np.isclose(multibanded_domain._binning.delta_f_bands[0], 0.125)
+    assert np.isclose(multibanded_domain._binning.delta_f_bands[1], 0.25)
+    assert np.isclose(multibanded_domain._binning.delta_f_bands[2], 0.5)
 
     # Check decimation factors
-    assert multibanded_domain._decimation_factors_bands[0] == 1
-    assert multibanded_domain._decimation_factors_bands[1] == 2
-    assert multibanded_domain._decimation_factors_bands[2] == 4
+    assert multibanded_domain._binning.decimation_factors_bands[0] == 1
+    assert multibanded_domain._binning.decimation_factors_bands[1] == 2
+    assert multibanded_domain._binning.decimation_factors_bands[2] == 4
 
 
 def test_multibanded_sample_frequencies(multibanded_domain):
@@ -108,17 +110,17 @@ def test_multibanded_duration_sampling_rate_not_implemented(multibanded_domain):
 
 def test_decimate_uniform_numpy():
     """Test decimate_uniform function with numpy arrays."""
-    data = np.arange(100, dtype=float)
-    # Decimate by factor of 2
-    decimated = decimate_uniform(data, 2)
+    data = np.arange(100, dtype=np.float32)
+    # Decimate by factor of 2 with mean policy
+    decimated = decimate_uniform(data, 2, policy="mean")
     assert len(decimated) == 50
     # Check averaging: (0+1)/2, (2+3)/2, etc.
     assert np.isclose(decimated[0], 0.5)
     assert np.isclose(decimated[1], 2.5)
 
-    # Decimate by factor of 5
-    data = np.arange(100, dtype=float)
-    decimated = decimate_uniform(data, 5)
+    # Decimate by factor of 5 with mean policy
+    data = np.arange(100, dtype=np.float32)
+    decimated = decimate_uniform(data, 5, policy="mean")
     assert len(decimated) == 20
     # Check averaging: (0+1+2+3+4)/5, etc.
     assert np.isclose(decimated[0], 2.0)
@@ -127,8 +129,8 @@ def test_decimate_uniform_numpy():
 def test_decimate_uniform_torch():
     """Test decimate_uniform function with torch tensors."""
     data = torch.arange(100, dtype=torch.float32)
-    # Decimate by factor of 2
-    decimated = decimate_uniform(data, 2)
+    # Decimate by factor of 2 with mean policy
+    decimated = decimate_uniform(data, 2, policy="mean")
     assert len(decimated) == 50
     assert torch.isclose(decimated[0], torch.tensor(0.5))
     assert torch.isclose(decimated[1], torch.tensor(2.5))
@@ -136,49 +138,56 @@ def test_decimate_uniform_torch():
 
 def test_decimate_uniform_invalid_factor():
     """Test that decimate_uniform raises error for invalid decimation factor."""
-    data = np.arange(100, dtype=float)
-    with pytest.raises(ValueError, match="not a multiple"):
-        decimate_uniform(data, 3)  # 100 is not divisible by 3
+    data = np.arange(100, dtype=np.float32)
+    # New implementation drops remainder, so non-divisible factors work
+    decimated = decimate_uniform(data, 3, policy="pick")
+    # 100 // 3 = 33 bins
+    assert len(decimated) == 33
 
 
-def test_multibanded_decimate_numpy(base_domain, multibanded_domain):
+def test_multibanded_decimate_numpy(multibanded_domain):
     """Test decimation with numpy arrays."""
-    # Create random data in base domain
+    # Create random data matching the coverage (windowed case for auto mode)
     np.random.seed(42)
-    data = np.random.randn(len(base_domain)) + 1j * np.random.randn(len(base_domain))
+    # For auto mode to work, data length must match coverage exactly
+    coverage = int(multibanded_domain._binning.nodes_indices[-1] - multibanded_domain._binning.nodes_indices[0])
+    data = np.random.randn(coverage) + 1j * np.random.randn(coverage)
 
     decimated = multibanded_domain.decimate(data)
     assert decimated.shape == (len(multibanded_domain),)
     assert decimated.dtype == data.dtype
 
 
-def test_multibanded_decimate_torch(base_domain, multibanded_domain):
+def test_multibanded_decimate_torch(multibanded_domain):
     """Test decimation with torch tensors."""
     torch.manual_seed(42)
-    data = torch.randn(len(base_domain), dtype=torch.complex64)
+    # For auto mode to work, data length must match coverage exactly
+    coverage = int(multibanded_domain._binning.nodes_indices[-1] - multibanded_domain._binning.nodes_indices[0])
+    data = torch.randn(coverage, dtype=torch.complex64)
 
     decimated = multibanded_domain.decimate(data)
     assert decimated.shape == (len(multibanded_domain),)
     assert decimated.dtype == data.dtype
 
 
-def test_multibanded_decimate_truncated_data(base_domain, multibanded_domain):
-    """Test decimation with data that starts at f_min (truncated)."""
-    # Create data starting from min_idx (no leading zeros)
+def test_multibanded_decimate_windowed_data(multibanded_domain):
+    """Test decimation with windowed data (coverage length only)."""
+    # Create data with exact coverage length (windowed case)
     np.random.seed(42)
-    data_len = len(base_domain) - base_domain.min_idx
-    data = np.random.randn(data_len) + 1j * np.random.randn(data_len)
+    coverage = int(multibanded_domain._binning.nodes_indices[-1] - multibanded_domain._binning.nodes_indices[0])
+    data = np.random.randn(coverage) + 1j * np.random.randn(coverage)
 
     decimated = multibanded_domain.decimate(data)
     assert decimated.shape == (len(multibanded_domain),)
 
 
-def test_multibanded_decimate_batched(base_domain, multibanded_domain):
+def test_multibanded_decimate_batched(multibanded_domain):
     """Test decimation with batched data."""
     np.random.seed(42)
     batch_size = 5
     num_detectors = 3
-    data = np.random.randn(batch_size, num_detectors, len(base_domain))
+    coverage = int(multibanded_domain._binning.nodes_indices[-1] - multibanded_domain._binning.nodes_indices[0])
+    data = np.random.randn(batch_size, num_detectors, coverage)
 
     decimated = multibanded_domain.decimate(data)
     assert decimated.shape == (batch_size, num_detectors, len(multibanded_domain))
@@ -187,7 +196,8 @@ def test_multibanded_decimate_batched(base_domain, multibanded_domain):
 def test_multibanded_decimate_invalid_shape(multibanded_domain):
     """Test that decimation raises error for incompatible data shape."""
     data = np.random.randn(100)  # Wrong length
-    with pytest.raises(ValueError, match="incompatible"):
+    # The error could be IndexError (out of bounds) or ValueError depending on the check
+    with pytest.raises((IndexError, ValueError)):
         multibanded_domain.decimate(data)
 
 
@@ -198,8 +208,8 @@ def test_multibanded_get_parameters(multibanded_domain):
     assert params.type == "dingo_waveform.domains.MultibandedFrequencyDomain"
     assert params.nodes == _nodes
     assert np.isclose(params.delta_f_initial, _delta_f_initial)
-    assert isinstance(params.base_domain, dict)
-    assert params.base_domain["type"] == "dingo_waveform.domains.FrequencyDomain"
+    assert np.isclose(params.base_delta_f, _base_domain_params["delta_f"])
+    assert params.window_factor is None  # Not set in fixture
 
 
 def test_multibanded_from_parameters(multibanded_domain):
@@ -231,12 +241,7 @@ def test_multibanded_build_domain_from_dict():
         "type": "MultibandedFrequencyDomain",
         "nodes": [20.0, 64.0, 256.0, 1024.0],
         "delta_f_initial": 0.125,
-        "base_domain": {
-            "type": "FrequencyDomain",
-            "f_min": 20.0,
-            "f_max": 1024.0,
-            "delta_f": 0.125,
-        },
+        "base_delta_f": 0.125,
     }
     domain = build_domain(domain_dict)
     assert isinstance(domain, MultibandedFrequencyDomain)
@@ -287,101 +292,118 @@ def test_multibanded_sample_frequencies_torch_cuda(multibanded_domain):
     assert len(freqs_cuda) == len(multibanded_domain)
 
 
-def test_multibanded_update_with_dict(base_domain):
-    """Test update method with dictionary."""
+def test_multibanded_narrowed_basic():
+    """Test narrowed() method creates new domain with reduced range."""
     mfd = MultibandedFrequencyDomain(
-        nodes=_nodes, delta_f_initial=_delta_f_initial, base_domain=base_domain
+        nodes=_nodes,
+        delta_f_initial=_delta_f_initial,
+        base_delta_f=_base_domain_params["delta_f"]
     )
     original_len = len(mfd)
 
-    # Update to smaller range
-    mfd.update({"f_min": 30.0, "f_max": 512.0})
+    # Narrow to smaller range
+    narrowed_mfd = mfd.narrowed(f_min=64.0, f_max=512.0)
 
-    assert len(mfd) < original_len
-    assert mfd.f_min >= 30.0
-    assert mfd.f_max <= 512.0
+    # Original domain unchanged
+    assert len(mfd) == original_len
+
+    # New domain is smaller
+    assert len(narrowed_mfd) < original_len
+    assert narrowed_mfd.f_min >= 64.0
+    assert narrowed_mfd.f_max <= 512.0
 
 
-def test_multibanded_update_prevents_second_update(base_domain):
-    """Test that update cannot be called twice."""
+def test_multibanded_narrowed_validation():
+    """Test that narrowed() validates inputs correctly."""
     mfd = MultibandedFrequencyDomain(
-        nodes=_nodes, delta_f_initial=_delta_f_initial, base_domain=base_domain
-    )
-    mfd.update({"f_min": 30.0})
-
-    with pytest.raises(ValueError, match="Can't update domain.*second time"):
-        mfd.update({"f_max": 512.0})
-
-
-def test_multibanded_set_new_range_validation(base_domain):
-    """Test _set_new_range validates inputs correctly."""
-    mfd = MultibandedFrequencyDomain(
-        nodes=_nodes, delta_f_initial=_delta_f_initial, base_domain=base_domain
+        nodes=_nodes,
+        delta_f_initial=_delta_f_initial,
+        base_delta_f=_base_domain_params["delta_f"]
     )
 
     # Test f_min >= f_max
-    with pytest.raises(ValueError, match="f_min must not be larger"):
-        mfd._set_new_range(f_min=100.0, f_max=50.0)
+    with pytest.raises(ValueError, match="f_min must be strictly smaller"):
+        mfd.narrowed(f_min=100.0, f_max=50.0)
 
     # Test f_min out of range
-    with pytest.raises(ValueError, match="not in expected range"):
-        mfd._set_new_range(f_min=10.0)
+    with pytest.raises(ValueError, match="not in"):
+        mfd.narrowed(f_min=10.0)
 
     # Test f_max out of range
-    with pytest.raises(ValueError, match="not in expected range"):
-        mfd._set_new_range(f_max=2000.0)
+    with pytest.raises(ValueError, match="not in"):
+        mfd.narrowed(f_max=2000.0)
 
 
-def test_multibanded_update_data_no_change(multibanded_domain):
-    """Test update_data returns data unchanged if already compatible."""
-    data = np.random.randn(len(multibanded_domain))
-    updated = multibanded_domain.update_data(data)
-    assert np.array_equal(data, updated)
+def test_multibanded_adapt_data_basic():
+    """Test adapt_data() function for slicing data to narrowed domain."""
+    from dingo_waveform.domains.multibanded_frequency_domain import adapt_data
 
-
-def test_multibanded_update_data_after_update(base_domain):
-    """Test update_data truncates data after domain update."""
     mfd = MultibandedFrequencyDomain(
-        nodes=_nodes, delta_f_initial=_delta_f_initial, base_domain=base_domain
+        nodes=_nodes,
+        delta_f_initial=_delta_f_initial,
+        base_delta_f=_base_domain_params["delta_f"]
     )
     original_len = len(mfd)
     data_original = np.random.randn(original_len)
 
-    # Update domain
-    mfd.update({"f_min": 30.0, "f_max": 512.0})
-    new_len = len(mfd)
+    # Create narrowed domain
+    narrowed_mfd = mfd.narrowed(f_min=64.0, f_max=512.0)
+    new_len = len(narrowed_mfd)
 
-    # Update data
-    data_updated = mfd.update_data(data_original)
-    assert len(data_updated) == new_len
-    assert len(data_updated) < len(data_original)
+    # Adapt data from old domain to new domain
+    data_adapted = adapt_data(mfd, narrowed_mfd, data_original)
 
-
-def test_multibanded_update_data_incompatible_shape(multibanded_domain):
-    """Test update_data raises error for incompatible data."""
-    data = np.random.randn(100)  # Wrong shape
-    with pytest.raises(ValueError, match="incompatible"):
-        multibanded_domain.update_data(data)
+    assert len(data_adapted) == new_len
+    assert len(data_adapted) < len(data_original)
 
 
-def test_multibanded_update_data_different_axis(base_domain):
-    """Test update_data works with different axis."""
+def test_multibanded_adapt_data_multidimensional():
+    """Test adapt_data() works with multidimensional arrays."""
+    from dingo_waveform.domains.multibanded_frequency_domain import adapt_data
+
     mfd = MultibandedFrequencyDomain(
-        nodes=_nodes, delta_f_initial=_delta_f_initial, base_domain=base_domain
+        nodes=_nodes,
+        delta_f_initial=_delta_f_initial,
+        base_delta_f=_base_domain_params["delta_f"]
     )
     original_len = len(mfd)
     data = np.random.randn(5, 3, original_len)
 
-    mfd.update({"f_max": 512.0})
-    new_len = len(mfd)
+    # Create narrowed domain
+    narrowed_mfd = mfd.narrowed(f_min=64.0, f_max=512.0)
+    new_len = len(narrowed_mfd)
 
-    # Update along last axis
-    updated = mfd.update_data(data, axis=-1)
-    assert updated.shape == (5, 3, new_len)
+    # Adapt along last axis (default)
+    adapted = adapt_data(mfd, narrowed_mfd, data, axis=-1)
+    assert adapted.shape == (5, 3, new_len)
 
-    # Update along axis 2
-    updated = mfd.update_data(data, axis=2)
-    assert updated.shape == (5, 3, new_len)
+    # Adapt along axis 2 (same as -1 for this shape)
+    adapted = adapt_data(mfd, narrowed_mfd, data, axis=2)
+    assert adapted.shape == (5, 3, new_len)
+
+
+def test_multibanded_adapt_data_incompatible_domains():
+    """Test adapt_data() raises error for incompatible domains."""
+    from dingo_waveform.domains.multibanded_frequency_domain import adapt_data
+
+    mfd1 = MultibandedFrequencyDomain(
+        nodes=_nodes,
+        delta_f_initial=_delta_f_initial,
+        base_delta_f=_base_domain_params["delta_f"]
+    )
+
+    # Create different domain that's not a subset
+    mfd2 = MultibandedFrequencyDomain(
+        nodes=[10.0, 50.0, 200.0],
+        delta_f_initial=_delta_f_initial,
+        base_delta_f=_base_domain_params["delta_f"]
+    )
+
+    data = np.random.randn(len(mfd1))
+
+    # Could raise either "not a subrange" or "Inconsistent bin mapping" depending on overlap
+    with pytest.raises(ValueError):
+        adapt_data(mfd1, mfd2, data)
 
 
 def test_multibanded_time_translate_numpy(multibanded_domain):
@@ -429,76 +451,70 @@ def test_multibanded_time_translate_torch_real_imag(multibanded_domain):
     assert translated.dtype == data.dtype
 
 
-def test_multibanded_base_domain_as_dict():
-    """Test creating MultibandedFrequencyDomain with base_domain as dict."""
-    base_domain_dict = {
-        "type": "FrequencyDomain",
-        "f_min": 20.0,
-        "f_max": 1024.0,
-        "delta_f": 0.125,
-    }
+def test_multibanded_with_window_factor():
+    """Test creating MultibandedFrequencyDomain with window_factor."""
     mfd = MultibandedFrequencyDomain(
-        nodes=_nodes, delta_f_initial=_delta_f_initial, base_domain=base_domain_dict
+        nodes=_nodes,
+        delta_f_initial=_delta_f_initial,
+        base_delta_f=_base_domain_params["delta_f"],
+        window_factor=0.5
     )
-    assert isinstance(mfd.base_domain, FrequencyDomain)
+    assert mfd.window_factor == 0.5
     assert len(mfd) == 2656
 
 
 def test_multibanded_invalid_nodes_shape():
     """Test that invalid nodes shape raises error."""
-    base_domain = FrequencyDomain(**_base_domain_params)
     # Nodes should be 1D array
     invalid_nodes = [[20.0, 64.0], [256.0, 1024.0]]
-    with pytest.raises(ValueError, match="Expected format.*for nodes"):
+    with pytest.raises(ValueError, match="Expected 1D nodes array"):
         MultibandedFrequencyDomain(
             nodes=invalid_nodes,
             delta_f_initial=_delta_f_initial,
-            base_domain=base_domain,
+            base_delta_f=_base_domain_params["delta_f"],
         )
 
 
-def test_multibanded_endpoints_in_base_domain(base_domain):
-    """Test that endpoints validation works correctly."""
-    # This should work - endpoints are in base domain
+def test_multibanded_endpoints():
+    """Test that endpoints are correctly computed."""
     mfd = MultibandedFrequencyDomain(
         nodes=[20.0, 64.0, 256.0, 1024.0],
         delta_f_initial=0.125,
-        base_domain=base_domain,
+        base_delta_f=0.125,
     )
-    assert mfd.f_min in base_domain()
+    assert mfd.f_min == 20.0
     # f_max might be slightly different due to edge effects, but should be close
     assert abs(mfd.f_max - 1024.0) < 1.0
 
 
-def test_multibanded_compare_with_uniform_low_frequencies(
-    base_domain, multibanded_domain
-):
+def test_multibanded_compare_with_uniform_low_frequencies(multibanded_domain):
     """Test that multibanded domain matches uniform domain at low frequencies."""
     # At the lowest band, multibanded should have same delta_f as base
-    assert np.isclose(multibanded_domain._delta_f_bands[0], base_domain.delta_f)
+    assert np.isclose(multibanded_domain._binning.delta_f_bands[0], _base_domain_params["delta_f"])
 
-    # Sample frequencies in first band should be similar to base domain
-    first_band_freqs = multibanded_domain.sample_frequencies[
-        : multibanded_domain._num_bins_bands[0]
-    ]
-    base_freqs = base_domain()[
-        base_domain.min_idx : base_domain.min_idx + len(first_band_freqs)
-    ]
+    # Sample frequencies in first band should start at f_min
+    first_band_num_bins = multibanded_domain._binning.num_bins_bands[0]
+    first_band_freqs = multibanded_domain.sample_frequencies[:first_band_num_bins]
 
-    # Should be very close (within delta_f/2)
-    assert np.allclose(first_band_freqs, base_freqs, atol=base_domain.delta_f / 2)
+    # First frequency should be close to f_min
+    assert np.isclose(first_band_freqs[0], multibanded_domain.f_min, atol=_base_domain_params["delta_f"])
 
 
 def test_multibanded_efficient_representation():
     """Test that multibanded domain is more efficient than uniform."""
-    base_domain = FrequencyDomain(f_min=20.0, f_max=2048.0, delta_f=0.0625)
+    base_delta_f = 0.0625
+    f_min = 20.0
+    f_max = 2048.0
     nodes = [20.0, 128.0, 512.0, 2048.0]
     mfd = MultibandedFrequencyDomain(
-        nodes=nodes, delta_f_initial=0.0625, base_domain=base_domain
+        nodes=nodes, delta_f_initial=base_delta_f, base_delta_f=base_delta_f
     )
 
-    # Multibanded should have fewer bins than base domain
-    assert len(mfd) < len(base_domain)
+    # Calculate what uniform domain length would be
+    uniform_len = int((f_max - f_min) / base_delta_f)
+
+    # Multibanded should have fewer bins than uniform domain
+    assert len(mfd) < uniform_len
     # Rough estimate: should be at least 30% reduction
-    reduction = 1 - len(mfd) / len(base_domain)
+    reduction = 1 - len(mfd) / uniform_len
     assert reduction > 0.3

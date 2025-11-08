@@ -119,9 +119,21 @@ class _InspiralFDParameters(TableStr):
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
             waveform_parameters, f_ref
         )
+        # Ensure domain parameters passed to LAL are scalar-typed where required.
+        # In multibanded domains, delta_f may be None; prefer delta_f_initial or base_delta_f
+        dp_dict = asdict(domain_params)
+        df = dp_dict.get("delta_f")
+        if df is None:
+            df = dp_dict.get("delta_f_initial")
+        if df is None:
+            df = dp_dict.get("base_delta_f")
+        # Construct a sanitized DomainParameters copy
+        sanitized = DomainParameters(**dp_dict)
+        sanitized.delta_f = df
+
         return cls.from_binary_black_hole_parameters(
             bbh_parameters,
-            domain_params,
+            sanitized,
             spin_conversion_phase,
             lal_params,
             approximant,
@@ -220,16 +232,50 @@ class _InspiralFDParameters(TableStr):
         h_cross = np.zeros_like(frequency_array, dtype=complex)
 
         # Ensure that length of wf agrees with length of domain. Enforce by truncating frequencies beyond f_max
-        if len(hp.data.data) > len(frequency_array):
-            _logger.warning(
-                "LALsimulation waveform longer than domain's `frequency_array`"
-                f"({len(hp.data.data)} vs {len(frequency_array)}). Truncating lalsim array."
-            )
-            h_plus = hp.data.data[: len(h_plus)]
-            h_cross = hc.data.data[: len(h_cross)]
+        # Map LAL uniform frequency grid to the requested frequency_array (supports multibanded domains)
+        lal_delta_f = hp.deltaF
+        # Some LAL series may have a starting frequency offset; try to obtain it, default 0.0
+        try:
+            f0 = hp.f0
+        except AttributeError:
+            f0 = 0.0
+        # Prefer exact bin-aligned copy when frequency_array is uniform and matches LAL deltaF
+        diffs = np.diff(frequency_array)
+        is_uniform = np.allclose(diffs, diffs[0])
+        if is_uniform and np.isclose(diffs[0], lal_delta_f, rtol=0, atol=1e-12):
+            start_idx = int(np.rint((float(frequency_array[0]) - float(f0)) / float(lal_delta_f)))
+            end_idx = start_idx + len(frequency_array)
+            if start_idx < 0 or end_idx > len(hp.data.data):
+                # fallback to safe clipping
+                start_idx = max(start_idx, 0)
+                end_idx = min(end_idx, len(hp.data.data))
+            # Fill overlapping region
+            n_copy = end_idx - start_idx
+            if n_copy > 0:
+                h_plus[:n_copy] = hp.data.data[start_idx:end_idx]
+                h_cross[:n_copy] = hc.data.data[start_idx:end_idx]
+            # Remaining entries (if any) stay zero
         else:
-            h_plus[: len(hp.data.data)] = hp.data.data
-            h_cross[: len(hc.data.data)] = hc.data.data
+            # Interpolate LAL uniform frequency grid to the requested frequency_array (supports multibanded domains)
+            N = len(hp.data.data)
+            lal_freqs = f0 + np.arange(N, dtype=frequency_array.dtype) * lal_delta_f
+            # Determine valid interpolation range
+            fmin = lal_freqs[0]
+            fmax = lal_freqs[-1]
+            valid = (frequency_array >= fmin) & (frequency_array <= fmax)
+            if not np.all(valid):
+                n_out = int(np.count_nonzero(~valid))
+                _logger.warning(
+                    f"{n_out} frequencies are outside the LAL waveform range and will be left as zeros."
+                )
+            # Use linear interpolation on real and imaginary parts separately
+            if np.any(valid):
+                hp_real = np.interp(frequency_array[valid].astype(float), lal_freqs.astype(float), hp.data.data.real.astype(float))
+                hp_imag = np.interp(frequency_array[valid].astype(float), lal_freqs.astype(float), hp.data.data.imag.astype(float))
+                hc_real = np.interp(frequency_array[valid].astype(float), lal_freqs.astype(float), hc.data.data.real.astype(float))
+                hc_imag = np.interp(frequency_array[valid].astype(float), lal_freqs.astype(float), hc.data.data.imag.astype(float))
+                h_plus[valid] = hp_real + 1j * hp_imag
+                h_cross[valid] = hc_real + 1j * hc_imag
 
         _logger.debug("undoing the time shift done in SimInspiralFD to the waveform")
 
@@ -262,7 +308,7 @@ def inspiral_FD(
     Raises
     ------
     ValueError
-      if the domain is not an instance of FrequencyDomain
+      if the domain is not an instance of UniformFrequencyDomain
     WaveformGenerationError
       if an numerical instability that could not be solved by
       turning off the multibanding is detected
@@ -284,6 +330,28 @@ def inspiral_FD(
         waveform_gen_params.f_start,
     )
 
-    frequency_array = waveform_gen_params.domain.sample_frequencies()
+    # Support both method and property access for sample frequencies across domains
+    domain = waveform_gen_params.domain
+
+    # For multibanded domains, generate on the base uniform grid
+    # The domain's waveform_transform() method will handle decimation
+    if isinstance(domain, MultibandedFrequencyDomain):
+        # Create a base uniform domain for waveform generation
+        # Start from f_min=0 to capture all frequencies the waveform generator will produce
+        from dingo_waveform.domains import UniformFrequencyDomain
+        base = UniformFrequencyDomain(
+            f_min=0.0,
+            f_max=domain.f_max,
+            delta_f=domain.base_delta_f,
+            window_factor=domain.window_factor,
+        )
+        # Handle both method and property for uniform domain
+        base_sf_attr = getattr(base, "sample_frequencies", None)
+        base_freqs = base_sf_attr() if callable(base_sf_attr) else base_sf_attr
+        return inspiral_fd_params.apply(base_freqs.astype(np.float32))
+
+    # Otherwise, use the domain's own frequency sampling
+    sample_freqs_attr = getattr(domain, "sample_frequencies", None)
+    frequency_array = sample_freqs_attr() if callable(sample_freqs_attr) else sample_freqs_attr
 
     return inspiral_fd_params.apply(frequency_array)

@@ -10,6 +10,7 @@ import torch
 from multipledispatch import dispatch
 
 from ..imports import import_entity
+from ..polarizations import Polarization
 
 _module_import_path = "dingo_waveform.domains"
 
@@ -37,7 +38,7 @@ class DomainParameters:
     # MultibandedFrequencyDomain specific parameters
     nodes: Optional[list] = None
     delta_f_initial: Optional[float] = None
-    base_domain: Optional[Union[Dict, "DomainParameters"]] = None
+    base_delta_f: Optional[float] = None
 
     @classmethod
     def from_file(cls, file_path: Union[str, Path]) -> "DomainParameters":
@@ -76,6 +77,9 @@ class DomainParameters:
 
 class Domain(ABC):
     """Base class representing a physical domain for data processing."""
+
+    def waveform_transform(self, polarizations: Polarization)->Polarization:
+        return polarizations
 
     @abstractmethod
     def get_parameters(self) -> DomainParameters:
@@ -136,15 +140,6 @@ class Domain(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, *args) -> None:
-        """
-        Update domain parameters.
-        """
-        raise NotImplementedError(
-            "Subclasses of Domain must implement the update method"
-        )
-
-    @abstractmethod
     def time_translate_data(
         self, data: Union[np.ndarray, torch.Tensor], dt: Union[float, torch.Tensor]
     ) -> Union[np.ndarray, torch.Tensor]:
@@ -182,9 +177,7 @@ class Domain(ABC):
     @property
     @abstractmethod
     def sampling_rate(self) -> float:
-        """
-        Sampling rate of the data.
-        """
+        """Sampling rate of the data."""
         raise NotImplementedError
 
     @property
@@ -211,6 +204,8 @@ class Domain(ABC):
         """Maximum index of the domain."""
         raise NotImplementedError
 
+
+    
 
 @dispatch(DomainParameters)
 def build_domain(domain_parameters: DomainParameters) -> Domain:

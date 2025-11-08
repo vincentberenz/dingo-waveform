@@ -37,7 +37,7 @@ dependencies = [
 ]
 
 [project.scripts]
-dingo-waveform-compare = "dingo_waveform.compare:main"
+dingo-verify = "dingo_waveform.cli:main"
 
 [project.optional-dependencies]
 dev = [

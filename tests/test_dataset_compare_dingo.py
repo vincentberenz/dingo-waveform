@@ -30,7 +30,7 @@ pytestmark = pytest.mark.skipif(
 def basic_domain_config():
     """Basic frequency domain configuration."""
     return {
-        "type": "FrequencyDomain",
+        "type": "UniformFrequencyDomain",
         "f_min": 20.0,
         "f_max": 512.0,
         "delta_f": 0.125,
@@ -215,7 +215,7 @@ class TestCompareWithDingo:
     ):
         """Test with higher frequency range."""
         domain_config = {
-            "type": "FrequencyDomain",
+            "type": "UniformFrequencyDomain",
             "f_min": 15.0,
             "f_max": 1024.0,
             "delta_f": 0.25,

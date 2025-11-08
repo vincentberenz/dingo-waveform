@@ -79,8 +79,25 @@ class _InspiralChooseFDModesParameters(TableStr):
             parameters[k] = getattr(bbh_parameters, k)
         # adding domain related params
         domain_dict = asdict(domain_params)
-        for k in ("delta_f", "f_min", "f_max"):
-            parameters[k] = domain_dict[k]
+        # Populate frequency grid parameters with robust fallbacks for multibanded domains
+        # delta_f: prefer explicit delta_f; fallback to delta_f_initial; then base_delta_f
+        df = domain_dict.get("delta_f")
+        if df is None:
+            df = domain_dict.get("delta_f_initial")
+        if df is None:
+            df = domain_dict.get("base_delta_f")
+        parameters["delta_f"] = df
+        # f_min and f_max should be present; if not, derive from nodes for MultibandedFrequencyDomain
+        fmin = domain_dict.get("f_min")
+        fmax = domain_dict.get("f_max")
+        if domain_dict.get("nodes") is not None:
+            nodes = domain_dict.get("nodes")
+            if fmin is None:
+                fmin = nodes[0]
+            if fmax is None:
+                fmax = nodes[-1]
+        parameters["f_min"] = fmin
+        parameters["f_max"] = fmax
         if f_start is not None:
             parameters["f_min"] = f_start
         # other params

@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from numbers import Number
 from typing import Any, List, Optional, Union
 
@@ -99,6 +99,22 @@ class GwSignalParameters(TableStr):
 
         spins: Spins = bbh_params.get_spins(spin_conversion_phase)
 
+        # Robustly derive domain-related scalars even when using multibanded domains
+        dp_dict = asdict(domain_params)
+        fmax = dp_dict.get("f_max")
+        # For MultibandedFrequencyDomain, f_max comes from the last node
+        if fmax is None and dp_dict.get("nodes") is not None:
+            fmax = dp_dict.get("nodes")[-1]
+        delf = dp_dict.get("delta_f")
+        if delf is None:
+            delf = dp_dict.get("delta_f_initial")
+        if delf is None:
+            delf = dp_dict.get("base_delta_f")
+        delt = dp_dict.get("delta_t")
+        if delt is None and fmax is not None:
+            # Follow convention used elsewhere: delta_t = 0.5 / f_max
+            delt = 0.5 / fmax
+
         params = {
             "mass1": bbh_params.mass_1 * astropy.units.solMass,
             "mass2": bbh_params.mass_2 * astropy.units.solMass,
@@ -108,11 +124,11 @@ class GwSignalParameters(TableStr):
             "spin2x": spins.s2x * astropy.units.dimensionless_unscaled,
             "spin2y": spins.s2y * astropy.units.dimensionless_unscaled,
             "spin2z": spins.s2z * astropy.units.dimensionless_unscaled,
-            "deltaT": domain_params.delta_t * astropy.units.s,
+            "deltaT": delt * astropy.units.s if delt is not None else None,
             "f22_start": f_min * astropy.units.Hz,
             "f22_ref": bbh_params.f_ref * astropy.units.Hz,
-            "f_max": domain_params.f_max * astropy.units.Hz,
-            "deltaF": domain_params.delta_f * astropy.units.Hz,
+            "f_max": fmax * astropy.units.Hz if fmax is not None else None,
+            "deltaF": delf * astropy.units.Hz if delf is not None else None,
             "phi_ref": bbh_params.phase * astropy.units.rad,
             "distance": bbh_params.luminosity_distance * astropy.units.Mpc,
             "inclination": spins.iota * astropy.units.rad,

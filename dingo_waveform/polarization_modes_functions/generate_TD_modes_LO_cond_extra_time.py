@@ -219,7 +219,7 @@ def generate_TD_modes_LO_cond_extra_time(
     ------
     ValueError
       - if the specified approximant is neither SEOBNRv5PHM nor SEOBNRv5HM
-      - if the domain is not of the class FrequencyDomain
+      - if the domain is not of the class UniformFrequencyDomain
       - if the phase parameter is not specified
     """
 

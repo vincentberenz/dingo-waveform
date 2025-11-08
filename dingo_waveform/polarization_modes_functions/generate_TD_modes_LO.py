@@ -114,7 +114,7 @@ def generate_TD_modes_LO(
     Raises
     ------
     ValueError
-      - if the domain is not of the class FrequencyDomain
+      - if the domain is not of the class UniformFrequencyDomain
       - if the phase parameter is not specified
     """
 
