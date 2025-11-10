@@ -19,6 +19,12 @@ FrequencySeries: TypeAlias = NDArray[Shape["*"], Complex128]
 Waveform frequency series, i.e. a one dimentional numpy array of complex type.
 """
 
+BatchFrequencySeries: TypeAlias = NDArray[Shape["*, *"], Complex128]
+"""
+Batched waveform frequency series, i.e. a two dimensional numpy array of complex type
+with shape (num_waveforms, frequency_bins).
+"""
+
 Mode = NewType("Mode", int)
 """
 Gravitational wave mode

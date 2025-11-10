@@ -2,16 +2,19 @@
 
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
+from ..compression.svd import SVDBasis
 from ..domains import Domain, build_domain
+from ..polarizations import BatchPolarizations
 from ..prior import build_prior_with_defaults
+from ..transforms import ApplySVD, ComposeTransforms, Transform, WhitenAndUnwhiten
 from ..waveform_generator import WaveformGenerator, build_waveform_generator
 from ..waveform_parameters import WaveformParameters
-from .polarizations import Polarizations
+from .compression_settings import CompressionSettings
 from .dataset_settings import DatasetSettings
 from .waveform_dataset import WaveformDataset
 
@@ -65,7 +68,7 @@ def _generate_single_waveform(
 def generate_waveforms_sequential(
     waveform_generator: WaveformGenerator,
     parameters: pd.DataFrame,
-) -> Polarizations:
+) -> BatchPolarizations:
     """
     Generate waveforms sequentially (single process).
 
@@ -78,7 +81,7 @@ def generate_waveforms_sequential(
 
     Returns
     -------
-    Polarizations with h_plus and h_cross arrays of shape (num_samples, frequency_bins).
+    BatchPolarizations with h_plus and h_cross arrays of shape (num_samples, frequency_bins).
     """
     h_plus_list = []
     h_cross_list = []
@@ -98,17 +101,25 @@ def generate_waveforms_sequential(
             h_plus_list.append(np.full(domain_length, np.nan, dtype=complex))
             h_cross_list.append(np.full(domain_length, np.nan, dtype=complex))
 
-    return Polarizations(
+    polarizations = BatchPolarizations(
         h_plus=np.array(h_plus_list),
         h_cross=np.array(h_cross_list),
     )
+
+    # Apply batch transforms if configured
+    if waveform_generator.transform is not None:
+        polarizations = apply_transforms_to_polarizations(
+            polarizations, waveform_generator.transform
+        )
+
+    return polarizations
 
 
 def generate_waveforms_parallel(
     waveform_generator: WaveformGenerator,
     parameters: pd.DataFrame,
     num_processes: int = 4,
-) -> Polarizations:
+) -> BatchPolarizations:
     """
     Generate waveforms in parallel using ProcessPoolExecutor.
 
@@ -123,7 +134,7 @@ def generate_waveforms_parallel(
 
     Returns
     -------
-    Polarizations with h_plus and h_cross arrays of shape (num_samples, frequency_bins).
+    BatchPolarizations with h_plus and h_cross arrays of shape (num_samples, frequency_bins).
     """
     if num_processes == 1:
         return generate_waveforms_sequential(waveform_generator, parameters)
@@ -171,10 +182,18 @@ def generate_waveforms_parallel(
         h_plus_list.append(results[idx]["h_plus"])
         h_cross_list.append(results[idx]["h_cross"])
 
-    return Polarizations(
+    polarizations = BatchPolarizations(
         h_plus=np.array(h_plus_list),
         h_cross=np.array(h_cross_list),
     )
+
+    # Apply batch transforms if configured
+    if waveform_generator.transform is not None:
+        polarizations = apply_transforms_to_polarizations(
+            polarizations, waveform_generator.transform
+        )
+
+    return polarizations
 
 
 def generate_parameters_and_polarizations(
@@ -182,7 +201,7 @@ def generate_parameters_and_polarizations(
     prior: Dict,
     num_samples: int,
     num_processes: int = 1,
-) -> Tuple[pd.DataFrame, Polarizations]:
+) -> Tuple[pd.DataFrame, BatchPolarizations]:
     """
     Generate dataset of waveforms based on parameters drawn from prior.
 
@@ -199,7 +218,7 @@ def generate_parameters_and_polarizations(
 
     Returns
     -------
-    Tuple of (parameters DataFrame, Polarizations dataclass).
+    Tuple of (parameters DataFrame, BatchPolarizations dataclass).
     If some waveforms fail, only successful ones are returned.
     """
     _logger.info(f"Generating dataset of size {num_samples}")
@@ -220,7 +239,7 @@ def generate_parameters_and_polarizations(
     if wf_failed.any():
         idx_failed = np.where(wf_failed)[0]
         idx_ok = np.where(~wf_failed)[0]
-        polarizations_ok = Polarizations(
+        polarizations_ok = BatchPolarizations(
             h_plus=polarizations.h_plus[idx_ok],
             h_cross=polarizations.h_cross[idx_ok],
         )
@@ -238,11 +257,190 @@ def generate_parameters_and_polarizations(
     return parameters, polarizations
 
 
+def train_svd_basis(
+    polarizations: BatchPolarizations,
+    parameters: pd.DataFrame,
+    size: int,
+    n_train: int,
+) -> Tuple[SVDBasis, int, int]:
+    """
+    Train and validate an SVD basis from waveform data.
+
+    Parameters
+    ----------
+    polarizations
+        Waveform polarizations to use for training and validation
+    parameters
+        Parameters corresponding to the waveforms
+    size
+        Number of SVD components to keep
+    n_train
+        Number of waveforms to use for training (rest used for validation)
+
+    Returns
+    -------
+    Tuple of (trained SVDBasis, actual_n_train, actual_n_validation)
+    """
+    # Split into train and validation
+    n_total = len(polarizations)
+    n_train = min(n_train, n_total)
+    n_validation = n_total - n_train
+
+    _logger.info(f"Training SVD basis: {n_train} train, {n_validation} validation samples")
+
+    # Prepare training data (concatenate h_plus and h_cross)
+    train_data = np.concatenate(
+        [polarizations.h_plus[:n_train], polarizations.h_cross[:n_train]],
+        axis=0
+    )
+
+    # Train SVD basis
+    basis = SVDBasis()
+    basis.generate_basis(train_data, n_components=size, method="scipy")
+
+    # Validate if we have validation samples
+    if n_validation > 0:
+        _logger.info("Computing validation mismatches...")
+        val_data = np.concatenate(
+            [polarizations.h_plus[n_train:], polarizations.h_cross[n_train:]],
+            axis=0
+        )
+        val_params = pd.concat([parameters[n_train:], parameters[n_train:]], ignore_index=True)
+        mismatches = basis.compute_mismatches(val_data, val_params)
+
+    return basis, n_train, n_validation
+
+
+def apply_transforms_to_polarizations(
+    polarizations: BatchPolarizations,
+    transforms: Optional[ComposeTransforms],
+) -> BatchPolarizations:
+    """
+    Apply transform pipeline to polarizations.
+
+    Parameters
+    ----------
+    polarizations
+        Polarizations to transform
+    transforms
+        Transform pipeline to apply, or None for no transforms
+
+    Returns
+    -------
+    Transformed polarizations
+    """
+    if transforms is None:
+        return polarizations
+
+    # Convert to dict format for transforms
+    pol_dict = {
+        "h_plus": polarizations.h_plus,
+        "h_cross": polarizations.h_cross,
+    }
+
+    # Apply transforms
+    transformed = transforms(pol_dict)
+
+    # Convert back to BatchPolarizations
+    return BatchPolarizations(
+        h_plus=transformed["h_plus"],
+        h_cross=transformed["h_cross"],
+    )
+
+
+def build_compression_transforms(
+    compression_settings: CompressionSettings,
+    domain: Domain,
+    prior: Dict,
+    waveform_generator: WaveformGenerator,
+    num_processes: int,
+) -> Tuple[Optional[ComposeTransforms], Optional[SVDBasis]]:
+    """
+    Build compression transform pipeline from settings.
+
+    Parameters
+    ----------
+    compression_settings
+        Compression configuration
+    domain
+        Frequency domain
+    prior
+        Prior for sampling training waveforms
+    waveform_generator
+        Waveform generator (will have transforms applied)
+    num_processes
+        Number of processes for parallel generation
+
+    Returns
+    -------
+    Tuple of (transform_pipeline, svd_basis)
+        transform_pipeline is None if no compression
+        svd_basis is None if SVD not used
+    """
+    transforms: List[Transform] = []
+    svd_basis: Optional[SVDBasis] = None
+
+    # Whitening transform
+    if compression_settings.whitening is not None:
+        _logger.info(f"Adding whitening transform with ASD from {compression_settings.whitening}")
+        transforms.append(
+            WhitenAndUnwhiten(domain, compression_settings.whitening, inverse=False)
+        )
+
+    # SVD compression
+    if compression_settings.svd is not None:
+        svd_settings = compression_settings.svd
+
+        # Load pre-trained SVD basis if file provided
+        if svd_settings.file is not None:
+            _logger.info(f"Loading SVD basis from {svd_settings.file}")
+            svd_basis = SVDBasis.load(svd_settings.file)
+
+        # Otherwise, generate SVD basis from training waveforms
+        else:
+            _logger.info("Generating SVD basis from training waveforms...")
+
+            # Apply whitening to training waveforms if needed
+            if transforms:
+                waveform_generator.transform = ComposeTransforms(transforms)
+
+            # Generate training waveforms
+            n_total = svd_settings.num_training_samples + svd_settings.num_validation_samples
+            train_parameters, train_polarizations = generate_parameters_and_polarizations(
+                waveform_generator, prior, n_total, num_processes
+            )
+
+            # Train SVD basis
+            svd_basis, n_train, n_val = train_svd_basis(
+                train_polarizations,
+                train_parameters,
+                svd_settings.size,
+                svd_settings.num_training_samples,
+            )
+
+            # Reset transform on generator
+            waveform_generator.transform = None
+
+        # Add SVD compression transform
+        transforms.append(ApplySVD(svd_basis, inverse=False))
+        _logger.info(f"Added SVD compression with {svd_basis.n_components} components")
+
+    # Return composed transforms if any
+    if transforms:
+        return ComposeTransforms(transforms), svd_basis
+    else:
+        return None, None
+
+
 def generate_waveform_dataset(
     settings: DatasetSettings, num_processes: int = 1
 ) -> WaveformDataset:
     """
     Generate a waveform dataset based on settings.
+
+    Supports optional compression via whitening and/or SVD. If compression
+    settings are provided, the waveforms will be compressed before being
+    stored in the dataset.
 
     Parameters
     ----------
@@ -253,7 +451,7 @@ def generate_waveform_dataset(
 
     Returns
     -------
-    WaveformDataset containing parameters and polarizations.
+    WaveformDataset containing parameters and polarizations (compressed if requested).
     """
     # Validate settings
     settings.validate()
@@ -262,11 +460,28 @@ def generate_waveform_dataset(
     _logger.info("Building domain, prior, and waveform generator...")
     domain = build_domain(settings.domain)
     prior = build_prior_with_defaults(settings.intrinsic_prior)
-    # Convert WaveformGeneratorSettings to dict for build_waveform_generator
     wfg_dict = settings.waveform_generator.to_dict()
     waveform_generator = build_waveform_generator(wfg_dict, domain)
 
-    # Generate waveforms
+    # Build compression transforms if requested
+    compression_transforms = None
+    svd_basis = None
+    if settings.compression is not None:
+        _logger.info("Building compression pipeline...")
+        compression_transforms, svd_basis = build_compression_transforms(
+            settings.compression,
+            domain,
+            prior,
+            waveform_generator,
+            num_processes,
+        )
+
+        # Apply compression transforms to waveform generator
+        if compression_transforms is not None:
+            waveform_generator.transform = compression_transforms
+            _logger.info(f"Compression pipeline: {compression_transforms}")
+
+    # Generate waveforms (will be compressed if transforms are set)
     parameters, polarizations = generate_parameters_and_polarizations(
         waveform_generator, prior, settings.num_samples, num_processes
     )
@@ -276,7 +491,11 @@ def generate_waveform_dataset(
         parameters=parameters,
         polarizations=polarizations,
         settings=settings,
+        svd_basis=svd_basis,
     )
 
     _logger.info(f"Dataset generated successfully with {len(parameters)} samples.")
+    if svd_basis is not None:
+        _logger.info(f"Dataset includes SVD compression with {svd_basis.n_components} components")
+
     return dataset

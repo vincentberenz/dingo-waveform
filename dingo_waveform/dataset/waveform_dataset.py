@@ -9,7 +9,8 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from .polarizations import Polarizations
+from ..compression.svd import SVDBasis
+from ..polarizations import BatchPolarizations
 from .dataset_settings import DatasetSettings
 
 _logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ class WaveformDataset:
     ----------
     parameters : pd.DataFrame
         DataFrame containing waveform parameters (one row per waveform).
-    polarizations : Polarizations
+    polarizations : BatchPolarizations
         Dataclass containing 'h_plus' and 'h_cross' arrays of shape (num_samples, frequency_bins).
     settings : Optional[DatasetSettings]
         Settings used to generate the dataset.
@@ -32,8 +33,9 @@ class WaveformDataset:
     def __init__(
         self,
         parameters: pd.DataFrame,
-        polarizations: Union[Polarizations, Dict[str, np.ndarray]],
+        polarizations: Union[BatchPolarizations, Dict[str, np.ndarray]],
         settings: Optional[Union[DatasetSettings, Dict]] = None,
+        svd_basis: Optional[SVDBasis] = None,
     ):
         """
         Initialize a WaveformDataset.
@@ -43,17 +45,19 @@ class WaveformDataset:
         parameters
             DataFrame of waveform parameters.
         polarizations
-            Polarizations dataclass or dictionary with 'h_plus' and 'h_cross' arrays.
+            BatchPolarizations dataclass or dictionary with 'h_plus' and 'h_cross' arrays.
             Dictionary support maintained for backward compatibility.
         settings
             Optional DatasetSettings or dictionary of generation settings.
             Dictionary support maintained for backward compatibility.
+        svd_basis
+            Optional SVD basis if dataset was compressed.
         """
         self.parameters = parameters
 
-        # Convert dict to Polarizations if needed (backward compatibility)
+        # Convert dict to BatchPolarizations if needed (backward compatibility)
         if isinstance(polarizations, dict):
-            self.polarizations = Polarizations(
+            self.polarizations = BatchPolarizations(
                 h_plus=polarizations["h_plus"],
                 h_cross=polarizations["h_cross"],
             )
@@ -69,6 +73,9 @@ class WaveformDataset:
             _logger.debug("Received settings as dict; consider using DatasetSettings dataclass")
         else:
             self.settings = settings
+
+        # Store SVD basis if provided
+        self.svd_basis = svd_basis
 
         # Validate consistency
         self._validate()
@@ -136,6 +143,19 @@ class WaveformDataset:
                     settings_dict = self.settings
                 self._save_dict_to_group(settings_group, settings_dict)
 
+            # Save SVD basis if present
+            if self.svd_basis is not None:
+                _logger.info("Saving SVD basis...")
+                svd_group = f.create_group("svd")
+                svd_dict = self.svd_basis.to_dict()
+                for key, value in svd_dict.items():
+                    if value is not None:
+                        # Only apply compression to arrays, not scalars
+                        if isinstance(value, np.ndarray) and value.size > 1:
+                            svd_group.create_dataset(key, data=value, compression="gzip")
+                        else:
+                            svd_group.create_dataset(key, data=value)
+
         _logger.info(f"Dataset saved successfully ({len(self)} waveforms)")
 
     @classmethod
@@ -158,7 +178,7 @@ class WaveformDataset:
 
         with h5py.File(file_path, "r") as f:
             # Load polarizations
-            polarizations = Polarizations(
+            polarizations = BatchPolarizations(
                 h_plus=f["h_plus"][:],
                 h_cross=f["h_cross"][:],
             )
@@ -171,8 +191,18 @@ class WaveformDataset:
             # Load settings (keep as dict for now, could be converted to DatasetSettings later)
             settings = cls._load_dict_from_group(f["settings"]) if "settings" in f else None
 
+            # Load SVD basis if present
+            svd_basis = None
+            if "svd" in f:
+                _logger.info("Loading SVD basis...")
+                svd_dict = {}
+                for key in f["svd"].keys():
+                    # Use [()] to read both scalars and arrays
+                    svd_dict[key] = f["svd"][key][()]
+                svd_basis = SVDBasis.from_dict(svd_dict)
+
         _logger.info(f"Dataset loaded successfully ({len(parameters)} waveforms)")
-        return cls(parameters, polarizations, settings)
+        return cls(parameters, polarizations, settings, svd_basis)
 
     @staticmethod
     def _save_dict_to_group(group: h5py.Group, data: Dict) -> None:

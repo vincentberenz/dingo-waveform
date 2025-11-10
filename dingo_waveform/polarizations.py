@@ -1,18 +1,34 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, fields
-from typing import Dict, List
+from typing import Dict, List, Protocol, Union, runtime_checkable
 
 import lal
 import numpy as np
 from rich.console import Console
 from rich.table import Table
 
-from dingo_waveform.types import FrequencySeries, Iota, Mode, Modes
+from dingo_waveform.types import BatchFrequencySeries, FrequencySeries, Iota, Mode, Modes
+
+
+@runtime_checkable
+class PolarizationProtocol(Protocol):
+    """
+    Protocol defining the interface for polarization data structures.
+
+    Both Polarization (single waveform) and BatchPolarizations (multiple waveforms)
+    implement this protocol, allowing functions to accept either type.
+    """
+    h_plus: Union[FrequencySeries, BatchFrequencySeries]
+    h_cross: Union[FrequencySeries, BatchFrequencySeries]
 
 
 @dataclass
 class Polarization:
     """
-    A dataclass representing the polarizations of gravitational waves.
+    A dataclass representing the polarizations of a single gravitational wave.
+
+    This class is used for single waveform generation and manipulation.
 
     Parameters
     ----------
@@ -24,6 +40,69 @@ class Polarization:
 
     h_plus: FrequencySeries
     h_cross: FrequencySeries
+
+
+@dataclass
+class BatchPolarizations:
+    """
+    A dataclass representing batched polarizations of gravitational waves.
+
+    This is used for storing multiple waveforms as numpy arrays, primarily
+    in dataset generation and batch processing contexts.
+
+    Attributes
+    ----------
+    h_plus
+        Array of plus polarization components with shape (num_waveforms, frequency_bins).
+    h_cross
+        Array of cross polarization components with shape (num_waveforms, frequency_bins).
+    """
+
+    h_plus: BatchFrequencySeries
+    h_cross: BatchFrequencySeries
+
+    def __post_init__(self):
+        """Validate that h_plus and h_cross have the same shape."""
+        if self.h_plus.shape != self.h_cross.shape:
+            raise ValueError(
+                f"h_plus and h_cross must have the same shape. "
+                f"Got h_plus: {self.h_plus.shape}, h_cross: {self.h_cross.shape}"
+            )
+
+    def __len__(self) -> int:
+        """Return the number of waveforms (first dimension of arrays)."""
+        return self.h_plus.shape[0]
+
+    @property
+    def num_waveforms(self) -> int:
+        """Return the number of waveforms."""
+        return len(self)
+
+    @property
+    def num_frequency_bins(self) -> int:
+        """Return the number of frequency bins."""
+        return self.h_plus.shape[1] if self.h_plus.ndim > 1 else self.h_plus.shape[0]
+
+    @classmethod
+    def from_polarizations(cls, polarizations: List[Polarization]) -> BatchPolarizations:
+        """
+        Create a BatchPolarizations from a list of single Polarization objects.
+
+        Parameters
+        ----------
+        polarizations
+            List of Polarization objects to batch together.
+
+        Returns
+        -------
+        A BatchPolarizations object containing all input polarizations.
+        """
+        if not polarizations:
+            raise ValueError("Cannot create BatchPolarizations from empty list")
+
+        h_plus = np.array([p.h_plus for p in polarizations])
+        h_cross = np.array([p.h_cross for p in polarizations])
+        return cls(h_plus=h_plus, h_cross=h_cross)
 
 
 def sum_contributions_m(

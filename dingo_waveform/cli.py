@@ -12,7 +12,7 @@ from typing import Dict, Any
 
 import numpy as np
 
-from .comparison import compare_waveforms, compare_waveforms_modes
+from .comparison import compare_waveforms, compare_waveforms_modes, compare_svd_compression
 from .prior import IntrinsicPriors
 
 
@@ -74,6 +74,51 @@ def validate_config(config: Dict[str, Any]) -> None:
     # Validate waveform_parameters
     if not isinstance(config['waveform_parameters'], dict):
         raise ValueError("waveform_parameters must be a dictionary")
+
+
+def validate_svd_config(config: Dict[str, Any]) -> None:
+    """
+    Validate configuration for SVD compression comparison.
+
+    Parameters
+    ----------
+    config : dict
+        Configuration dictionary
+
+    Raises
+    ------
+    ValueError
+        If configuration is missing required fields for SVD comparison
+    """
+    required_fields = ['domain', 'waveform_generator', 'prior', 'svd']
+    missing = [f for f in required_fields if f not in config]
+
+    if missing:
+        raise ValueError(
+            f"Configuration missing required fields for SVD comparison: {', '.join(missing)}\n"
+            f"Required fields: {', '.join(required_fields)}"
+        )
+
+    # Validate domain
+    if 'type' not in config['domain']:
+        raise ValueError("domain.type is required")
+
+    # Validate waveform_generator
+    if 'approximant' not in config['waveform_generator']:
+        raise ValueError("waveform_generator.approximant is required")
+
+    # Validate SVD config
+    svd_required = ['n_components', 'num_training', 'num_validation']
+    svd_missing = [f for f in svd_required if f not in config['svd']]
+    if svd_missing:
+        raise ValueError(
+            f"SVD configuration missing required fields: {', '.join(svd_missing)}\n"
+            f"Required fields: {', '.join(svd_required)}"
+        )
+
+    # Validate prior
+    if not isinstance(config['prior'], dict):
+        raise ValueError("prior must be a dictionary")
 
 
 def build_prior_from_params(params: Dict[str, Any]) -> IntrinsicPriors:
@@ -167,6 +212,99 @@ def display_comparison(result, verbose: bool = False):
     print("\n" + "=" * 80)
 
 
+def display_svd_comparison(result, verbose: bool = False):
+    """
+    Display SVD compression comparison results to terminal.
+
+    Parameters
+    ----------
+    result : SVDComparisonResult
+        SVD comparison result
+    verbose : bool
+        If True, display detailed information
+    """
+    print("\n" + "=" * 80)
+    print("SVD COMPRESSION VERIFICATION RESULTS")
+    print("=" * 80)
+
+    # SVD basis properties
+    print(f"\n{'SVD Basis:':<20}")
+    print(f"{'  n_components:':<20} {result.n_components}")
+    print(f"{'  Dingo shape:':<20} {result.dingo_basis_shape}")
+    print(f"{'  Refactored shape:':<20} {result.refactored_basis_shape}")
+    print(f"{'  Shapes match:':<20} {'✅ YES' if result.shapes_match else '❌ NO'}")
+
+    if not result.shapes_match:
+        print("\n❌ VERIFICATION FAILED: Shape mismatch")
+        return
+
+    # Basis matrix comparison
+    if result.max_diff_V is not None:
+        print(f"\n{'Basis Matrix (V) Differences:':<20}")
+        print(f"  {'Max:':<18} {result.max_diff_V:.2e}")
+        print(f"  {'Mean:':<18} {result.mean_diff_V:.2e}")
+        if result.max_rel_diff_V is not None:
+            print(f"  {'Max relative:':<18} {result.max_rel_diff_V:.2e}")
+
+    # Singular values comparison
+    if result.max_diff_s is not None:
+        print(f"\n{'Singular Values (s) Differences:':<20}")
+        print(f"  {'Max:':<18} {result.max_diff_s:.2e}")
+        print(f"  {'Mean:':<18} {result.mean_diff_s:.2e}")
+        if result.max_rel_diff_s is not None:
+            print(f"  {'Max relative:':<18} {result.max_rel_diff_s:.2e}")
+
+    # Reconstruction mismatches
+    if result.dingo_mean_mismatch is not None:
+        print(f"\n{'Reconstruction Mismatches:':<20}")
+        print(f"  {'Dingo mean:':<18} {result.dingo_mean_mismatch:.2e}")
+        print(f"  {'Refactored mean:':<18} {result.refactored_mean_mismatch:.2e}")
+        print(f"  {'Dingo max:':<18} {result.dingo_max_mismatch:.2e}")
+        print(f"  {'Refactored max:':<18} {result.refactored_max_mismatch:.2e}")
+        print(f"  {'Difference:':<18} {result.mismatch_difference:.2e}")
+
+    # Cross-system test
+    if result.cross_system_max_diff is not None:
+        print(f"\n{'Basis Interchangeability Test:':<20}")
+        print(f"  {'Max difference:':<18} {result.cross_system_max_diff:.2e}")
+        print(f"  {'Mean difference:':<18} {result.cross_system_mean_diff:.2e}")
+
+    # Overall assessment
+    tolerance = 1e-12
+    max_diff = 0.0
+    if result.max_diff_V is not None:
+        max_diff = max(max_diff, result.max_diff_V)
+    if result.cross_system_max_diff is not None:
+        max_diff = max(max_diff, result.cross_system_max_diff)
+
+    print(f"\n{'Tolerance:':<20} {tolerance:.2e}")
+    print(f"{'Max Difference:':<20} {max_diff:.2e}")
+
+    if max_diff < tolerance:
+        print("\n" + "✅ " * 20)
+        print("✅ VERIFICATION PASSED")
+        print("✅ dingo-waveform SVD compression is IDENTICAL to dingo (dingo-gw)")
+        print("✅ Basis matrices are interchangeable between systems")
+        print("✅ " * 20)
+    elif max_diff < 1e-10:
+        print("\n⚠️  VERIFICATION ACCEPTABLE")
+        print(f"⚠️  Differences are small ({max_diff:.2e}) but above strict tolerance")
+        print("⚠️  This may be acceptable depending on use case")
+    else:
+        print("\n❌ " * 20)
+        print("❌ VERIFICATION FAILED")
+        print(f"❌ Differences ({max_diff:.2e}) exceed acceptable tolerance")
+        print("❌ " * 20)
+
+    if verbose:
+        print("\n" + "-" * 80)
+        print("DETAILED OUTPUT")
+        print("-" * 80)
+        print(result)
+
+    print("\n" + "=" * 80)
+
+
 def main():
     """Main entry point for CLI."""
     parser = argparse.ArgumentParser(
@@ -227,6 +365,11 @@ Configuration File Format:
         action='store_true',
         help='Compare mode-separated waveforms (generate_hplus_hcross_m) instead of total polarizations. Only works with PHM/HM approximants.'
     )
+    parser.add_argument(
+        '--svd', '--compression',
+        action='store_true',
+        help='Compare SVD compression instead of waveforms. Requires additional config fields: svd.n_components, svd.num_training, svd.num_validation, and prior definitions.'
+    )
 
     args = parser.parse_args()
 
@@ -234,7 +377,13 @@ Configuration File Format:
         # Load and validate configuration
         print(f"Loading configuration from: {args.config}")
         config = load_config(args.config)
-        validate_config(config)
+
+        # Validate config differently based on mode
+        if not args.svd:
+            validate_config(config)
+        else:
+            # For SVD mode, we need different validation
+            validate_svd_config(config)
 
         # Set random seed if provided
         if args.seed is not None:
@@ -244,7 +393,6 @@ Configuration File Format:
         # Extract configuration
         domain_params = config['domain']
         wfg_config = config['waveform_generator']
-        waveform_params = config['waveform_parameters']
 
         # Determine domain type
         domain_type = domain_params['type'].lower()
@@ -259,8 +407,65 @@ Configuration File Format:
         # Prepare domain parameters (remove 'type' key for comparison function)
         domain_params_clean = {k: v for k, v in domain_params.items() if k != 'type'}
 
-        # Generate and compare waveforms
-        if args.modes:
+        # Generate and compare waveforms or SVD compression
+        if args.svd:
+            # SVD compression comparison mode
+            svd_config = config['svd']
+            prior_config = config['prior']
+
+            print("\nSVD Compression Comparison Mode")
+            print(f"n_components: {svd_config['n_components']}")
+            print(f"num_training: {svd_config['num_training']}")
+            print(f"num_validation: {svd_config['num_validation']}")
+
+            # Build prior and sample parameters
+            from .prior import build_prior_with_defaults
+            prior = build_prior_with_defaults(prior_config)
+
+            total_samples = svd_config['num_training'] + svd_config['num_validation']
+            print(f"\nSampling {total_samples} parameter sets from prior...")
+
+            waveform_params_list = []
+            for i in range(total_samples):
+                sample = prior.sample()
+                waveform_params_list.append(sample)
+
+            # Run SVD comparison
+            result = compare_svd_compression(
+                domain_type=domain_type,
+                domain_params=domain_params_clean,
+                approximant=wfg_config['approximant'],
+                waveform_params_list=waveform_params_list,
+                f_ref=wfg_config.get('f_ref', 20.0),
+                f_start=wfg_config.get('f_start', 20.0),
+                n_components=svd_config['n_components'],
+                num_training=svd_config['num_training'],
+                num_validation=svd_config['num_validation'],
+                spin_conversion_phase=wfg_config.get('spin_conversion_phase', 0.0),
+                svd_method=svd_config.get('method', 'scipy'),
+            )
+
+            # Display results
+            display_svd_comparison(result, verbose=args.verbose)
+
+            # Exit with appropriate code
+            if not result.shapes_match:
+                sys.exit(1)
+
+            # Check if differences are acceptable
+            tolerance = 1e-12
+            if result.max_diff_V is not None and result.max_diff_V > tolerance:
+                print(f"\n⚠️  WARNING: SVD basis differences exceed tolerance ({tolerance:.2e})")
+                sys.exit(1)
+
+            if result.cross_system_max_diff is not None and result.cross_system_max_diff > tolerance:
+                print(f"\n⚠️  WARNING: Cross-system compatibility test failed (tolerance: {tolerance:.2e})")
+                sys.exit(1)
+
+            sys.exit(0)
+
+        elif args.modes:
+            waveform_params = config['waveform_parameters']
             print("\nGenerating mode-separated waveforms...")
             print("  - Using dingo (dingo-gw) generate_hplus_hcross_m()...")
             print("  - Using dingo-waveform generate_hplus_hcross_m()...")
@@ -275,6 +480,7 @@ Configuration File Format:
                 spin_conversion_phase=wfg_config.get('spin_conversion_phase', 0.0),
             )
         else:
+            waveform_params = config['waveform_parameters']
             print("\nGenerating waveforms...")
             print("  - Using dingo (dingo-gw)...")
             print("  - Using dingo-waveform...")

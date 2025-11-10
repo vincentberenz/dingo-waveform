@@ -224,6 +224,10 @@ class WaveformGenerator:
             )
         )
 
+        # Batch transform pipeline (for compression, whitening, etc.)
+        # This is applied after generation and operates on dictionaries of arrays
+        self.transform = None
+
     def generate_hplus_hcross(
         self, waveform_parameters: WaveformParameters
     ) -> Polarization:

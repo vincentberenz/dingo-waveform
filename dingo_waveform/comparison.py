@@ -2,11 +2,13 @@
 Utilities for comparing waveform generation between original dingo and dingo-waveform.
 
 This module provides functions to generate waveforms using both packages and compare results.
+It also provides utilities for comparing SVD compression between the two packages.
 """
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 import numpy as np
+import pandas as pd
 
 # Original dingo imports
 from dingo.gw.domains import MultibandedFrequencyDomain as DingoMFD
@@ -494,5 +496,322 @@ def compare_waveforms_modes(
         refactored_f_min=domain_refactored.f_min,
         refactored_f_max=domain_refactored.f_max,
     )
+
+    return result
+
+
+@dataclass
+class SVDComparisonResult:
+    """Results of comparing SVD compression between dingo and dingo-waveform."""
+
+    # SVD basis properties
+    n_components: int
+    dingo_basis_shape: tuple
+    refactored_basis_shape: tuple
+    shapes_match: bool
+
+    # Basis comparison (V matrices)
+    max_diff_V: Optional[float] = None
+    mean_diff_V: Optional[float] = None
+    max_rel_diff_V: Optional[float] = None
+
+    # Singular values comparison
+    max_diff_s: Optional[float] = None
+    mean_diff_s: Optional[float] = None
+    max_rel_diff_s: Optional[float] = None
+
+    # Reconstruction mismatch comparison
+    dingo_mean_mismatch: Optional[float] = None
+    refactored_mean_mismatch: Optional[float] = None
+    dingo_max_mismatch: Optional[float] = None
+    refactored_max_mismatch: Optional[float] = None
+    mismatch_difference: Optional[float] = None
+
+    # Cross-system reconstruction test (basis interchangeability)
+    cross_system_max_diff: Optional[float] = None
+    cross_system_mean_diff: Optional[float] = None
+
+    def __str__(self) -> str:
+        """Human-readable summary of comparison."""
+        lines = [
+            "=== SVD Compression Comparison Result ===",
+            f"\nSVD Basis Properties:",
+            f"  n_components: {self.n_components}",
+            f"  Dingo shape:      {self.dingo_basis_shape}",
+            f"  Refactored shape: {self.refactored_basis_shape}",
+            f"  Shapes match:     {self.shapes_match}",
+        ]
+
+        if self.shapes_match:
+            if self.max_diff_V is not None:
+                lines.extend([
+                    f"\nBasis Matrix (V) Differences:",
+                    f"  Max:  {self.max_diff_V:.2e}",
+                    f"  Mean: {self.mean_diff_V:.2e}",
+                    f"  Max relative: {self.max_rel_diff_V:.2e}",
+                ])
+
+            if self.max_diff_s is not None:
+                lines.extend([
+                    f"\nSingular Values (s) Differences:",
+                    f"  Max:  {self.max_diff_s:.2e}",
+                    f"  Mean: {self.mean_diff_s:.2e}",
+                    f"  Max relative: {self.max_rel_diff_s:.2e}",
+                ])
+
+            if self.dingo_mean_mismatch is not None:
+                lines.extend([
+                    f"\nReconstruction Mismatches:",
+                    f"  Dingo mean:      {self.dingo_mean_mismatch:.2e}",
+                    f"  Refactored mean: {self.refactored_mean_mismatch:.2e}",
+                    f"  Dingo max:       {self.dingo_max_mismatch:.2e}",
+                    f"  Refactored max:  {self.refactored_max_mismatch:.2e}",
+                    f"  Difference:      {self.mismatch_difference:.2e}",
+                ])
+
+            if self.cross_system_max_diff is not None:
+                lines.extend([
+                    f"\nCross-System Reconstruction Test:",
+                    f"  Max difference:  {self.cross_system_max_diff:.2e}",
+                    f"  Mean difference: {self.cross_system_mean_diff:.2e}",
+                ])
+
+        return "\n".join(lines)
+
+
+def compare_svd_compression(
+    domain_type: str,
+    domain_params: Dict,
+    approximant: str,
+    waveform_params_list: list[Dict[str, float]],
+    f_ref: float,
+    f_start: float,
+    n_components: int,
+    num_training: int,
+    num_validation: int,
+    spin_conversion_phase: Optional[float] = None,
+    svd_method: str = "scipy",
+) -> SVDComparisonResult:
+    """
+    Compare SVD compression between dingo and dingo-waveform.
+
+    This function:
+    1. Generates training waveforms using both systems
+    2. Trains SVD basis in both systems
+    3. Validates reconstruction quality on test waveforms
+    4. Tests cross-system compatibility (basis interchangeability)
+
+    Parameters
+    ----------
+    domain_type : str
+        Either "uniform" or "multibanded"
+    domain_params : dict
+        Domain parameters
+    approximant : str
+        Approximant name (e.g., "IMRPhenomXPHM")
+    waveform_params_list : list[dict]
+        List of waveform parameters for training and validation.
+        First num_training used for training, next num_validation for validation.
+    f_ref : float
+        Reference frequency
+    f_start : float
+        Starting frequency
+    n_components : int
+        Number of SVD basis components to keep
+    num_training : int
+        Number of waveforms to use for training SVD
+    num_validation : int
+        Number of waveforms to use for validation
+    spin_conversion_phase : float, optional
+        Phase for spin conversion
+    svd_method : str
+        SVD method to use ("scipy" or "randomized")
+
+    Returns
+    -------
+    SVDComparisonResult
+        Detailed comparison of SVD compression in both systems
+
+    Raises
+    ------
+    ValueError
+        If insufficient waveform parameters provided
+    """
+    # Import SVD classes
+    from dingo.gw.SVD import SVDBasis as DingoSVD
+    from dingo_waveform.compression.svd import SVDBasis as RefactoredSVD
+
+    if len(waveform_params_list) < num_training + num_validation:
+        raise ValueError(
+            f"Insufficient waveform parameters: need {num_training + num_validation}, "
+            f"got {len(waveform_params_list)}"
+        )
+
+    # Create domains
+    if domain_type == "uniform":
+        domain_dingo = create_uniform_domain_dingo(**domain_params)
+        domain_refactored = create_uniform_domain_refactored(**domain_params)
+    elif domain_type == "multibanded":
+        domain_dingo = create_multibanded_domain_dingo(**domain_params)
+        domain_refactored = create_multibanded_domain_refactored(**domain_params)
+    else:
+        raise ValueError(f"Unknown domain_type: {domain_type}")
+
+    print(f"\nGenerating {num_training} training waveforms...")
+
+    # Generate training waveforms
+    training_data_dingo = []
+    training_data_refactored = []
+
+    for i, params in enumerate(waveform_params_list[:num_training]):
+        # Generate waveforms
+        wf_dingo = generate_waveform_dingo(
+            domain_dingo, approximant, params, f_ref, f_start, spin_conversion_phase
+        )
+        wf_refactored = generate_waveform_refactored(
+            domain_refactored, approximant, params, f_ref, f_start, spin_conversion_phase
+        )
+
+        # Concatenate h_plus and h_cross (standard dingo format)
+        data_dingo = np.concatenate([wf_dingo["h_plus"], wf_dingo["h_cross"]])
+        data_refactored = np.concatenate([wf_refactored["h_plus"], wf_refactored["h_cross"]])
+
+        training_data_dingo.append(data_dingo)
+        training_data_refactored.append(data_refactored)
+
+    training_data_dingo = np.array(training_data_dingo)
+    training_data_refactored = np.array(training_data_refactored)
+
+    print(f"Training data shape: {training_data_dingo.shape}")
+
+    # Train SVD basis in both systems
+    print(f"\nTraining SVD basis with {n_components} components...")
+    print("  - Training dingo SVD...")
+    svd_dingo = DingoSVD()
+    svd_dingo.generate_basis(training_data_dingo, n=n_components, method=svd_method)
+
+    print("  - Training dingo-waveform SVD...")
+    svd_refactored = RefactoredSVD()
+    svd_refactored.generate_basis(
+        training_data_refactored, n_components=n_components, method=svd_method
+    )
+
+    # Compare basis shapes
+    shapes_match = svd_dingo.V.shape == svd_refactored.V.shape
+
+    result = SVDComparisonResult(
+        n_components=n_components,
+        dingo_basis_shape=svd_dingo.V.shape,
+        refactored_basis_shape=svd_refactored.V.shape,
+        shapes_match=shapes_match,
+    )
+
+    if not shapes_match:
+        return result
+
+    # Compare basis matrices (V)
+    diff_V = np.abs(svd_dingo.V - svd_refactored.V)
+    result.max_diff_V = float(np.max(diff_V))
+    result.mean_diff_V = float(np.mean(diff_V))
+
+    V_mag = np.abs(svd_dingo.V)
+    threshold = 1e-30
+    mask = V_mag > threshold
+    if np.any(mask):
+        rel_diff_V = diff_V[mask] / V_mag[mask]
+        result.max_rel_diff_V = float(np.max(rel_diff_V))
+
+    # Compare singular values (s)
+    diff_s = np.abs(svd_dingo.s[:n_components] - svd_refactored.s)
+    result.max_diff_s = float(np.max(diff_s))
+    result.mean_diff_s = float(np.mean(diff_s))
+
+    s_mag = np.abs(svd_dingo.s[:n_components])
+    mask_s = s_mag > threshold
+    if np.any(mask_s):
+        rel_diff_s = diff_s[mask_s] / s_mag[mask_s]
+        result.max_rel_diff_s = float(np.max(rel_diff_s))
+
+    # Generate validation waveforms and compute mismatches
+    if num_validation > 0:
+        print(f"\nGenerating {num_validation} validation waveforms...")
+
+        validation_data_dingo = []
+        validation_data_refactored = []
+        validation_params = waveform_params_list[num_training:num_training + num_validation]
+
+        for params in validation_params:
+            wf_dingo = generate_waveform_dingo(
+                domain_dingo, approximant, params, f_ref, f_start, spin_conversion_phase
+            )
+            wf_refactored = generate_waveform_refactored(
+                domain_refactored, approximant, params, f_ref, f_start, spin_conversion_phase
+            )
+
+            data_dingo = np.concatenate([wf_dingo["h_plus"], wf_dingo["h_cross"]])
+            data_refactored = np.concatenate([wf_refactored["h_plus"], wf_refactored["h_cross"]])
+
+            validation_data_dingo.append(data_dingo)
+            validation_data_refactored.append(data_refactored)
+
+        validation_data_dingo = np.array(validation_data_dingo)
+        validation_data_refactored = np.array(validation_data_refactored)
+
+        print(f"Validation data shape: {validation_data_dingo.shape}")
+
+        # Compute mismatches in dingo
+        print("\nComputing reconstruction mismatches...")
+        print("  - Dingo...")
+        mismatches_dingo = []
+        for data in validation_data_dingo:
+            compressed = svd_dingo.compress(data)
+            reconstructed = svd_dingo.decompress(compressed)
+            norm1 = np.sqrt(np.sum(np.abs(data) ** 2))
+            norm2 = np.sqrt(np.sum(np.abs(reconstructed) ** 2))
+            inner = np.sum(data.conj() * reconstructed).real
+            mismatch = 1.0 - inner / (norm1 * norm2)
+            mismatches_dingo.append(mismatch)
+
+        # Compute mismatches in dingo-waveform
+        print("  - Dingo-waveform...")
+        mismatches_refactored = []
+        for data in validation_data_refactored:
+            compressed = svd_refactored.compress(data)
+            reconstructed = svd_refactored.decompress(compressed)
+            norm1 = np.sqrt(np.sum(np.abs(data) ** 2))
+            norm2 = np.sqrt(np.sum(np.abs(reconstructed) ** 2))
+            inner = np.sum(data.conj() * reconstructed).real
+            mismatch = 1.0 - inner / (norm1 * norm2)
+            mismatches_refactored.append(mismatch)
+
+        mismatches_dingo = np.array(mismatches_dingo)
+        mismatches_refactored = np.array(mismatches_refactored)
+
+        result.dingo_mean_mismatch = float(np.mean(mismatches_dingo))
+        result.refactored_mean_mismatch = float(np.mean(mismatches_refactored))
+        result.dingo_max_mismatch = float(np.max(mismatches_dingo))
+        result.refactored_max_mismatch = float(np.max(mismatches_refactored))
+        result.mismatch_difference = float(np.abs(
+            result.dingo_mean_mismatch - result.refactored_mean_mismatch
+        ))
+
+        # Test cross-system compatibility (basis interchangeability)
+        print("\nTesting basis interchangeability...")
+        print("  - Compressing with dingo, decompressing with dingo-waveform...")
+
+        # Use first validation waveform for cross-system test
+        test_data = validation_data_dingo[0]
+
+        # Compress with dingo, decompress with refactored
+        compressed_dingo = svd_dingo.compress(test_data)
+        reconstructed_cross = svd_refactored.decompress(compressed_dingo)
+
+        # Decompress with dingo for comparison
+        reconstructed_dingo = svd_dingo.decompress(compressed_dingo)
+
+        # Compare reconstructions
+        cross_diff = np.abs(reconstructed_dingo - reconstructed_cross)
+        result.cross_system_max_diff = float(np.max(cross_diff))
+        result.cross_system_mean_diff = float(np.mean(cross_diff))
 
     return result
