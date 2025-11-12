@@ -250,30 +250,6 @@ def build_domain(domain_parameters: DomainParameters) -> Domain:
     return instance
 
 
-@dispatch(dict)  # type: ignore[no-redef]
-def build_domain(domain_parameters: Dict) -> Domain:
-    """
-    Build an instance of domain based on a dictionary with domain parameters.
-
-    Parameters
-    ----------
-    domain_parameters
-        A dictionary with domain parameters
-
-    Returns
-    -------
-    An instance of the domain.
-    """
-    try:
-        domain_parameters = DomainParameters(**domain_parameters)
-    except Exception as e:
-        raise ValueError(
-            "Constructing domain: failed to construct from dictionary "
-            f"{repr(domain_parameters)}. {type(e)}: {e}"
-        ) from e
-    return build_domain(domain_parameters)
-
-
 @dispatch((str, Path))  # type: ignore[no-redef]
 def build_domain(domain_parameters: Union[str, Path]) -> Domain:
     """

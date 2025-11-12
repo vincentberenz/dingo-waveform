@@ -7,14 +7,10 @@ from .generate import generate_waveform_dataset
 from .waveform_dataset import WaveformDataset
 from .waveform_generator_settings import WaveformGeneratorSettings
 
-# Backward compatibility alias
-Polarizations = BatchPolarizations
-
 __all__ = [
     "BatchPolarizations",
     "CompressionSettings",
     "DatasetSettings",
-    "Polarizations",  # Keep for backward compatibility
     "SVDSettings",
     "WaveformDataset",
     "WaveformGeneratorSettings",

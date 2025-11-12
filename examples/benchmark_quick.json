@@ -1,0 +1,27 @@
+{
+  "domain": {
+    "type": "UniformFrequencyDomain",
+    "delta_f": 0.25,
+    "f_min": 20.0,
+    "f_max": 512.0
+  },
+  "waveform_generator": {
+    "approximant": "IMRPhenomD",
+    "f_ref": 20.0,
+    "f_start": 20.0
+  },
+  "prior": {
+    "chirp_mass": "Uniform(minimum=25.0, maximum=35.0)",
+    "mass_ratio": "Uniform(minimum=0.8, maximum=1.0)",
+    "luminosity_distance": 1000.0,
+    "theta_jn": "Uniform(minimum=0.0, maximum=3.14159)",
+    "phase": 0.0,
+    "a_1": 0.0,
+    "a_2": 0.0,
+    "tilt_1": 0.0,
+    "tilt_2": 0.0,
+    "phi_12": 0.0,
+    "phi_jl": 0.0,
+    "geocent_time": 0.0
+  }
+}

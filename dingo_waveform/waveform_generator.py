@@ -195,11 +195,12 @@ class WaveformGenerator:
         )
 
         # summarizing things for the user
-        _logger.info(
-            self._waveform_gen_params.to_table(
-                "instantiated waveform generator with parameters:"
+        if _logger.isEnabledFor(logging.INFO):
+            _logger.info(
+                self._waveform_gen_params.to_table(
+                    "instantiated waveform generator with parameters:"
+                )
             )
-        )
 
         # the argument polarization_method can be either:
         # - None: the method used by generate_hplus_hcross will be selected based
@@ -292,13 +293,14 @@ class WaveformGenerator:
             )
 
         # logging the waveform parameters as a nice looking table
-        _logger.info(
-            waveform_parameters.to_table(
-                f"starting to generate waveforms for approximant {self._waveform_gen_params.approximant} "
-                f"using function {polarization_method.__name__} "
-                f"and waveform parameters (f_ref={self._waveform_gen_params.f_ref}):"
+        if _logger.isEnabledFor(logging.INFO):
+            _logger.info(
+                waveform_parameters.to_table(
+                    f"starting to generate waveforms for approximant {self._waveform_gen_params.approximant} "
+                    f"using function {polarization_method.__name__} "
+                    f"and waveform parameters (f_ref={self._waveform_gen_params.f_ref}):"
+                )
             )
-        )
 
         # generating the waveforms
         polarization = polarization_method(
@@ -420,14 +422,15 @@ class WaveformGenerator:
             )
 
         # printing in the log the waveform parameters
-        _logger.info(
-            waveform_parameters.to_table(
-                f"starting to generate waveforms (separated by modes) "
-                f"for approximant {self._waveform_gen_params.approximant} "
-                f"using {polarization_modes_function.__name__} "
-                f"with waveform parameters (f_ref={self._waveform_gen_params.f_ref}):"
+        if _logger.isEnabledFor(logging.INFO):
+            _logger.info(
+                waveform_parameters.to_table(
+                    f"starting to generate waveforms (separated by modes) "
+                    f"for approximant {self._waveform_gen_params.approximant} "
+                    f"using {polarization_modes_function.__name__} "
+                    f"with waveform parameters (f_ref={self._waveform_gen_params.f_ref}):"
+                )
             )
-        )
 
         # generating the waveforms
         polarization_modes: Dict[Mode, Polarization] = polarization_modes_function(
@@ -435,9 +438,10 @@ class WaveformGenerator:
         )
 
         # logging the generated polarizations as a nice looking table.
-        _logger.debug(
-            f"generated polarizations:\n{polarizations_to_table(polarization_modes)}"
-        )
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(
+                f"generated polarizations:\n{polarizations_to_table(polarization_modes)}"
+            )
 
         return polarization_modes
 

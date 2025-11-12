@@ -1,6 +1,5 @@
 import logging
-from copy import deepcopy
-from dataclasses import asdict, astuple, dataclass, fields
+from dataclasses import asdict, astuple, dataclass, fields, replace
 from math import isclose
 from typing import Optional, Tuple, Union
 
@@ -75,6 +74,49 @@ class _InspiralFDParameters(TableStr):
 
         return tuple(getattr(self, f.name) for f in fields(self))
 
+    def to_lal_args(
+        self,
+        lal_params_override: Optional[lal.Dict] = None
+    ) -> Tuple[Union[float, Optional[lal.Dict]], ...]:
+        """
+        Convert to LAL arguments with unit conversions applied.
+
+        This method directly creates the tuple needed for SimInspiralFD,
+        avoiding the overhead of deepcopy + mutation + astuple.
+
+        Parameters
+        ----------
+        lal_params_override : Optional[lal.Dict]
+            If provided, use this instead of self.lal_params
+
+        Returns
+        -------
+        tuple
+            Arguments ready for SimInspiralFD in SI units
+        """
+        return (
+            self.mass_1 * lal.MSUN_SI,
+            self.mass_2 * lal.MSUN_SI,
+            self.s1x,
+            self.s1y,
+            self.s1z,
+            self.s2x,
+            self.s2y,
+            self.s2z,
+            self.r * 1e6 * lal.PC_SI,
+            self.iota,
+            self.phase,
+            self.longAscNode,
+            self.eccentricity,
+            self.meanPerAno,
+            self.delta_f,
+            self.f_min,
+            self.f_max,
+            self.f_ref,
+            lal_params_override if lal_params_override is not None else self.lal_params,
+            self.approximant
+        )
+
     @classmethod
     def from_binary_black_hole_parameters(
         cls,
@@ -96,12 +138,31 @@ class _InspiralFDParameters(TableStr):
                 f_start,
             )
         )
-        d = asdict(inspiral_choose_fd_modes_parameters)
-        ecc_attrs = ("longAscNode", "eccentricity", "meanPerAno")
-        for attr in ecc_attrs:
-            d[attr] = 0
-        instance = cls(**d)
-        _logger.debug(instance.to_table("generated inspiral fd parameters"))
+        # Optimization: Explicit field access to eliminate expensive asdict() call
+        instance = cls(
+            mass_1=inspiral_choose_fd_modes_parameters.mass_1,
+            mass_2=inspiral_choose_fd_modes_parameters.mass_2,
+            s1x=inspiral_choose_fd_modes_parameters.s1x,
+            s1y=inspiral_choose_fd_modes_parameters.s1y,
+            s1z=inspiral_choose_fd_modes_parameters.s1z,
+            s2x=inspiral_choose_fd_modes_parameters.s2x,
+            s2y=inspiral_choose_fd_modes_parameters.s2y,
+            s2z=inspiral_choose_fd_modes_parameters.s2z,
+            r=inspiral_choose_fd_modes_parameters.r,
+            iota=inspiral_choose_fd_modes_parameters.iota,
+            phase=inspiral_choose_fd_modes_parameters.phase,
+            delta_f=inspiral_choose_fd_modes_parameters.delta_f,
+            f_min=inspiral_choose_fd_modes_parameters.f_min,
+            f_max=inspiral_choose_fd_modes_parameters.f_max,
+            f_ref=inspiral_choose_fd_modes_parameters.f_ref,
+            lal_params=inspiral_choose_fd_modes_parameters.lal_params,
+            approximant=inspiral_choose_fd_modes_parameters.approximant,
+            longAscNode=0,
+            eccentricity=0,
+            meanPerAno=0,
+        )
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(instance.to_table("generated inspiral fd parameters"))
         return instance
 
     @classmethod
@@ -121,15 +182,14 @@ class _InspiralFDParameters(TableStr):
         )
         # Ensure domain parameters passed to LAL are scalar-typed where required.
         # In multibanded domains, delta_f may be None; prefer delta_f_initial or base_delta_f
-        dp_dict = asdict(domain_params)
-        df = dp_dict.get("delta_f")
+        # Optimization: Use getattr() instead of asdict() to avoid dict conversion overhead
+        df = getattr(domain_params, 'delta_f', None)
         if df is None:
-            df = dp_dict.get("delta_f_initial")
+            df = getattr(domain_params, 'delta_f_initial', None)
         if df is None:
-            df = dp_dict.get("base_delta_f")
-        # Construct a sanitized DomainParameters copy
-        sanitized = DomainParameters(**dp_dict)
-        sanitized.delta_f = df
+            df = getattr(domain_params, 'base_delta_f', None)
+        # Construct a sanitized DomainParameters copy using replace()
+        sanitized = replace(domain_params, delta_f=df)
 
         return cls.from_binary_black_hole_parameters(
             bbh_parameters,
@@ -163,18 +223,12 @@ class _InspiralFDParameters(TableStr):
         )
         LS.SimInspiralWaveformParamsInsertPhenomXHMThresholdMband(lal_params, 0)
         LS.SimInspiralWaveformParamsInsertPhenomXPHMThresholdMband(lal_params, 0)
-        params: "_InspiralFDParameters" = deepcopy(self)
-        params.mass_1 *= lal.MSUN_SI
-        params.mass_2 *= lal.MSUN_SI
-        params.r *= 1e6 * lal.PC_SI
-        params.lal_params = lal_params
-        # arguments = list(astuple(params))
-        #  The above would not always work, because lal.Dict can not be deep copied.
-        #  (a RuntimeError is raised).
-        #  So we do instead:
-        arguments = list(params.to_tuple())
 
-        _logger.debug(params.to_table("calling LS.SimInspiralFD with parameters"))
+        # Optimization: Use to_lal_args() with custom lal_params to avoid deepcopy
+        arguments = self.to_lal_args(lal_params_override=lal_params)
+
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(self.to_table("calling LS.SimInspiralFD with parameters"))
 
         hp, hc = LS.SimInspiralFD(*arguments)
         if max(np.max(np.abs(hp.data.data)), np.max(np.abs(hc.data.data))) <= threshold:
@@ -191,20 +245,18 @@ class _InspiralFDParameters(TableStr):
         delta_f_tolerance: float = 1e-6,
     ) -> Polarization:
 
-        # SimInspiralFD requires kg, converting here
-        params: "_InspiralFDParameters" = deepcopy(self)
-        params.mass_1 *= lal.MSUN_SI
-        params.mass_2 *= lal.MSUN_SI
-        params.r *= 1e6 * lal.PC_SI
+        # SimInspiralFD requires SI units - convert directly to tuple
+        # Optimization: Avoid deepcopy + mutation + astuple overhead
+        arguments = self.to_lal_args()
 
-        _logger.debug(
-            params.to_table("generating polarization using lalsimulation.SimInspiralFD")
-        )
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(
+                self.to_table("generating polarization using lalsimulation.SimInspiralFD")
+            )
 
         hp: lal.COMPLEX16FrequencySeries
         hc: lal.COMPLEX16FrequencySeries
 
-        arguments = list(astuple(params))
         hp, hc = LS.SimInspiralFD(*arguments)
 
         if auto_turn_off_multibanding:

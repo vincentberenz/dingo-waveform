@@ -72,26 +72,34 @@ class _InspiralChooseFDModesParameters(TableStr):
         # Creates an instance from binary black hole parameters.
 
         spins: Spins = bbh_parameters.get_spins(spin_conversion_phase)
-        # adding iota, s1x, ..., s2x, ...
-        parameters = asdict(spins)
-        # direct mapping from this instance
-        for k in ("mass_1", "mass_2", "phase"):
-            parameters[k] = getattr(bbh_parameters, k)
-        # adding domain related params
-        domain_dict = asdict(domain_params)
+        # Optimization: Build parameter dictionary with explicit field access to eliminate asdict() calls
+        parameters = {
+            "iota": spins.iota,
+            "s1x": spins.s1x,
+            "s1y": spins.s1y,
+            "s1z": spins.s1z,
+            "s2x": spins.s2x,
+            "s2y": spins.s2y,
+            "s2z": spins.s2z,
+            "mass_1": bbh_parameters.mass_1,
+            "mass_2": bbh_parameters.mass_2,
+            "phase": bbh_parameters.phase,
+        }
+
         # Populate frequency grid parameters with robust fallbacks for multibanded domains
         # delta_f: prefer explicit delta_f; fallback to delta_f_initial; then base_delta_f
-        df = domain_dict.get("delta_f")
+        df = getattr(domain_params, "delta_f", None)
         if df is None:
-            df = domain_dict.get("delta_f_initial")
+            df = getattr(domain_params, "delta_f_initial", None)
         if df is None:
-            df = domain_dict.get("base_delta_f")
+            df = getattr(domain_params, "base_delta_f", None)
         parameters["delta_f"] = df
+
         # f_min and f_max should be present; if not, derive from nodes for MultibandedFrequencyDomain
-        fmin = domain_dict.get("f_min")
-        fmax = domain_dict.get("f_max")
-        if domain_dict.get("nodes") is not None:
-            nodes = domain_dict.get("nodes")
+        fmin = getattr(domain_params, "f_min", None)
+        fmax = getattr(domain_params, "f_max", None)
+        nodes = getattr(domain_params, "nodes", None)
+        if nodes is not None:
             if fmin is None:
                 fmin = nodes[0]
             if fmax is None:
@@ -106,9 +114,10 @@ class _InspiralChooseFDModesParameters(TableStr):
         parameters["lal_params"] = lal_params
         parameters["approximant"] = get_approximant(approximant)
         instance = cls(**parameters)
-        _logger.debug(
-            instance.to_table("generated inspiral choose fd modes parameters")
-        )
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(
+                instance.to_table("generated inspiral choose fd modes parameters")
+            )
         return instance
 
     @classmethod
@@ -145,9 +154,10 @@ class _InspiralChooseFDModesParameters(TableStr):
         params.r *= 1e6 * lal.PC_SI
 
         # informing the user which arguments we pass to the function
-        _logger.debug(
-            params.to_table(f"calling LS.SimInspiralChooseFDModes with arguments:")
-        )
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(
+                params.to_table(f"calling LS.SimInspiralChooseFDModes with arguments:")
+            )
 
         # Calling the lal simulation method
         arguments = list(astuple(params))

@@ -1,0 +1,31 @@
+# Production-scale benchmark configuration
+# Realistic settings with IMRPhenomXPHM and fine frequency grid
+
+domain:
+  type: UniformFrequencyDomain
+  f_min: 20.0
+  f_max: 1024.0
+  delta_f: 0.125
+
+waveform_generator:
+  approximant: IMRPhenomXPHM
+  f_ref: 20.0
+  f_start: 20.0
+  spin_conversion_phase: 0.0
+
+# Intrinsic prior matching typical dingo-gw configurations
+intrinsic_prior:
+  mass_1: bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)
+  mass_2: bilby.core.prior.Constraint(minimum=10.0, maximum=80.0)
+  chirp_mass: bilby.gw.prior.UniformInComponentsChirpMass(minimum=25.0, maximum=45.0)
+  mass_ratio: bilby.gw.prior.UniformInComponentsMassRatio(minimum=0.125, maximum=1.0)
+  luminosity_distance: 1000.0
+  theta_jn: Sine(minimum=0.0, maximum=3.14159)
+  phase: Uniform(minimum=0.0, maximum=6.28318)
+  a_1: Uniform(minimum=0.0, maximum=0.88)
+  a_2: Uniform(minimum=0.0, maximum=0.88)
+  tilt_1: Sine(minimum=0.0, maximum=3.14159)
+  tilt_2: Sine(minimum=0.0, maximum=3.14159)
+  phi_12: Uniform(minimum=0.0, maximum=6.28318)
+  phi_jl: Uniform(minimum=0.0, maximum=6.28318)
+  geocent_time: 0.0

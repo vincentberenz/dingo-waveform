@@ -40,6 +40,7 @@ dependencies = [
 
 [project.scripts]
 dingo-verify = "dingo_waveform.cli:main"
+dingo-benchmark = "dingo_waveform.benchmark:main"
 dingo_generate_dataset = "dingo_waveform.dataset_generation_cli:main"
 dingo-plot = "dingo_waveform.plotting_cli:main"
 

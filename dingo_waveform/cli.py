@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 import numpy as np
+import yaml
 
 from .comparison import compare_waveforms, compare_waveforms_modes, compare_svd_compression
 from .prior import IntrinsicPriors
@@ -18,12 +19,12 @@ from .prior import IntrinsicPriors
 
 def load_config(config_path: str) -> Dict[str, Any]:
     """
-    Load configuration from JSON file.
+    Load configuration from YAML or JSON file.
 
     Parameters
     ----------
     config_path : str
-        Path to JSON configuration file
+        Path to YAML or JSON configuration file
 
     Returns
     -------
@@ -35,7 +36,13 @@ def load_config(config_path: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
     with open(path, 'r') as f:
-        config = json.load(f)
+        if path.suffix in [".yaml", ".yml"]:
+            config = yaml.safe_load(f)
+        elif path.suffix == ".json":
+            config = json.load(f)
+        else:
+            # Try YAML by default
+            config = yaml.safe_load(f)
 
     return config
 
@@ -312,42 +319,39 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Use config.json in current directory
+  # Use config.yaml in current directory
   dingo-verify
 
   # Specify config file path
-  dingo-verify --config /path/to/config.json
+  dingo-verify --config /path/to/config.yaml
 
   # Verbose output
-  dingo-verify --config config.json --verbose
+  dingo-verify --config config.yaml --verbose
 
-Configuration File Format:
-  {
-    "domain": {
-      "type": "UniformFrequencyDomain" or "MultibandedFrequencyDomain",
-      "delta_f": 0.125,
-      "f_min": 20.0,
-      "f_max": 1024.0
-    },
-    "waveform_generator": {
-      "approximant": "IMRPhenomXPHM",
-      "f_ref": 20.0,
-      "f_start": 20.0
-    },
-    "waveform_parameters": {
-      "mass_1": 36.0,
-      "mass_2": 29.0,
-      "luminosity_distance": 1000.0,
-      ...
-    }
-  }
+Configuration File Format (YAML):
+  domain:
+    type: UniformFrequencyDomain  # or MultibandedFrequencyDomain
+    delta_f: 0.125
+    f_min: 20.0
+    f_max: 1024.0
+
+  waveform_generator:
+    approximant: IMRPhenomXPHM
+    f_ref: 20.0
+    f_start: 20.0
+
+  waveform_parameters:
+    mass_1: 36.0
+    mass_2: 29.0
+    luminosity_distance: 1000.0
+    ...
         """
     )
 
     parser.add_argument(
         '--config', '-c',
-        default='config.json',
-        help='Path to JSON configuration file (default: config.json)'
+        default='config.yaml',
+        help='Path to YAML configuration file (default: config.yaml)'
     )
     parser.add_argument(
         '--verbose', '-v',
@@ -411,7 +415,8 @@ Configuration File Format:
         if args.svd:
             # SVD compression comparison mode
             svd_config = config['svd']
-            prior_config = config['prior']
+            # Support both 'prior' and 'intrinsic_prior' (dingo-gw compatibility)
+            prior_config = config.get('prior') or config.get('intrinsic_prior')
 
             print("\nSVD Compression Comparison Mode")
             print(f"n_components: {svd_config['n_components']}")

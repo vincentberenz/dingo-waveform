@@ -2,6 +2,7 @@
 
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import shared_memory
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -20,15 +21,114 @@ from .waveform_dataset import WaveformDataset
 
 _logger = logging.getLogger(__name__)
 
+# Global worker state for persistent worker pool (Priority 1 optimization)
+_worker_generator: Optional[WaveformGenerator] = None
+_worker_domain: Optional[Domain] = None
+
+
+def _init_worker(waveform_generator_params: Dict, domain_params_dict: Dict) -> None:
+    """
+    Initialize worker process state.
+
+    This function is called once per worker process to set up the waveform generator.
+    This avoids reconstructing the generator for every waveform (Priority 1 optimization).
+
+    Parameters
+    ----------
+    waveform_generator_params
+        Dictionary of waveform generator configuration.
+    domain_params_dict
+        Dictionary of domain configuration (will be reconstructed to DomainParameters).
+    """
+    global _worker_generator, _worker_domain
+
+    # Build domain and generator once per worker
+    from ..domains import DomainParameters
+    domain_params = DomainParameters(**domain_params_dict)
+    _worker_domain = build_domain(domain_params)
+    _worker_generator = build_waveform_generator(waveform_generator_params, _worker_domain)
+
+
+def _generate_single_waveform_optimized(parameters_dict: Dict) -> Dict[str, np.ndarray]:
+    """
+    Generate a single waveform using initialized worker state (Priority 1 optimization).
+
+    This function assumes the worker has been initialized via _init_worker().
+    It reuses the generator instead of rebuilding it for each waveform.
+
+    Parameters
+    ----------
+    parameters_dict
+        Dictionary of waveform parameters.
+
+    Returns
+    -------
+    Dict with 'h_plus' and 'h_cross' arrays, or None values if generation failed.
+    """
+    global _worker_generator
+
+    try:
+        # Use pre-initialized generator
+        wf_params = WaveformParameters(**parameters_dict)
+        polarization = _worker_generator.generate_hplus_hcross(wf_params)
+
+        return {
+            "h_plus": polarization.h_plus,
+            "h_cross": polarization.h_cross,
+        }
+    except Exception as e:
+        _logger.warning(
+            f"Failed to generate waveform for parameters {parameters_dict}: {e}"
+        )
+        return {"h_plus": None, "h_cross": None}
+
+
+def _generate_waveform_batch(params_batch: List[Dict]) -> List[Dict[str, np.ndarray]]:
+    """
+    Generate a batch of waveforms using initialized worker state (Priority 2 optimization).
+
+    This function processes multiple waveforms in one task to reduce task overhead.
+
+    Parameters
+    ----------
+    params_batch
+        List of parameter dictionaries.
+
+    Returns
+    -------
+    List of dicts with 'h_plus' and 'h_cross' arrays.
+    """
+    global _worker_generator
+
+    results = []
+    for parameters_dict in params_batch:
+        try:
+            wf_params = WaveformParameters(**parameters_dict)
+            polarization = _worker_generator.generate_hplus_hcross(wf_params)
+            results.append({
+                "h_plus": polarization.h_plus,
+                "h_cross": polarization.h_cross,
+            })
+        except Exception as e:
+            _logger.warning(
+                f"Failed to generate waveform for parameters {parameters_dict}: {e}"
+            )
+            results.append({"h_plus": None, "h_cross": None})
+
+    return results
+
 
 def _generate_single_waveform(
     parameters_dict: Dict, waveform_generator_params: Dict, domain_params: Dict
 ) -> Dict[str, np.ndarray]:
     """
-    Generate a single waveform for given parameters.
+    Generate a single waveform for given parameters (legacy function).
 
     This function is designed to be called in parallel via ProcessPoolExecutor.
     It reconstructs the waveform generator from parameters to avoid pickling issues.
+
+    NOTE: This is the old implementation. Use generate_waveforms_parallel_optimized
+    for better performance with worker initialization.
 
     Parameters
     ----------
@@ -181,6 +281,115 @@ def generate_waveforms_parallel(
     for idx in sorted(results.keys()):
         h_plus_list.append(results[idx]["h_plus"])
         h_cross_list.append(results[idx]["h_cross"])
+
+    polarizations = BatchPolarizations(
+        h_plus=np.array(h_plus_list),
+        h_cross=np.array(h_cross_list),
+    )
+
+    # Apply batch transforms if configured
+    if waveform_generator.transform is not None:
+        polarizations = apply_transforms_to_polarizations(
+            polarizations, waveform_generator.transform
+        )
+
+    return polarizations
+
+
+def generate_waveforms_parallel_optimized(
+    waveform_generator: WaveformGenerator,
+    parameters: pd.DataFrame,
+    num_processes: int = 4,
+    batch_size: Optional[int] = None,
+) -> BatchPolarizations:
+    """
+    Generate waveforms in parallel with optimized worker initialization (Priorities 1 & 2).
+
+    This function uses persistent worker processes that initialize the waveform generator once,
+    and optionally processes waveforms in batches to reduce task overhead.
+
+    Parameters
+    ----------
+    waveform_generator
+        Configured waveform generator.
+    parameters
+        DataFrame of waveform parameters.
+    num_processes
+        Number of parallel processes to use.
+    batch_size
+        Number of waveforms to process per task. If None, auto-compute based on dataset size.
+        Recommended: 50-100 for simple approximants, 10-20 for complex approximants.
+
+    Returns
+    -------
+    BatchPolarizations with h_plus and h_cross arrays of shape (num_samples, frequency_bins).
+    """
+    if num_processes == 1:
+        return generate_waveforms_sequential(waveform_generator, parameters)
+
+    _logger.info(
+        f"Generating {len(parameters)} waveforms with {num_processes} processes "
+        f"(optimized with worker initialization and batching)..."
+    )
+
+    # Extract configuration for passing to workers
+    wfg_params = waveform_generator._waveform_gen_params
+    domain_params = wfg_params.domain.get_parameters()
+    wfg_config = {
+        "approximant": str(wfg_params.approximant),
+        "f_ref": wfg_params.f_ref,
+        "spin_conversion_phase": wfg_params.spin_conversion_phase,
+    }
+
+    # Auto-compute batch size if not specified
+    if batch_size is None:
+        # Heuristic: aim for ~4-8 tasks per process
+        num_waveforms = len(parameters)
+        ideal_num_tasks = num_processes * 6
+        batch_size = max(1, num_waveforms // ideal_num_tasks)
+        # Cap at reasonable values
+        batch_size = min(batch_size, 100)
+        _logger.debug(f"Auto-computed batch_size: {batch_size}")
+
+    # Prepare parameter batches
+    param_dicts = [row.to_dict() for idx, row in parameters.iterrows()]
+
+    if batch_size == 1:
+        # No batching - process one waveform per task
+        batches = [[p] for p in param_dicts]
+    else:
+        # Batch parameters
+        batches = [
+            param_dicts[i:i+batch_size]
+            for i in range(0, len(param_dicts), batch_size)
+        ]
+
+    _logger.debug(f"Split {len(parameters)} waveforms into {len(batches)} batches")
+
+    # Process batches in parallel with worker initialization
+    all_results = []
+    with ProcessPoolExecutor(
+        max_workers=num_processes,
+        initializer=_init_worker,
+        initargs=(wfg_config, domain_params.__dict__)
+    ) as executor:
+        # Submit all batch tasks
+        futures = [executor.submit(_generate_waveform_batch, batch) for batch in batches]
+
+        # Collect results as they complete
+        for future in as_completed(futures):
+            try:
+                batch_results = future.result()
+                all_results.extend(batch_results)
+            except Exception as e:
+                _logger.error(f"Batch processing failed: {e}")
+                # Append None results for failed batch
+                batch_size_actual = len(batches[0])  # Approximate
+                all_results.extend([{"h_plus": None, "h_cross": None}] * batch_size_actual)
+
+    # Aggregate results
+    h_plus_list = [r["h_plus"] for r in all_results]
+    h_cross_list = [r["h_cross"] for r in all_results]
 
     polarizations = BatchPolarizations(
         h_plus=np.array(h_plus_list),

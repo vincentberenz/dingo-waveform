@@ -1,7 +1,7 @@
 """Settings dataclass for waveform dataset generation."""
 
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 from ..domains import DomainParameters, build_domain
 from ..prior import IntrinsicPriors
@@ -136,11 +136,3 @@ class DatasetSettings:
             compression=compression,
         )
 
-    def validate(self) -> None:
-        """
-        Validate settings (for backward compatibility).
-
-        Validation is now done in __post_init__ and individual dataclass validators.
-        This method is kept for backward compatibility but does nothing.
-        """
-        pass  # Validation happens in __post_init__

@@ -1,0 +1,29 @@
+# Example configuration for dingo-verify with UniformFrequencyDomain
+
+domain:
+  type: UniformFrequencyDomain
+  delta_f: 0.125
+  f_min: 20.0
+  f_max: 1024.0
+
+waveform_generator:
+  approximant: IMRPhenomXPHM
+  f_ref: 20.0
+  f_start: 20.0
+  spin_conversion_phase: 0.0
+
+waveform_parameters:
+  mass_1: 36.0
+  mass_2: 29.0
+  chirp_mass: 28.095556
+  mass_ratio: 0.805556
+  luminosity_distance: 1000.0
+  theta_jn: 0.5
+  phase: 0.0
+  a_1: 0.5
+  a_2: 0.3
+  tilt_1: 0.5
+  tilt_2: 0.8
+  phi_12: 1.7
+  phi_jl: 0.3
+  geocent_time: 0.0

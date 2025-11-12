@@ -71,7 +71,8 @@ class _InspiralTDParameters(TableStr):
         params["lal_params"] = lal_params
         params["approximant"] = get_approximant(approximant)
         instance = cls(**params)
-        _logger.debug(instance.to_table("generated inspiral td parameters"))
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(instance.to_table("generated inspiral td parameters"))
         return instance
 
     @classmethod
@@ -100,9 +101,10 @@ class _InspiralTDParameters(TableStr):
 
     def apply(self) -> Polarization:
 
-        _logger.debug(
-            self.to_table("generating polarization using lalsimulation.SimInspiralTD")
-        )
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(
+                self.to_table("generating polarization using lalsimulation.SimInspiralTD")
+            )
 
         parameters = list(astuple(self))
         hp, hc = LS.SimInspiralTD(*parameters)

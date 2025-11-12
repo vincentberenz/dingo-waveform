@@ -20,15 +20,17 @@ _logger = logging.getLogger(__name__)
 def convert_to_float(x: Union[np.ndarray, Number, float]) -> float:
     # "convert" x to float, by x.item() if x is a numpy array,
     # float(x) otherwise.
+    # Optimization: Fast path for already-float values
+    if type(x) is float:
+        return x
+    # Fast path for scalar arrays
     if isinstance(x, np.ndarray):
-        if x.shape == () or x.shape == (1,):
+        if x.ndim == 0 or (x.ndim == 1 and len(x) == 1):
             return float(x.item())
-        else:
-            raise ValueError(
-                f"Expected an array of length one, but got shape = {x.shape}"
-            )
-    else:
-        return float(x)  # type: ignore
+        raise ValueError(
+            f"Expected an array of length one, but got shape = {x.shape}"
+        )
+    return float(x)  # type: ignore
 
 
 @dataclass
@@ -80,11 +82,45 @@ class BinaryBlackHoleParameters(TableStr):
         A BinaryBlackHoleParameters instance.
         """
 
-        # Convert the waveform parameters to a dictionary
-        params = asdict(waveform_params)
-
-        # Add the reference frequency to the parameters
-        params["f_ref"] = f_ref
+        # Build parameter dictionary with explicit field access
+        # This eliminates the expensive asdict() call which creates 73 function calls per waveform
+        params = {
+            "luminosity_distance": waveform_params.luminosity_distance,
+            "redshift": waveform_params.redshift,
+            "comoving_distance": waveform_params.comoving_distance,
+            "chi_1": waveform_params.chi_1,
+            "chi_2": waveform_params.chi_2,
+            "chi_1_in_plane": waveform_params.chi_1_in_plane,
+            "chi_2_in_plane": waveform_params.chi_2_in_plane,
+            "a_1": waveform_params.a_1,
+            "a_2": waveform_params.a_2,
+            "phi_jl": waveform_params.phi_jl,
+            "phi_12": waveform_params.phi_12,
+            "tilt_1": waveform_params.tilt_1,
+            "tilt_2": waveform_params.tilt_2,
+            "dec": waveform_params.dec,
+            "ra": waveform_params.ra,
+            "geocent_time": waveform_params.geocent_time,
+            "delta_phase": waveform_params.delta_phase,
+            "phase": waveform_params.phase,
+            "psi": waveform_params.psi,
+            "theta_jn": waveform_params.theta_jn,
+            "mass_1": waveform_params.mass_1,
+            "mass_2": waveform_params.mass_2,
+            "total_mass": waveform_params.total_mass,
+            "chirp_mass": waveform_params.chirp_mass,
+            "mass_ratio": waveform_params.mass_ratio,
+            "symmetric_mass_ratio": waveform_params.symmetric_mass_ratio,
+            "mass_1_source": waveform_params.mass_1_source,
+            "mass_2_source": waveform_params.mass_2_source,
+            "total_mass_source": waveform_params.total_mass_source,
+            "chirp_mass_source": waveform_params.chirp_mass_source,
+            "l_max": waveform_params.l_max,
+            "postadiabatic": waveform_params.postadiabatic,
+            "postadiabatic_type": waveform_params.postadiabatic_type,
+            "lmax_nyquist": waveform_params.lmax_nyquist,
+            "f_ref": f_ref,
+        }
 
         # Filter out any parameters that are None
         params = {k: v for k, v in params.items() if v is not None}
@@ -97,7 +133,8 @@ class BinaryBlackHoleParameters(TableStr):
         instance = cls(**converted_params)
 
         # Log the generated binary black hole parameters
-        _logger.debug(instance.to_table("generated binary black hole parameters"))
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(instance.to_table("generated binary black hole parameters"))
 
         return instance
 
@@ -143,10 +180,11 @@ class BinaryBlackHoleParameters(TableStr):
             args[-1] = spin_conversion_phase
 
         # Log the parameters being passed to the spin conversion function for debugging.
-        _logger.debug(
-            "calling bilby_to_lalsimulation_spins with arguments:\n"
-            f"{to_table({k: a for k,a in zip(keys,args)})}"
-        )
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(
+                "calling bilby_to_lalsimulation_spins with arguments:\n"
+                f"{to_table({k: a for k,a in zip(keys,args)})}"
+            )
 
         # Convert the parameters to the iota and Cartesian spin components using the external function.
         iota_and_cart_spins: List[float] = [
@@ -158,7 +196,8 @@ class BinaryBlackHoleParameters(TableStr):
         instance = Spins(*iota_and_cart_spins)
         # type ignore : for some reason I do not understand, instance is not
         # recognized by mypy as a dataclass type.
-        _logger.debug("generated spins:\n" f"{to_table(instance)}")  # type: ignore
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug("generated spins:\n" f"{to_table(instance)}")  # type: ignore
 
         # Return the Spins instance containing the calculated spin values.
         return instance
