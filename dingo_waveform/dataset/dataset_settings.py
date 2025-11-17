@@ -54,6 +54,15 @@ class DatasetSettings:
         if self.num_samples <= 0:
             raise ValueError(f"num_samples must be positive, got {self.num_samples}")
 
+    def validate(self):
+        """
+        Validate dataset settings.
+
+        This method is a no-op since validation happens in __post_init__().
+        Kept for backward compatibility with code that calls settings.validate().
+        """
+        pass
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert settings to dictionary format suitable for serialization.

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Dict, Optional, Union
 
 import numpy as np
 import torch
 from multipledispatch import dispatch
 
 from .domain import Domain, DomainParameters
+
+if TYPE_CHECKING:
+    from ..types import FrequencySeries, Modes
+    import lal
 
 
 class BaseFrequencyDomain(Domain, ABC):
@@ -87,6 +91,38 @@ class BaseFrequencyDomain(Domain, ABC):
             if data.shape[-2] > 2:
                 result[..., 2:, :] = data[..., 2:, :]
             return result
+
+    # --- Time-domain to frequency-domain mode conversion ---
+    def convert_td_modes_to_fd(
+        self, hlm_td: "Dict[Modes, lal.COMPLEX16FrequencySeries]"
+    ) -> "Dict[Modes, FrequencySeries]":
+        """
+        Convert time-domain modes to frequency-domain modes.
+
+        This method provides domain-specific logic for converting TD modes to FD.
+        The default implementation delegates to the existing td_modes_to_fd_modes
+        utility function, which works for uniform frequency domains.
+
+        Subclasses (e.g., MultibandedFrequencyDomain) can override this method
+        to implement custom conversion strategies (e.g., convert in uniform base
+        domain then decimate).
+
+        Parameters
+        ----------
+        hlm_td : Dict[Modes, lal.COMPLEX16FrequencySeries]
+            Dictionary of time-domain modes with (l,m) keys.
+
+        Returns
+        -------
+        Dict[Modes, FrequencySeries]
+            Dictionary of frequency-domain modes.
+        """
+        # Import here to avoid circular dependency
+        from ..polarization_modes_functions.polarization_modes_utils import (
+            td_modes_to_fd_modes,
+        )
+
+        return td_modes_to_fd_modes(hlm_td, self)
 
     # --- Core frequency range and resolution ---
     @property

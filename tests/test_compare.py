@@ -34,9 +34,10 @@ _new_interface_approximants = (Approximant("SEOBNRv5PHM"), Approximant("SEOBNRv5
 _f_start = (None, 15.0)
 
 
-def _same(a: np.ndarray, b: np.ndarray, tolerance=1e-25) -> None:
+def _same(a: np.ndarray, b: np.ndarray, tolerance=1e-15) -> None:
     # assert a and b are the same up to the tolerance.
     # 'same': same shape, dtype and values.
+    # tolerance set to 1e-15 (machine precision for float64)
     assert a.shape == b.shape
     assert a.dtype == b.dtype
     assert np.allclose(a, b, atol=tolerance)

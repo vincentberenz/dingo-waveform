@@ -29,7 +29,6 @@ from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
 from ..types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
 from ..waveform_generator_parameters import WaveformGeneratorParameters
 from ..waveform_parameters import WaveformParameters
-from .polarization_modes_utils import td_modes_to_fd_modes
 
 _logger = logging.getLogger(__name__)
 
@@ -191,7 +190,8 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
                 )
                 hlms_lal[modes] = hlm_lal
 
-        h: Dict[Modes, FrequencySeries] = td_modes_to_fd_modes(hlms_lal, domain)
+        # Convert TD modes to FD modes using domain-specific method
+        h: Dict[Modes, FrequencySeries] = domain.convert_td_modes_to_fd(hlms_lal)
         return get_polarizations_from_fd_modes_m(h, Iota(self.inclination.value), phase)
 
 

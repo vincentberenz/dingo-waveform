@@ -86,19 +86,19 @@ def test_FD_set_new_range() -> None:
     domain = UniformFrequencyDomain(**p)
     # test that ValueErrors are raised for infeasible inputs
     with pytest.raises(ValueError):
-        domain.set_new_range(p["f_max"] + 10, None)
+        domain = domain.update(f_max=p["f_max"] + 10)
     with pytest.raises(ValueError):
-        domain.set_new_range(p["f_min"] - 10, None)
+        domain = domain.update(f_min=p["f_min"] - 10)
     with pytest.raises(ValueError):
-        domain.set_new_range(None, p["f_max"] + 10)
+        domain = domain.update(f_max=p["f_max"] + 10)
     with pytest.raises(ValueError):
-        domain.set_new_range(None, p["f_min"] - 10)
+        domain = domain.update(f_min=p["f_min"] - 10)
     with pytest.raises(ValueError):
-        domain.set_new_range(p["f_min"] + 10, p["f_min"] + 5)
+        domain = domain.update(f_min=p["f_min"] + 10, f_max=p["f_min"] + 5)
     # test that setting new frequency range works as intended
     f_min_new, f_max_new = 40, 800
     n = int(f_max_new / p["delta_f"]) + 1
-    domain.set_new_range(f_min_new, f_max_new)
+    domain = domain.update(f_min=f_min_new, f_max=f_max_new)
     assert n == len(domain) == len(domain())
     new_linespace = np.linspace(0, f_max_new, n)
     assert np.all(domain() == np.linspace(0, f_max_new, n))

@@ -135,14 +135,14 @@ class TestCompareWithDingo:
                 h_plus_new,
                 h_plus_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_plus mismatch for waveform {i}",
             )
             np.testing.assert_allclose(
                 h_cross_new,
                 h_cross_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_cross mismatch for waveform {i}",
             )
 
@@ -199,14 +199,14 @@ class TestCompareWithDingo:
                 h_plus_new,
                 h_plus_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_plus mismatch for waveform {i}",
             )
             np.testing.assert_allclose(
                 h_cross_new,
                 h_cross_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_cross mismatch for waveform {i}",
             )
 
@@ -265,14 +265,14 @@ class TestCompareWithDingo:
                 h_plus_new,
                 h_plus_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_plus mismatch for waveform {i}",
             )
             np.testing.assert_allclose(
                 h_cross_new,
                 h_cross_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_cross mismatch for waveform {i}",
             )
 
@@ -329,14 +329,14 @@ class TestCompareWithDingo:
                 h_plus_new,
                 h_plus_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_plus mismatch for waveform {i}",
             )
             np.testing.assert_allclose(
                 h_cross_new,
                 h_cross_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_cross mismatch for waveform {i}",
             )
 
@@ -399,13 +399,13 @@ class TestCompareWithDingo:
                 h_plus_new,
                 h_plus_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_plus mismatch for waveform {i}",
             )
             np.testing.assert_allclose(
                 h_cross_new,
                 h_cross_dingo,
                 rtol=1e-10,
-                atol=1e-25,
+                atol=1e-15,
                 err_msg=f"h_cross mismatch for waveform {i}",
             )

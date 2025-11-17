@@ -111,6 +111,67 @@ class MultibandedFrequencyDomain(BaseFrequencyDomain):
         h_cross_decimated = self.decimate(polarizations.h_cross, mode='explicit')
         return Polarization(h_plus=h_plus_decimated, h_cross=h_cross_decimated)
 
+    @override
+    def convert_td_modes_to_fd(self, hlm_td):
+        """
+        Convert time-domain modes to frequency-domain modes for multibanded domain.
+
+        For multibanded domains with TD approximants, we follow dingo's approach:
+        1. Create a temporary uniform frequency domain using base_delta_f
+        2. Convert TD modes to FD in that uniform domain (with standard FFT)
+        3. Return the FD modes in symmetric format (-f_max,...,0,...,f_max)
+
+        Note: The returned modes are on a uniform frequency grid, NOT the multibanded
+        grid. This matches dingo's behavior where domain.property returns base_domain
+        for TD approximants with MultibandedFrequencyDomain. After conversion to
+        polarizations, users can manually decimate if desired using domain.decimate().
+
+        Parameters
+        ----------
+        hlm_td : Dict[Modes, lal.COMPLEX16FrequencySeries]
+            Dictionary of time-domain modes with (l,m) keys.
+
+        Returns
+        -------
+        Dict[Modes, FrequencySeries]
+            Dictionary of frequency-domain modes in symmetric format on uniform grid.
+        """
+        # Import here to avoid circular dependency
+        from ..polarization_modes_functions.polarization_modes_utils import (
+            td_modes_to_fd_modes,
+        )
+        import numpy as np
+
+        # Extract delta_t from TD modes to compute appropriate f_max
+        first_mode = next(iter(hlm_td.values()))
+        delta_t_actual = first_mode.deltaT
+
+        # Compute f_max that will give us the correct delta_t
+        # delta_t = 0.5 / f_max, so f_max = 0.5 / delta_t
+        f_max_from_td = 0.5 / delta_t_actual
+
+        # For FFT, we need chirplen = 2 * f_max / delta_f to be a power of 2
+        # We want to match base_delta_f as closely as possible while satisfying this constraint
+        # Strategy: Find power-of-2 chirplen closest to target, then adjust delta_f
+        chirplen_target = 2 * f_max_from_td / self.base_delta_f
+        chirplen = 2 ** int(np.round(np.log2(chirplen_target)))
+
+        # Compute delta_f that gives exact power-of-2 chirplen with required f_max
+        # delta_f = 2 * f_max_from_td / chirplen
+        delta_f_adjusted = 2 * f_max_from_td / chirplen
+        f_max_uniform = f_max_from_td  # Use exact f_max from TD modes
+
+        uniform_domain = UniformFrequencyDomain(
+            delta_f=delta_f_adjusted,
+            f_min=0.0,  # Start from 0 for standard FFT
+            f_max=f_max_uniform,
+            window_factor=self.window_factor,
+        )
+
+        # Convert TD modes to FD in the uniform base domain
+        # Return in symmetric format for use by get_polarizations_from_fd_modes_m()
+        return td_modes_to_fd_modes(hlm_td, uniform_domain)
+
     # ---------------------------
     # Construction helpers
     # ---------------------------
@@ -338,6 +399,7 @@ class MultibandedFrequencyDomain(BaseFrequencyDomain):
         return DomainParameters(
             f_max=self.f_max,
             f_min=self.f_min,
+            delta_t=0.5 / self.f_max if self.f_max > 0 else None,
             nodes=self.nodes.tolist(),
             delta_f_initial=float(self._binning.delta_f_bands[0]) if self.num_bands > 0 else None,
             base_delta_f=self.base_delta_f,

@@ -130,6 +130,17 @@ class BinaryBlackHoleParameters(TableStr):
         for k, v in converted_params.items():
             converted_params[k] = convert_to_float(v) if v is not None else None
 
+        # Ensure chirp_mass and mass_ratio are present (bilby conversion may not preserve them)
+        if "chirp_mass" not in converted_params and "mass_1" in converted_params and "mass_2" in converted_params:
+            m1 = converted_params["mass_1"]
+            m2 = converted_params["mass_2"]
+            converted_params["chirp_mass"] = (m1 * m2) ** 0.6 / (m1 + m2) ** 0.2
+
+        if "mass_ratio" not in converted_params and "mass_1" in converted_params and "mass_2" in converted_params:
+            m1 = converted_params["mass_1"]
+            m2 = converted_params["mass_2"]
+            converted_params["mass_ratio"] = m2 / m1
+
         instance = cls(**converted_params)
 
         # Log the generated binary black hole parameters

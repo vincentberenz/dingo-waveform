@@ -250,7 +250,7 @@ class TestGenerateWaveformDataset:
         dataset = generate_waveform_dataset(basic_settings, num_processes=1)
 
         expected_length = int(
-            basic_settings.domain["f_max"] / basic_settings.domain["delta_f"]
+            basic_settings.domain.f_max / basic_settings.domain.delta_f
         ) + 1
 
         assert dataset.polarizations.h_plus.shape == (len(dataset), expected_length)

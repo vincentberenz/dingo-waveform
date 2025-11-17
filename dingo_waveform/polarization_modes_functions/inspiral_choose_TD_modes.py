@@ -17,7 +17,6 @@ from ..types import FrequencySeries, Iota, Mode, Modes
 from ..waveform_generator_parameters import WaveformGeneratorParameters
 from ..waveform_parameters import WaveformParameters
 from . import polarization_modes_utils
-from .polarization_modes_utils import td_modes_to_fd_modes
 
 _logger = logging.getLogger(__name__)
 
@@ -140,7 +139,9 @@ class _InspiralChooseTDModesParameters(TableStr):
         # taper the time domain modes in place
         polarization_modes_utils.taper_td_modes_in_place(hlm_)
 
-        hlm: Dict[Modes, FrequencySeries] = td_modes_to_fd_modes(hlm_, domain)
+        # Convert TD modes to FD modes using domain-specific method
+        # (allows MultibandedFrequencyDomain to handle conversion differently)
+        hlm: Dict[Modes, FrequencySeries] = domain.convert_td_modes_to_fd(hlm_)
 
         pol: Dict[Mode, Polarization] = get_polarizations_from_fd_modes_m(
             hlm, self.iota, phase  # type: ignore

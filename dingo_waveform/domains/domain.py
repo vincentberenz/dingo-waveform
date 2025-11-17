@@ -250,6 +250,31 @@ def build_domain(domain_parameters: DomainParameters) -> Domain:
     return instance
 
 
+@dispatch(dict)  # type: ignore[no-redef]
+def build_domain(domain_parameters: dict) -> Domain:
+    """
+    Build an instance of domain based on a dictionary.
+
+    Parameters
+    ----------
+    domain_parameters
+        A dictionary containing domain parameters
+
+    Returns
+    -------
+    An instance of the domain.
+    """
+    try:
+        dp = DomainParameters(**domain_parameters)
+    except Exception as e:
+        raise ValueError(
+            f"Constructing domain: failed to parse parameters from dictionary "
+            f"{repr(domain_parameters)}. {type(e)}: {e}"
+        ) from e
+
+    return build_domain(dp)
+
+
 @dispatch((str, Path))  # type: ignore[no-redef]
 def build_domain(domain_parameters: Union[str, Path]) -> Domain:
     """
