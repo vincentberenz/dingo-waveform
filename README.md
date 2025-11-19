@@ -22,22 +22,10 @@ pip install -e .
 
 ### Development Installation
 
-For development with testing and type checking:
+For development:
 
 ```bash
 pip install -e ".[dev]"
-```
-
-### Optional Features
-
-For documentation building:
-```bash
-pip install -e ".[docs]"
-```
-
-For interactive examples:
-```bash
-pip install -e ".[examples]"
 ```
 
 ## Quick Start
@@ -288,7 +276,8 @@ dingo_waveform/
 ├── waveform_parameters.py              # Parameter definitions
 ├── cli.py                              # Verification CLI
 ├── cli_batch.py                        # Batch verification CLI
-└── dataset_generation_cli.py           # Dataset generation CLI
+└── dataset/
+    └── cli.py                          # Dataset generation CLI (dingo_generate_dataset)
 ```
 
 ## Contributing

@@ -4,7 +4,6 @@
 
 
 import logging
-import sys
 from dataclasses import asdict, dataclass
 from typing import Dict, Optional, Union, cast
 
@@ -14,6 +13,7 @@ import gwpy.frequencyseries
 import lal
 import lalsimulation
 import numpy as np
+import pyseobnr
 from lalsimulation.gwsignal.core import waveform
 from lalsimulation.gwsignal.core.gw import (
     GravitationalWaveModes,
@@ -168,8 +168,6 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
             self.to_table("generating polarization using waveform.GenerateFDModes")
         )
 
-        if not "pyseobnr" in sys.modules:
-            import pyseobnr
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
         params["f22_start"] = SEOBRNRv5_conditioning.new_f_start * astropy.units.Hz

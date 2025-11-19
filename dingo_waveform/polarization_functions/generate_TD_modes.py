@@ -1,8 +1,8 @@
 import logging
-import sys
 from dataclasses import asdict, dataclass
 from typing import Optional, cast
 
+import pyseobnr
 from lalsimulation.gwsignal.core import waveform
 from lalsimulation.gwsignal.models import gwsignal_get_waveform_generator
 
@@ -55,8 +55,6 @@ class _GenerateTDModesParameters(GwSignalParameters):
             )
         )
 
-        if not "pyseobnr" in sys.modules:
-            import pyseobnr
         generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
         hpc = waveform.GenerateTDWaveform(params, generator)

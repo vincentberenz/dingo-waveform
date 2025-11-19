@@ -39,15 +39,16 @@ dependencies = [
 ]
 
 [project.scripts]
-dingo-verify = "dingo_waveform.cli:main"
-dingo-verify-batch = "dingo_waveform.cli_batch:main"
-dingo-benchmark = "dingo_waveform.benchmark:main"
-dingo_generate_dataset = "dingo_waveform.dataset_generation_cli:main"
-dingo-plot = "dingo_waveform.plotting_cli:main"
+dingo-verify = "dingo_waveform.comparison.cli:main"
+dingo-verify-batch = "dingo_waveform.comparison.cli_batch:main"
+dingo-benchmark = "dingo_waveform.comparison.benchmark:main"
+dingo_generate_dataset = "dingo_waveform.dataset.cli:main"
+dingo-plot = "dingo_waveform.plotting.cli:main"
 
 [project.optional-dependencies]
 dev = [
     "black",
+    "dingo-gw",
     "isort",
     "linkify-it-py",
     "mypy",
@@ -56,9 +57,7 @@ dev = [
     "types-PyYAML",
     "types-toml",
     "marimo>=0.9.0",
-    "pyyaml>=6.0"
-]
-docs = [
+    "pyyaml>=6.0",
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.24.0",

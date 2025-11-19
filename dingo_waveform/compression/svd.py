@@ -13,6 +13,14 @@ import pandas as pd
 import scipy.linalg
 from sklearn.utils.extmath import randomized_svd
 
+from ..types import (
+    SVDBasisMatrix,
+    SVDBasisMatrixH,
+    SingularValues,
+    SVDCoefficients,
+    WaveformTrainingData,
+)
+
 _logger = logging.getLogger(__name__)
 
 
@@ -29,24 +37,32 @@ class SVDBasis:
 
     Attributes
     ----------
-    V : np.ndarray
-        Right singular vectors (basis), shape (n_features, n_components)
-    Vh : np.ndarray
-        Hermitian conjugate of V, shape (n_components, n_features)
-    s : np.ndarray
-        Singular values, shape (n_components,)
-    n_components : int
-        Number of basis elements kept
+    V : SVDBasisMatrix | None
+        Right singular vectors (basis), shape (n_features, n_components).
+        Complex128 array. Each column is one basis vector representing a
+        fundamental pattern in the waveform dataset.
+    Vh : SVDBasisMatrixH | None
+        Hermitian conjugate of V, shape (n_components, n_features).
+        Complex128 array. Each row is a conjugate-transposed basis vector.
+        Used for decompression: waveform ≈ coefficients @ Vh
+    s : SingularValues | None
+        Singular values, shape (n_components,). Float64 array of non-negative
+        real numbers ordered from largest to smallest, representing the
+        importance of each basis vector.
+    n_components : int | None
+        Number of basis elements kept. Range: 1 ≤ n_components ≤ min(n_samples, n_features)
     """
 
-    V: Optional[np.ndarray] = None
-    Vh: Optional[np.ndarray] = None
-    s: Optional[np.ndarray] = None
-    n_components: Optional[int] = None
+    # Type hints use the new type aliases from dingo_waveform.types
+    # These provide clear documentation of expected shapes and dtypes
+    V: Optional[SVDBasisMatrix] = None  # (n_features, n_components), complex128
+    Vh: Optional[SVDBasisMatrixH] = None  # (n_components, n_features), complex128
+    s: Optional[SingularValues] = None  # (n_components,), float64
+    n_components: Optional[int] = None  # Integer in range [1, min(n_samples, n_features)]
 
     def generate_basis(
         self,
-        training_data: np.ndarray,
+        training_data: WaveformTrainingData,  # (n_samples, n_features), complex128
         n_components: int = 0,
         method: Literal["scipy", "randomized"] = "scipy",
     ) -> None:
@@ -55,12 +71,15 @@ class SVDBasis:
 
         Parameters
         ----------
-        training_data
+        training_data : WaveformTrainingData
             Array of waveform data with shape (n_samples, n_features).
-            For complex waveforms, this should be a complex array.
-        n_components
-            Number of basis elements to keep. If 0, keeps all components.
-        method
+            Complex128 array where each row is one waveform. For example,
+            1000 waveforms with 2048 frequency bins would be shape (1000, 2048).
+        n_components : int
+            Number of basis elements to keep. If 0, keeps all components
+            up to min(n_samples, n_features). Typical usage keeps a fraction
+            of available components for compression (e.g., 200 out of 2048).
+        method : Literal["scipy", "randomized"]
             SVD method to use:
             - "scipy": Full SVD using scipy.linalg.svd (more accurate)
             - "randomized": Randomized SVD (faster for large datasets)
@@ -123,20 +142,27 @@ class SVDBasis:
 
         _logger.info(f"SVD basis generated with {self.n_components} components")
 
-    def compress(self, data: np.ndarray) -> np.ndarray:
+    def compress(self, data: np.ndarray) -> SVDCoefficients:
         """
         Compress data using the SVD basis.
 
         Projects waveform data onto the SVD basis to get compressed coefficients.
+        The compression operation is: coefficients = data @ V
 
         Parameters
         ----------
-        data
-            Waveform data to compress, shape (n_samples, n_features) or (n_features,)
+        data : np.ndarray
+            Waveform data to compress. Can be:
+            - Single waveform: shape (n_features,) -> returns (n_components,)
+            - Batch of waveforms: shape (n_samples, n_features) -> returns (n_samples, n_components)
+            Complex128 array.
 
         Returns
         -------
-        Compressed coefficients, shape (n_samples, n_components) or (n_components,)
+        SVDCoefficients
+            Compressed coefficients with reduced dimensionality.
+            Complex128 array, shape (n_samples, n_components) or (n_components,)
+            The dimensionality is reduced from n_features to n_components.
 
         Raises
         ------
@@ -146,22 +172,31 @@ class SVDBasis:
         if self.V is None:
             raise ValueError("SVD basis has not been generated. Call generate_basis() first.")
 
+        # Project waveform(s) onto basis vectors: coefficients = data @ V
         return data @ self.V
 
-    def decompress(self, coefficients: np.ndarray) -> np.ndarray:
+    def decompress(self, coefficients: SVDCoefficients) -> np.ndarray:
         """
         Decompress coefficients back to waveform data.
 
-        Reconstructs waveform data from SVD coefficients.
+        Reconstructs waveform data from SVD coefficients. This is an approximate
+        reconstruction - some information is lost in compression.
+        The decompression operation is: waveform ≈ coefficients @ Vh
 
         Parameters
         ----------
-        coefficients
-            SVD coefficients, shape (n_samples, n_components) or (n_components,)
+        coefficients : SVDCoefficients
+            SVD coefficients to decompress. Can be:
+            - Single set: shape (n_components,) -> returns (n_features,)
+            - Batch: shape (n_samples, n_components) -> returns (n_samples, n_features)
+            Complex128 array.
 
         Returns
         -------
-        Reconstructed waveform data, shape (n_samples, n_features) or (n_features,)
+        np.ndarray
+            Reconstructed waveform data with original dimensionality.
+            Complex128 array, shape (n_samples, n_features) or (n_features,)
+            This is an approximate reconstruction; accuracy depends on n_components.
 
         Raises
         ------
@@ -171,11 +206,12 @@ class SVDBasis:
         if self.Vh is None:
             raise ValueError("SVD basis has not been generated. Call generate_basis() first.")
 
+        # Reconstruct waveform(s) from coefficients: waveform ≈ coefficients @ Vh
         return coefficients @ self.Vh
 
     def compute_mismatches(
         self,
-        data: np.ndarray,
+        data: WaveformTrainingData,  # (n_samples, n_features), complex128
         parameters: Optional[pd.DataFrame] = None,
     ) -> pd.DataFrame:
         """
@@ -189,19 +225,25 @@ class SVDBasis:
 
         Parameters
         ----------
-        data
-            Validation data, shape (n_samples, n_features)
-        parameters
-            Optional parameters DataFrame for labeling results
+        data : WaveformTrainingData
+            Validation data, shape (n_samples, n_features).
+            Complex128 array of waveforms to validate compression quality.
+        parameters : pd.DataFrame | None
+            Optional parameters DataFrame for labeling results.
+            If provided, must have same length as data.
 
         Returns
         -------
-        DataFrame with mismatch values and optional parameter columns
+        pd.DataFrame
+            DataFrame with mismatch values and optional parameter columns.
+            Contains column f"mismatch_n={self.n_components}" with mismatch
+            values for each waveform.
 
         Raises
         ------
         ValueError
-            If basis has not been generated yet.
+            If basis has not been generated yet or if parameters length
+            does not match data length.
         """
         if self.V is None or self.Vh is None:
             raise ValueError("SVD basis has not been generated.")

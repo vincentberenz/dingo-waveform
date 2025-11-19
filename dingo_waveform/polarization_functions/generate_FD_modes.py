@@ -1,10 +1,10 @@
 import logging
-import sys
 from dataclasses import asdict, dataclass
 from math import isclose
 from typing import Optional, Union, cast
 
 import numpy as np
+import pyseobnr
 from lalsimulation.gwsignal.core import waveform
 from lalsimulation.gwsignal.core.gw import GravitationalWavePolarizations
 from lalsimulation.gwsignal.models import (
@@ -73,9 +73,6 @@ class _GenerateFDModesParameters(GwSignalParameters):
                 "lalsimulation.gwsignal.core.waveform.GenerateFDWaveform"
             )
         )
-
-        if not "pyseobnr" in sys.modules:
-            import pyseobnr
 
         generator: _Generators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}

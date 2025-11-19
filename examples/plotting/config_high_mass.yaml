@@ -1,0 +1,28 @@
+# High-mass binary waveform plotting example
+# Shorter waveform with higher frequency content
+
+domain:
+  type: UniformFrequencyDomain
+  delta_f: 0.25
+  f_min: 30.0
+  f_max: 2048.0
+
+waveform_generator:
+  approximant: IMRPhenomXPHM
+  f_ref: 30.0
+  f_start: 30.0
+  spin_conversion_phase: 0.0
+
+waveform_parameters:
+  mass_1: 80.0
+  mass_2: 60.0
+  luminosity_distance: 1500.0
+  theta_jn: 0.3
+  phase: 0.0
+  a_1: 0.3
+  a_2: 0.2
+  tilt_1: 0.2
+  tilt_2: 0.3
+  phi_12: 1.0
+  phi_jl: 0.5
+  geocent_time: 0.0
