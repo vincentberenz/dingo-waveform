@@ -1,0 +1,28 @@
+# Mode-separated waveform plotting example
+# Uses IMRPhenomXPHM which supports mode separation
+
+domain:
+  type: UniformFrequencyDomain
+  delta_f: 0.125
+  f_min: 20.0
+  f_max: 1024.0
+
+waveform_generator:
+  approximant: IMRPhenomXPHM  # Supports mode separation
+  f_ref: 20.0
+  f_start: 20.0
+  spin_conversion_phase: 0.0
+
+waveform_parameters:
+  mass_1: 50.0
+  mass_2: 35.0
+  luminosity_distance: 600.0
+  theta_jn: 0.8
+  phase: 0.2
+  a_1: 0.6
+  a_2: 0.4
+  tilt_1: 0.5
+  tilt_2: 0.6
+  phi_12: 2.0
+  phi_jl: 1.0
+  geocent_time: 0.0

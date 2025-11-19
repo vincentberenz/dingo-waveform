@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=62.0", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dingo-waveform"
+description = "Modular gravitational waveform generator with improved type safety and performance"
+readme = "README.md"
+requires-python = ">=3.8"
+dynamic = ["version"]
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Operating System :: OS Independent"
+]
+
+dependencies = [
+    "bilby",
+    "bilby_pipe==1.4.2",
+    "lalsuite>=7.15",
+    "matplotlib",
+    "numpy",
+    "nptyping",
+    "multipledispatch",
+    "pyseobnr",
+    "rich",
+    "scipy",
+    "scipy-stubs[scipy]",
+    "toml",
+    "tomli",
+    "torch",
+    "gwpy",
+    "plotly>=5.0.0",
+    "kaleido"
+    #"dingo-gw"
+]
+
+[project.scripts]
+dingo-verify = "dingo_waveform.comparison.cli:main"
+dingo-verify-batch = "dingo_waveform.comparison.cli_batch:main"
+dingo-benchmark = "dingo_waveform.comparison.benchmark:main"
+dingo_generate_dataset = "dingo_waveform.dataset.cli:main"
+dingo-plot = "dingo_waveform.plotting.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "dingo-gw",
+    "isort",
+    "linkify-it-py",
+    "mypy",
+    "pylint",
+    "pytest",
+    "types-PyYAML",
+    "types-toml",
+    "marimo>=0.9.0",
+    "pyyaml>=6.0",
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-jupyter>=0.24.0"
+]
+
+# Configure setuptools_scm for version management
+[tool.setuptools_scm]
+write_to = "dingo_waveform/_version.py"
+
+# Configure package discovery to exclude notebooks
+[tool.setuptools.packages.find]
+include = ["dingo_waveform*"]
+exclude = ["notebooks*", "tests*", "docs*"]
+
+# Optional: Configure package data if needed
+[tool.setuptools.package-data]
+"*" = ["py.typed"]

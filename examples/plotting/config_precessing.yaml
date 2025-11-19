@@ -1,0 +1,28 @@
+# Precessing binary waveform plotting example
+# Uses SEOBNRv5PHM approximant with precessing spins
+
+domain:
+  type: UniformFrequencyDomain
+  delta_f: 0.125
+  f_min: 20.0
+  f_max: 1024.0
+
+waveform_generator:
+  approximant: SEOBNRv5PHM
+  f_ref: 20.0
+  f_start: 20.0
+  spin_conversion_phase: 0.0
+
+waveform_parameters:
+  mass_1: 40.0
+  mass_2: 30.0
+  luminosity_distance: 800.0
+  theta_jn: 1.0
+  phase: 0.5
+  a_1: 0.7
+  a_2: 0.6
+  tilt_1: 0.8  # Precessing
+  tilt_2: 1.2  # Precessing
+  phi_12: 1.5
+  phi_jl: 0.8
+  geocent_time: 0.0
