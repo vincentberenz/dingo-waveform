@@ -29,3 +29,5 @@ intrinsic_prior:
   phi_12: Uniform(minimum=0.0, maximum=6.28318)
   phi_jl: Uniform(minimum=0.0, maximum=6.28318)
   geocent_time: 0.0
+
+num_samples: 100

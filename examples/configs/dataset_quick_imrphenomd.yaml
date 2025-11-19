@@ -26,3 +26,5 @@ intrinsic_prior:
   phi_12: 0.0
   phi_jl: 0.0
   geocent_time: 0.0
+
+num_samples: 100
