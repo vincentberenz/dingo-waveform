@@ -354,8 +354,8 @@ def compile_binning_from_bands(
         raise ValueError("Bands must be indexed 0..num_bands-1 without gaps.")
 
     # Reconstruct nodes and indices; check continuity
-    nodes: F32Vec = np.empty((num_bands + 1,), dtype=dtype)  # (num_bands + 1,)
-    nodes_indices: IntVec = np.empty((num_bands + 1,), dtype=int)  # (num_bands + 1,)
+    nodes = np.empty((num_bands + 1,), dtype=dtype)  # (num_bands + 1,)
+    nodes_indices = np.empty((num_bands + 1,), dtype=int)  # (num_bands + 1,)
 
     nodes[0] = bands_sorted[0].node_lower
     nodes_indices[0] = bands_sorted[0].node_lower_idx
@@ -388,7 +388,7 @@ def compile_binning_from_bands(
     )  # (num_bands,)
 
     # Bin ranges (num_bands, 2), each row is [start, end) into per-bin arrays
-    band_bin_ranges: IntMat2 = np.empty((num_bands, 2), dtype=int)  # (num_bands, 2)
+    band_bin_ranges = np.empty((num_bands, 2), dtype=int)  # (num_bands, 2)
     for i, b in enumerate(bands_sorted):
         band_bin_ranges[i, 0] = b.bin_start
         band_bin_ranges[i, 1] = b.bin_end
@@ -557,8 +557,8 @@ def decimate_uniform(
             raise RuntimeError(
                 "Torch is required for tensor decimation but is not available."
             ) from e
-        x_reshaped = x_trim.reshape(*x_trim.shape[:-1], n_bins, d)
-        return x_reshaped.mean(dim=-1)
+        x_reshaped_tensor = x_trim.reshape(*x_trim.shape[:-1], n_bins, d)
+        return x_reshaped_tensor.mean(dim=-1)
 
 
 def decimate(

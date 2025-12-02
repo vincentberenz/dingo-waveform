@@ -1,7 +1,7 @@
 """Multi-banded frequency domain for efficient waveform representation."""
 
 from dataclasses import asdict
-from typing import Iterable, Optional, Tuple, Union
+from typing import Iterable, Literal, Optional, Tuple, Union, cast
 
 import numpy as np
 import torch
@@ -17,6 +17,7 @@ from .domain import DomainParameters, build_domain
 from .frequency_base import BaseFrequencyDomain
 from .frequency_domain import UniformFrequencyDomain
 from ..polarizations import Polarization
+from ..types import FrequencySeries
 
 _module_import_path = "dingo_waveform.domains"
 
@@ -109,7 +110,11 @@ class MultibandedFrequencyDomain(BaseFrequencyDomain):
         """
         h_plus_decimated = self.decimate(polarizations.h_plus, mode='explicit')
         h_cross_decimated = self.decimate(polarizations.h_cross, mode='explicit')
-        return Polarization(h_plus=h_plus_decimated, h_cross=h_cross_decimated)
+        # Cast to FrequencySeries (numpy array) for Polarization
+        return Polarization(
+            h_plus=cast(FrequencySeries, h_plus_decimated),
+            h_cross=cast(FrequencySeries, h_cross_decimated)
+        )
 
     @override
     def convert_td_modes_to_fd(self, hlm_td):
@@ -236,7 +241,7 @@ class MultibandedFrequencyDomain(BaseFrequencyDomain):
     # ---------------------------
 
     def decimate(
-        self, data: Union[np.ndarray, torch.Tensor], mode: str = 'auto'
+        self, data: Union[np.ndarray, torch.Tensor], mode: Literal['auto', 'explicit'] = 'auto'
     ) -> Union[np.ndarray, torch.Tensor]:
         """
         Decimate data from the base uniform grid to this multi-banded domain.
@@ -261,7 +266,7 @@ class MultibandedFrequencyDomain(BaseFrequencyDomain):
     # ---------------------------
 
     @property
-    def fbase(self)->Tuple[float,float]:
+    def fbase(self)->Tuple[np.ndarray, np.ndarray]:
         return self._binning.f_base_lower, self._binning.f_base_upper
 
     @property
@@ -380,6 +385,7 @@ class MultibandedFrequencyDomain(BaseFrequencyDomain):
         """
         Return a 1D frequency array compatible with the last index of data array.
         """
+        f: Union[np.ndarray, torch.Tensor]
         if isinstance(data, np.ndarray):
             f = self.sample_frequencies
         elif isinstance(data, torch.Tensor):

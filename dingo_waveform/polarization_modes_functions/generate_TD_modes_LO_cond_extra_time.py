@@ -159,7 +159,7 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
 
     def apply(
         self, approximant: Approximant, domain: BaseFrequencyDomain, phase: float
-    ) -> Dict[Mode, Polarization]:
+    ) -> Dict[Modes, Polarization]:
         SEOBRNRv5_conditioning: _SEOBRNRv5Conditioning = (
             self._get_starting_frequency_for_SEOBRNRv5_conditioning()
         )
@@ -196,7 +196,7 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
 def generate_TD_modes_LO_cond_extra_time(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
-) -> Dict[Mode, Polarization]:
+) -> Dict[Modes, Polarization]:
     """
     Wrapper over lalsimulation.gwsignal.core.waveform.GenerateFDModes
     using the SEOBNRv5PHM or the SEOBNRv5HM approximant;

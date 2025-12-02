@@ -106,7 +106,7 @@ class BatchPolarizations:
 
 
 def sum_contributions_m(
-    x_m: Dict[Mode, Polarization], phase_shift: float = 0.0
+    x_m: Dict[Modes, Polarization], phase_shift: float = 0.0
 ) -> Polarization:
     """
     Sum the contributions over m-components, optionally introducing a phase shift.
@@ -124,14 +124,16 @@ def sum_contributions_m(
     """
     result = Polarization(h_plus=0.0, h_cross=0.0)  # type: ignore
     for mode in x_m.keys():
-        result.h_plus += x_m[mode].h_plus * np.exp(-1j * mode * phase_shift)
-        result.h_cross += x_m[mode].h_cross * np.exp(-1j * mode * phase_shift)
+        # mode is (ℓ, m), use m value for phase shift
+        m_value = mode[1]
+        result.h_plus += x_m[mode].h_plus * np.exp(-1j * m_value * phase_shift)
+        result.h_cross += x_m[mode].h_cross * np.exp(-1j * m_value * phase_shift)
     return result
 
 
 def get_polarizations_from_fd_modes_m(
     hlm_fd: Dict[Modes, FrequencySeries], iota: Iota, phase: float
-) -> Dict[Mode, Polarization]:
+) -> Dict[Mode, Polarization]:  # type: ignore[return]
     """
     Compute polarizations from frequency domain modes.
 
@@ -188,7 +190,7 @@ def get_polarizations_from_fd_modes_m(
     }
 
 
-def polarizations_to_table(pol: Dict[Mode, Polarization]) -> str:
+def polarizations_to_table(pol: Dict[Modes, Polarization]) -> str:
     """
     Convert polarizations to a formatted table string.
 

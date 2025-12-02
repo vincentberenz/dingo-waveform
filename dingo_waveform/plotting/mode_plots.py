@@ -12,11 +12,11 @@ from plotly.subplots import make_subplots
 
 from ..domains import Domain, BaseFrequencyDomain, TimeDomain
 from ..polarizations import Polarization, sum_contributions_m
-from ..types import Mode
+from ..types import Mode, Modes
 
 
 def plot_mode_amplitudes(
-    modes: Dict[Mode, Polarization],
+    modes: Dict[Modes, Polarization],
     domain: Domain,
     frequency: Optional[float] = None,
     polarization_type: Literal["plus", "cross"] = "plus",
@@ -28,7 +28,7 @@ def plot_mode_amplitudes(
 
     Parameters
     ----------
-    modes : Dict[Mode, Polarization]
+    modes : Dict[Modes, Polarization]
         Mode-separated polarizations from generate_hplus_hcross_m
     domain : Domain
         Domain specification
@@ -106,7 +106,7 @@ def plot_mode_amplitudes(
 
 
 def plot_individual_modes(
-    modes: Dict[Mode, Polarization],
+    modes: Dict[Modes, Polarization],
     domain: Domain,
     mode_list: Optional[List[Mode]] = None,
     domain_type: Literal["time", "frequency"] = "frequency",
@@ -121,7 +121,7 @@ def plot_individual_modes(
 
     Parameters
     ----------
-    modes : Dict[Mode, Polarization]
+    modes : Dict[Modes, Polarization]
         Mode-separated polarizations from generate_hplus_hcross_m
     domain : Domain
         Domain specification
@@ -218,9 +218,9 @@ def plot_individual_modes(
 
 
 def plot_mode_comparison(
-    modes: Dict[Mode, Polarization],
+    modes: Dict[Modes, Polarization],
     domain: Domain,
-    reference_mode: Mode = (2, 2),
+    reference_mode: Modes = (2, 2),  # type: ignore[assignment]
     metric: Literal["amplitude_ratio", "phase_difference"] = "amplitude_ratio",
     polarization_type: Literal["plus", "cross"] = "plus",
     title: Optional[str] = None,
@@ -231,7 +231,7 @@ def plot_mode_comparison(
 
     Parameters
     ----------
-    modes : Dict[Mode, Polarization]
+    modes : Dict[Modes, Polarization]
         Mode-separated polarizations
     domain : Domain
         Domain specification
@@ -323,7 +323,7 @@ def plot_mode_comparison(
 
 
 def plot_modes_grid(
-    modes: Dict[Mode, Polarization],
+    modes: Dict[Modes, Polarization],
     domain: Domain,
     domain_type: Literal["time", "frequency"] = "frequency",
     polarization_type: Literal["plus", "cross"] = "plus",
@@ -334,7 +334,7 @@ def plot_modes_grid(
 
     Parameters
     ----------
-    modes : Dict[Mode, Polarization]
+    modes : Dict[Modes, Polarization]
         Mode-separated polarizations
     domain : Domain
         Domain specification
@@ -445,7 +445,7 @@ def plot_modes_grid(
 
 
 def plot_mode_reconstruction(
-    modes: Dict[Mode, Polarization],
+    modes: Dict[Modes, Polarization],
     domain: Domain,
     selected_modes: Optional[List[Mode]] = None,
     phase_shift: float = 0.0,
@@ -461,7 +461,7 @@ def plot_mode_reconstruction(
 
     Parameters
     ----------
-    modes : Dict[Mode, Polarization]
+    modes : Dict[Modes, Polarization]
         Mode-separated polarizations
     domain : Domain
         Domain specification

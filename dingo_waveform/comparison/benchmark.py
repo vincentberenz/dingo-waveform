@@ -12,7 +12,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -260,15 +260,15 @@ def benchmark_waveform_generation(
         logger.debug(f"Random seed set to: {seed}")
 
     # Load configuration
-    config_path = Path(config_path)
-    if not config_path.exists():
+    config_file = Path(config_path)
+    if not config_file.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
     logger.debug(f"Loading configuration from: {config_path}")
-    with open(config_path, "r") as f:
-        if config_path.suffix in [".yaml", ".yml"]:
+    with open(config_file, "r") as f:
+        if config_file.suffix in [".yaml", ".yml"]:
             config = yaml.safe_load(f)
-        elif config_path.suffix == ".json":
+        elif config_file.suffix == ".json":
             config = json.load(f)
         else:
             # Try YAML by default
@@ -378,6 +378,7 @@ def benchmark_waveform_generation(
 
     # Build domain
     domain_params_clean = {k: v for k, v in domain_params.items() if k != "type"}
+    refactored_domain: Union[UniformFrequencyDomain, MultibandedFrequencyDomain]
     if "multibanded" in domain_type.lower():
         refactored_domain = MultibandedFrequencyDomain(**domain_params_clean)
     else:

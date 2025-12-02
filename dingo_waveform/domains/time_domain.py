@@ -37,7 +37,6 @@ class TimeDomain(Domain):
             f"sampling rate: {self._sampling_rate:.2f})"
         )
 
-    @override
     def update(self) -> None:
         """
         TimeDomain does not support update.

@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 import pytest
 
-from dingo_waveform.compression.svd import SVDBasis
+from dingo_svd import SVDBasis, SVDGenerationConfig
 from dingo_waveform.domains import UniformFrequencyDomain
 from dingo_waveform.transforms import ApplySVD, ComposeTransforms, Transform, WhitenAndUnwhiten
 
@@ -20,8 +20,8 @@ class TestApplySVD:
         """Create a simple SVD basis for testing."""
         np.random.seed(42)
         data = np.random.randn(100, 200) + 1j * np.random.randn(100, 200)
-        basis = SVDBasis()
-        basis.generate_basis(data, n_components=20, method="scipy")
+        config = SVDGenerationConfig(n_components=20, method="scipy")
+        basis = SVDBasis.from_training_data(data, config)
         return basis
 
     @pytest.fixture
@@ -75,12 +75,8 @@ class TestApplySVD:
         assert reconstructed["h_plus"].dtype == sample_polarizations["h_plus"].dtype
         assert not np.any(np.isnan(reconstructed["h_plus"]))
 
-    def test_error_untrained_basis(self):
-        """Test error when using untrained basis."""
-        basis = SVDBasis()
-
-        with pytest.raises(ValueError, match="has not been trained"):
-            ApplySVD(basis, inverse=False)
+    # Test removed: dingo-svd's immutable API doesn't allow creating untrained basis
+    # ApplySVD will only work with properly trained bases from factory methods
 
     def test_repr(self, sample_basis):
         """Test string representation."""
@@ -247,8 +243,8 @@ class TestComposeTransforms:
         # Create SVD basis
         np.random.seed(42)
         train_data = np.random.randn(50, len(domain)) + 1j * np.random.randn(50, len(domain))
-        basis = SVDBasis()
-        basis.generate_basis(train_data, n_components=20, method="scipy")
+        config = SVDGenerationConfig(n_components=20, method="scipy")
+        basis = SVDBasis.from_training_data(train_data, config)
 
         # Create pipeline: whiten then compress
         pipeline = ComposeTransforms([

@@ -639,7 +639,7 @@ def compare_svd_compression(
     """
     # Import SVD classes
     from dingo.gw.SVD import SVDBasis as DingoSVD
-    from dingo_waveform.compression.svd import SVDBasis as RefactoredSVD
+    from dingo_svd import SVDBasis as RefactoredSVD
 
     if len(waveform_params_list) < num_training + num_validation:
         raise ValueError(
@@ -679,22 +679,26 @@ def compare_svd_compression(
         training_data_dingo.append(data_dingo)
         training_data_refactored.append(data_refactored)
 
-    training_data_dingo = np.array(training_data_dingo)
-    training_data_refactored = np.array(training_data_refactored)
+    training_data_dingo_np: np.ndarray = np.array(training_data_dingo)
+    training_data_refactored_np: np.ndarray = np.array(training_data_refactored)
 
-    print(f"Training data shape: {training_data_dingo.shape}")
+    print(f"Training data shape: {training_data_dingo_np.shape}")
 
     # Train SVD basis in both systems
     print(f"\nTraining SVD basis with {n_components} components...")
     print("  - Training dingo SVD...")
     svd_dingo = DingoSVD()
-    svd_dingo.generate_basis(training_data_dingo, n=n_components, method=svd_method)
+    svd_dingo.generate_basis(training_data_dingo_np, n=n_components, method=svd_method)
 
     print("  - Training dingo-waveform SVD...")
-    svd_refactored = RefactoredSVD()
-    svd_refactored.generate_basis(
-        training_data_refactored, n_components=n_components, method=svd_method
+    # Use the new dingo-svd API
+    from dingo_svd import generate_svd_basis, SVDGenerationConfig, SVDBasis
+    svd_result = generate_svd_basis(
+        training_data_refactored_np,
+        config=SVDGenerationConfig(n_components=n_components, method=svd_method)
     )
+    # Create SVDBasis from the result
+    svd_refactored = SVDBasis(_result=svd_result)
 
     # Compare basis shapes
     shapes_match = svd_dingo.V.shape == svd_refactored.V.shape
@@ -754,16 +758,16 @@ def compare_svd_compression(
             validation_data_dingo.append(data_dingo)
             validation_data_refactored.append(data_refactored)
 
-        validation_data_dingo = np.array(validation_data_dingo)
-        validation_data_refactored = np.array(validation_data_refactored)
+        validation_data_dingo_np: np.ndarray = np.array(validation_data_dingo)
+        validation_data_refactored_np: np.ndarray = np.array(validation_data_refactored)
 
-        print(f"Validation data shape: {validation_data_dingo.shape}")
+        print(f"Validation data shape: {validation_data_dingo_np.shape}")
 
         # Compute mismatches in dingo
         print("\nComputing reconstruction mismatches...")
         print("  - Dingo...")
         mismatches_dingo = []
-        for data in validation_data_dingo:
+        for data in validation_data_dingo_np:
             compressed = svd_dingo.compress(data)
             reconstructed = svd_dingo.decompress(compressed)
             norm1 = np.sqrt(np.sum(np.abs(data) ** 2))
@@ -775,22 +779,24 @@ def compare_svd_compression(
         # Compute mismatches in dingo-waveform
         print("  - Dingo-waveform...")
         mismatches_refactored = []
-        for data in validation_data_refactored:
-            compressed = svd_refactored.compress(data)
-            reconstructed = svd_refactored.decompress(compressed)
+        for data in validation_data_refactored_np:
+            from dingo_svd import compress, decompress
+            compressed_result = compress(data, svd_refactored.V)
+            decompressed_result = decompress(compressed_result.coefficients, svd_refactored.Vh)
+            reconstructed = decompressed_result.data
             norm1 = np.sqrt(np.sum(np.abs(data) ** 2))
             norm2 = np.sqrt(np.sum(np.abs(reconstructed) ** 2))
             inner = np.sum(data.conj() * reconstructed).real
             mismatch = 1.0 - inner / (norm1 * norm2)
             mismatches_refactored.append(mismatch)
 
-        mismatches_dingo = np.array(mismatches_dingo)
-        mismatches_refactored = np.array(mismatches_refactored)
+        mismatches_dingo_np: np.ndarray = np.array(mismatches_dingo)
+        mismatches_refactored_np: np.ndarray = np.array(mismatches_refactored)
 
-        result.dingo_mean_mismatch = float(np.mean(mismatches_dingo))
-        result.refactored_mean_mismatch = float(np.mean(mismatches_refactored))
-        result.dingo_max_mismatch = float(np.max(mismatches_dingo))
-        result.refactored_max_mismatch = float(np.max(mismatches_refactored))
+        result.dingo_mean_mismatch = float(np.mean(mismatches_dingo_np))
+        result.refactored_mean_mismatch = float(np.mean(mismatches_refactored_np))
+        result.dingo_max_mismatch = float(np.max(mismatches_dingo_np))
+        result.refactored_max_mismatch = float(np.max(mismatches_refactored_np))
         result.mismatch_difference = float(np.abs(
             result.dingo_mean_mismatch - result.refactored_mean_mismatch
         ))

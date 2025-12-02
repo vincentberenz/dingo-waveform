@@ -14,7 +14,7 @@ import numpy as np
 
 from ..domains import Domain, TimeDomain, BaseFrequencyDomain
 from ..polarizations import Polarization
-from ..types import Mode
+from ..types import Mode, Modes
 
 
 def polarization_to_gwpy_timeseries(
@@ -98,21 +98,21 @@ def polarization_to_gwpy_frequencyseries(
 
 
 def modes_to_gwpy_dict_timeseries(
-    modes: Dict[Mode, Polarization], domain: TimeDomain
-) -> Dict[Mode, Tuple[gwpy.timeseries.TimeSeries, gwpy.timeseries.TimeSeries]]:
+    modes: Dict[Modes, Polarization], domain: TimeDomain
+) -> Dict[Modes, Tuple[gwpy.timeseries.TimeSeries, gwpy.timeseries.TimeSeries]]:
     """
     Convert mode-separated polarizations to gwpy TimeSeries objects.
 
     Parameters
     ----------
-    modes : Dict[Mode, Polarization]
+    modes : Dict[Modes, Polarization]
         Mode-separated polarizations from generate_hplus_hcross_m
     domain : TimeDomain
         Time domain specification
 
     Returns
     -------
-    Dict[Mode, Tuple[gwpy.timeseries.TimeSeries, gwpy.timeseries.TimeSeries]]
+    Dict[Modes, Tuple[gwpy.timeseries.TimeSeries, gwpy.timeseries.TimeSeries]]
         Dictionary mapping each mode to (h_plus_ts, h_cross_ts)
     """
     result = {}
@@ -126,21 +126,21 @@ def modes_to_gwpy_dict_timeseries(
 
 
 def modes_to_gwpy_dict_frequencyseries(
-    modes: Dict[Mode, Polarization], domain: BaseFrequencyDomain
-) -> Dict[Mode, Tuple[gwpy.frequencyseries.FrequencySeries, gwpy.frequencyseries.FrequencySeries]]:
+    modes: Dict[Modes, Polarization], domain: BaseFrequencyDomain
+) -> Dict[Modes, Tuple[gwpy.frequencyseries.FrequencySeries, gwpy.frequencyseries.FrequencySeries]]:
     """
     Convert mode-separated polarizations to gwpy FrequencySeries objects.
 
     Parameters
     ----------
-    modes : Dict[Mode, Polarization]
+    modes : Dict[Modes, Polarization]
         Mode-separated polarizations from generate_hplus_hcross_m
     domain : BaseFrequencyDomain
         Frequency domain specification
 
     Returns
     -------
-    Dict[Mode, Tuple[gwpy.frequencyseries.FrequencySeries, gwpy.frequencyseries.FrequencySeries]]
+    Dict[Modes, Tuple[gwpy.frequencyseries.FrequencySeries, gwpy.frequencyseries.FrequencySeries]]
         Dictionary mapping each mode to (h_plus_fs, h_cross_fs)
     """
     result = {}

@@ -56,7 +56,7 @@ class _GenerateTDModesLO(GwSignalParameters):
 
     def apply(
         self, approximant: Approximant, domain: BaseFrequencyDomain, phase: float
-    ) -> Dict[Mode, Polarization]:
+    ) -> Dict[Modes, Polarization]:
 
         _logger.debug(
             self.to_table("generating polarization using waveform.GenerateFDModes")
@@ -95,7 +95,7 @@ class _GenerateTDModesLO(GwSignalParameters):
 def generate_TD_modes_LO(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
-) -> Dict[Mode, Polarization]:
+) -> Dict[Modes, Polarization]:
     """
     Wrapper over lalsimulation.gwsignal.core.waveform.GenerateFDModes
 

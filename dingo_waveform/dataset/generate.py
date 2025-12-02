@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from bilby.gw.prior import BBHPriorDict
 
-from ..compression.svd import SVDBasis
+from dingo_svd import SVDBasis, SVDGenerationConfig, SVDMetadata, ValidationConfig
 from ..domains import Domain, DomainParameters, build_domain
 from ..polarizations import BatchPolarizations
 from ..prior import build_prior_with_defaults
@@ -530,9 +530,19 @@ def train_svd_basis(
         axis=0
     )
 
-    # Train SVD basis
-    basis = SVDBasis()
-    basis.generate_basis(train_data, n_components=size, method="scipy")
+    # Create SVD generation config
+    config = SVDGenerationConfig(n_components=size, method="scipy")
+
+    # Create metadata
+    metadata = SVDMetadata(
+        description="Waveform SVD basis",
+        n_training_samples=n_train,
+        n_validation_samples=n_validation,
+        data_shape=train_data.shape
+    )
+
+    # Train SVD basis using factory method
+    basis = SVDBasis.from_training_data(train_data, config, metadata)
 
     # Validate if we have validation samples
     if n_validation > 0:
@@ -542,7 +552,18 @@ def train_svd_basis(
             axis=0
         )
         val_params = pd.concat([parameters[n_train:], parameters[n_train:]], ignore_index=True)
-        mismatches = basis.compute_mismatches(val_data, val_params)
+
+        # Use dingo-svd's validation
+        val_config = ValidationConfig(
+            increment=size,  # Only validate at full n_components
+            compute_percentiles=True
+        )
+        basis, validation_result = basis.validate(
+            test_data=val_data,
+            config=val_config,
+            labels=val_params,
+            verbose=True
+        )
 
     return basis, n_train, n_validation
 
@@ -630,7 +651,7 @@ def build_compression_transforms(
         # Load pre-trained SVD basis if file provided
         if svd_settings.file is not None:
             _logger.info(f"Loading SVD basis from {svd_settings.file}")
-            svd_basis = SVDBasis.load(svd_settings.file)
+            svd_basis = SVDBasis.from_file(svd_settings.file)
 
         # Otherwise, generate SVD basis from training waveforms
         else:

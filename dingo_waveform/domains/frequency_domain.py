@@ -182,7 +182,6 @@ class UniformFrequencyDomain(BaseFrequencyDomain):
             domain_parameters.delta_f,  # type: ignore
         )
 
-    @override
     def update(
         self,
         f_min: Optional[float] = None,
@@ -372,8 +371,9 @@ class UniformFrequencyDomain(BaseFrequencyDomain):
     @override
     def __call__(self) -> np.ndarray:
         """Return array of uniform frequency bins in the domain [0, f_max]."""
-        return self.sample_frequencies()
+        return self.sample_frequencies
 
+    @property
     def sample_frequencies(self) -> np.ndarray:
         """Return the sample frequencies."""
         return self._cached_sample_frequencies.sample_frequencies

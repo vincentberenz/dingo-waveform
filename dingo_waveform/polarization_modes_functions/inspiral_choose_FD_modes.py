@@ -145,7 +145,7 @@ class _InspiralChooseFDModesParameters(TableStr):
             f_start,
         )
 
-    def apply(self) -> Dict[Mode, Polarization]:
+    def apply(self) -> Dict[Modes, Polarization]:
 
         # for SimInspiralChooseFDModes, SI units are required
         params: "_InspiralChooseFDModesParameters" = deepcopy(self)
@@ -180,7 +180,7 @@ class _InspiralChooseFDModesParameters(TableStr):
 def inspiral_choose_FD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
-) -> Dict[Mode, Polarization]:
+) -> Dict[Modes, Polarization]:
     """
     Wrapper over lalsimulation.SimInspiralChooseFDModes
 

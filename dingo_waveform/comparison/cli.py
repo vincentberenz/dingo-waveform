@@ -439,7 +439,7 @@ Configuration File Format (YAML):
             logger.info(f"num_validation: {svd_config['num_validation']}")
 
             # Build prior and sample parameters
-            from .prior import build_prior_with_defaults
+            from ..prior import build_prior_with_defaults
             prior = build_prior_with_defaults(prior_config)
 
             total_samples = svd_config['num_training'] + svd_config['num_validation']

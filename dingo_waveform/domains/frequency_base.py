@@ -152,54 +152,64 @@ class BaseFrequencyDomain(Domain, ABC):
         """Number of frequency bins represented by the domain."""
         raise NotImplementedError
 
+    @property
     @abstractmethod
     def min_idx(self) -> int:
         """Index of the first frequency bin included in the domain."""
         raise NotImplementedError
 
+    @property
     @abstractmethod
     def max_idx(self) -> int:
         """Index of the last frequency bin included in the domain."""
         raise NotImplementedError
 
     # --- Frequencies ---
+    @property
     @abstractmethod
     def sample_frequencies(self) -> np.ndarray:
         """NumPy array of sample frequencies for the domain."""
         raise NotImplementedError
 
+    @property
     @abstractmethod
     def sample_frequencies_torch(self) -> torch.Tensor:
         """PyTorch tensor of sample frequencies for the domain (CPU)."""
         raise NotImplementedError
 
+    @property
     @abstractmethod
     def sample_frequencies_torch_cuda(self) -> torch.Tensor:
         """PyTorch tensor of sample frequencies for the domain (CUDA)."""
         raise NotImplementedError
 
+    @property
     @abstractmethod
     def frequency_mask(self) -> np.ndarray:
         """Boolean mask indicating bins at or above f_min (or valid bins)."""
         raise NotImplementedError
 
+    @property
     @abstractmethod
     def frequency_mask_length(self) -> int:
         """Number of true entries in frequency mask."""
         raise NotImplementedError
 
     # --- Common derived quantities ---
+    @property
     @abstractmethod
     def duration(self) -> float:
         """Effective time duration corresponding to the frequency resolution."""
         raise NotImplementedError
 
+    @property
     @abstractmethod
     def sampling_rate(self) -> float:
         """Effective sampling rate corresponding to the band structure."""
         raise NotImplementedError
 
     # --- Noise and data utilities ---
+    @property
     @abstractmethod
     def noise_std(self) -> Union[float, np.ndarray]:
         """Standard deviation of noise per frequency bin."""

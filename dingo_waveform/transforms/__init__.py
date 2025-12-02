@@ -1,7 +1,9 @@
 """Transform pipeline for waveform compression and preprocessing."""
 
-from .base import Transform, ComposeTransforms
-from .svd_transform import ApplySVD
+# Import Transform framework from dingo-svd
+from dingo_svd import Transform, ComposeTransforms, ApplySVD
+
+# Keep domain-specific transforms in dingo-waveform
 from .whitening import WhitenAndUnwhiten
 
 __all__ = [

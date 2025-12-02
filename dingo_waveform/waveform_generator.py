@@ -41,7 +41,7 @@ A single polarization value for the specified parameters.
 
 
 PolarizationModesFunction: TypeAlias = Callable[
-    [WaveformGeneratorParameters, WaveformParameters], Dict[Mode, Polarization]
+    [WaveformGeneratorParameters, WaveformParameters], Dict[Modes, Polarization]
 ]
 """
 Type alias for functions that generate multiple polarization modes.
@@ -385,7 +385,7 @@ class WaveformGenerator:
 
     def generate_hplus_hcross_m(
         self, waveform_parameters: WaveformParameters
-    ) -> Dict[Mode, Polarization]:
+    ) -> Dict[Modes, Polarization]:
         """
         Generate h+ and h× polarizations for multiple modes.
 
@@ -433,7 +433,7 @@ class WaveformGenerator:
             )
 
         # generating the waveforms
-        polarization_modes: Dict[Mode, Polarization] = polarization_modes_function(
+        polarization_modes: Dict[Modes, Polarization] = polarization_modes_function(
             self._waveform_gen_params, waveform_parameters
         )
 
@@ -493,7 +493,7 @@ def build_waveform_generator(params: Dict, domain: Domain) -> WaveformGenerator:
     )
 
 
-@dispatch(dict)
+@dispatch(dict)  # type: ignore[no-redef]
 def build_waveform_generator(params: Dict) -> WaveformGenerator:
 
     for key in ("domain", "waveform_generator"):
@@ -508,12 +508,12 @@ def build_waveform_generator(params: Dict) -> WaveformGenerator:
     return build_waveform_generator(waveform_params, domain)
 
 
-@dispatch(Path)
+@dispatch(Path)  # type: ignore[no-redef]
 def build_waveform_generator(file_path: Path) -> WaveformGenerator:
     params = read_file(file_path)
     return build_waveform_generator(params)
 
 
-@dispatch(str)
+@dispatch(str)  # type: ignore[no-redef]
 def build_waveform_generator(file_path: Path) -> WaveformGenerator:
     return build_waveform_generator(Path(file_path))

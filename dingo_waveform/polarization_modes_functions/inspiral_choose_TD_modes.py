@@ -111,7 +111,7 @@ class _InspiralChooseTDModesParameters(TableStr):
             f_start,
         )
 
-    def apply(self, domain: BaseFrequencyDomain, phase: float) -> Dict[Mode, Polarization]:
+    def apply(self, domain: BaseFrequencyDomain, phase: float) -> Dict[Modes, Polarization]:
 
         # for SimInspiralChooseFDModes, SI units are required
         params: "_InspiralChooseTDModesParameters" = deepcopy(self)
@@ -143,7 +143,7 @@ class _InspiralChooseTDModesParameters(TableStr):
         # (allows MultibandedFrequencyDomain to handle conversion differently)
         hlm: Dict[Modes, FrequencySeries] = domain.convert_td_modes_to_fd(hlm_)
 
-        pol: Dict[Mode, Polarization] = get_polarizations_from_fd_modes_m(
+        pol: Dict[Modes, Polarization] = get_polarizations_from_fd_modes_m(
             hlm, self.iota, phase  # type: ignore
         )
 
@@ -153,7 +153,7 @@ class _InspiralChooseTDModesParameters(TableStr):
 def inspiral_choose_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
-) -> Dict[Mode, Polarization]:
+) -> Dict[Modes, Polarization]:
     """
     Wrapper over lalsimulation.SimInspiralChooseTDModes
 

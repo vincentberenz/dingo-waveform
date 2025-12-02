@@ -155,7 +155,7 @@ class TestDatasetGenerationWithCompression:
     def test_load_pretrained_svd(self, basic_settings, tmp_path):
         """Test loading pre-trained SVD basis from file."""
         # First, create and save an SVD basis
-        from dingo_waveform.compression.svd import SVDBasis
+        from dingo_svd import SVDBasis, SVDGenerationConfig
         from dingo_waveform.domains import build_domain
 
         # Get the actual domain length
@@ -165,8 +165,8 @@ class TestDatasetGenerationWithCompression:
         np.random.seed(42)
         # Need at least 40 training samples to get 40 components
         train_data = np.random.randn(50, domain_length) + 1j * np.random.randn(50, domain_length)
-        basis = SVDBasis()
-        basis.generate_basis(train_data, n_components=40, method="scipy")
+        config = SVDGenerationConfig(n_components=40, method="scipy")
+        basis = SVDBasis.from_training_data(train_data, config)
 
         basis_path = tmp_path / "pretrained_basis.hdf5"
         basis.save(basis_path)

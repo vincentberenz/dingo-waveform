@@ -55,7 +55,7 @@ import h5py
 import numpy as np
 
 from ..domains import Domain
-from .base import Transform
+from dingo_svd import Transform
 
 _logger = logging.getLogger(__name__)
 
@@ -133,10 +133,10 @@ class WhitenAndUnwhiten(Transform):
     Full compression pipeline with whitening and SVD:
 
     >>> from dingo_waveform.transforms import ComposeTransforms, ApplySVD
-    >>> from dingo_waveform.compression import SVDBasis
+    >>> from dingo_svd import SVDBasis
     >>>
     >>> # Load SVD basis
-    >>> basis = SVDBasis.load("svd_basis.hdf5")
+    >>> basis = SVDBasis.from_file("svd_basis.hdf5")
     >>>
     >>> # Create compression pipeline
     >>> compress_pipeline = ComposeTransforms([

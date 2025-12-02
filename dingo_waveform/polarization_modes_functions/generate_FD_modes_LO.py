@@ -58,7 +58,7 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
         self,
         spin_conversion_phase: float,
         phase: float,
-    ) -> Dict[Mode, Polarization]:
+    ) -> Dict[Modes, Polarization]:
 
         # only approximant supported.
         # (so no need to pass it as argument)
@@ -124,7 +124,7 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
 def generate_FD_modes_LO(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
-) -> Dict[Mode, Polarization]:
+) -> Dict[Modes, Polarization]:
     """
     Wrapper over lalsimulation.gwsignal.core.waveform.GenerateFDModes
     using the IMRPhenomXPHM approximant.

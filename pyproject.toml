@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "bilby",
     "bilby_pipe==1.4.2",
+    "dingo-svd>=0.2.0",
     "lalsuite>=7.15",
     "matplotlib",
     "numpy",
