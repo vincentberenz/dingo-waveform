@@ -2,6 +2,15 @@
 
 A refactor of dingo-gw's waveform generator, meant to replicate its functionalities and outputs while improving code readability and maintainability.
 
+## Features
+
+- Modular gravitational waveform generation with type-safe interfaces
+- Multiple domain support (time, frequency, multibanded frequency)
+- **Integrated SVD compression** via `dingo_waveform.svd` subpackage
+- Parallel dataset generation with multiprocessing
+- CLI tools for verification, benchmarking, and visualization
+- Comprehensive test coverage with pytest
+
 ## Installation
 
 ```bash

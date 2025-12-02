@@ -155,7 +155,7 @@ class TestDatasetGenerationWithCompression:
     def test_load_pretrained_svd(self, basic_settings, tmp_path):
         """Test loading pre-trained SVD basis from file."""
         # First, create and save an SVD basis
-        from dingo_svd import SVDBasis, SVDGenerationConfig
+        from dingo_waveform.svd import SVDBasis, SVDGenerationConfig
         from dingo_waveform.domains import build_domain
 
         # Get the actual domain length

@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 import pytest
 
-from dingo_svd import SVDBasis, SVDGenerationConfig
+from dingo_waveform.svd import SVDBasis, SVDGenerationConfig
 from dingo_waveform.domains import UniformFrequencyDomain
 from dingo_waveform.transforms import ApplySVD, ComposeTransforms, Transform, WhitenAndUnwhiten
 

@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from dingo_svd import SVDBasis
+from dingo_waveform.svd import SVDBasis
 from ..polarizations import BatchPolarizations
 from .dataset_settings import DatasetSettings
 

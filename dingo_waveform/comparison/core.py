@@ -639,7 +639,7 @@ def compare_svd_compression(
     """
     # Import SVD classes
     from dingo.gw.SVD import SVDBasis as DingoSVD
-    from dingo_svd import SVDBasis as RefactoredSVD
+    from dingo_waveform.svd import SVDBasis as RefactoredSVD
 
     if len(waveform_params_list) < num_training + num_validation:
         raise ValueError(
@@ -691,8 +691,8 @@ def compare_svd_compression(
     svd_dingo.generate_basis(training_data_dingo_np, n=n_components, method=svd_method)
 
     print("  - Training dingo-waveform SVD...")
-    # Use the new dingo-svd API
-    from dingo_svd import generate_svd_basis, SVDGenerationConfig, SVDBasis
+    # Use the new dingo_waveform.svd API
+    from dingo_waveform.svd import generate_svd_basis, SVDGenerationConfig, SVDBasis
     svd_result = generate_svd_basis(
         training_data_refactored_np,
         config=SVDGenerationConfig(n_components=n_components, method=svd_method)
@@ -780,7 +780,7 @@ def compare_svd_compression(
         print("  - Dingo-waveform...")
         mismatches_refactored = []
         for data in validation_data_refactored_np:
-            from dingo_svd import compress, decompress
+            from dingo_waveform.svd import compress, decompress
             compressed_result = compress(data, svd_refactored.V)
             decompressed_result = decompress(compressed_result.coefficients, svd_refactored.Vh)
             reconstructed = decompressed_result.data

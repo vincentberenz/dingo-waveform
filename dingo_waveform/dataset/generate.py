@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from bilby.gw.prior import BBHPriorDict
 
-from dingo_svd import SVDBasis, SVDGenerationConfig, SVDMetadata, ValidationConfig
+from dingo_waveform.svd import SVDBasis, SVDGenerationConfig, SVDMetadata, ValidationConfig
 from ..domains import Domain, DomainParameters, build_domain
 from ..polarizations import BatchPolarizations
 from ..prior import build_prior_with_defaults
