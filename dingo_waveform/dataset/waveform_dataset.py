@@ -3,7 +3,7 @@
 import logging
 from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import h5py
 import numpy as np
@@ -11,7 +11,9 @@ import pandas as pd
 
 from dingo_waveform.svd import SVDBasis
 from ..polarizations import BatchPolarizations
+from ..transform.transform import Transform
 from .dataset_settings import DatasetSettings
+from .sampler import Sampler
 
 _logger = logging.getLogger(__name__)
 
@@ -268,3 +270,112 @@ class WaveformDataset:
                     else:
                         result[key] = data
         return result
+
+    def get_svd_sampler(
+        self,
+        asd_dataset_path: str,
+        data_settings: Optional[Dict[str, Any]] = None,
+    ) -> Sampler:
+        """
+        Create a Sampler configured for SVD generation.
+
+        Uses Transform.for_svd() to construct the transform with settings
+        extracted from this dataset.
+
+        Parameters
+        ----------
+        asd_dataset_path : str
+            Path to ASD dataset file
+        data_settings : Optional[Dict[str, Any]]
+            Optional data settings override. If None, extracts from self.settings.
+
+        Returns
+        -------
+        Sampler
+            Configured sampler for SVD generation
+
+        Raises
+        ------
+        ValueError
+            If settings are not available and data_settings not provided
+
+        Examples
+        --------
+        >>> dataset = WaveformDataset.load("dataset.hdf5")
+        >>> sampler = dataset.get_svd_sampler(asd_dataset_path="asd.hdf5")
+        >>> svd_iterator = sampler.get_svd_iterator(batch_size=32)
+        """
+        # Extract or use provided data_settings
+        if data_settings is None:
+            if self.settings is None:
+                raise ValueError(
+                    "Cannot create SVD sampler: dataset has no settings and "
+                    "data_settings parameter not provided"
+                )
+            # Convert DatasetSettings to dict format expected by Transform.for_svd()
+            if hasattr(self.settings, "__dict__"):
+                data_settings = (
+                    asdict(self.settings)
+                    if callable(asdict)
+                    else vars(self.settings)
+                )
+            else:
+                data_settings = self.settings
+
+        # Construct Transform using for_svd factory method
+        transform = Transform.for_svd(
+            data_settings=data_settings,
+            waveform_dataset=self,
+            asd_dataset_path=asd_dataset_path,
+        )
+
+        # Return Sampler wrapping the transform
+        return Sampler(transform=transform, dataset=self)
+
+    def get_inference_sampler(
+        self,
+        model_metadata: Dict[str, Any],
+        detectors: List[str],
+        ref_time: float,
+    ) -> Sampler:
+        """
+        Create a Sampler configured for inference.
+
+        Uses Transform.for_inference() to construct the transform from
+        model metadata.
+
+        Parameters
+        ----------
+        model_metadata : Dict[str, Any]
+            Model metadata containing domain, standardization, etc.
+        detectors : List[str]
+            List of detector names (e.g., ['H1', 'L1', 'V1'])
+        ref_time : float
+            Reference GPS time for event
+
+        Returns
+        -------
+        Sampler
+            Configured sampler for inference
+
+        Examples
+        --------
+        >>> dataset = WaveformDataset.load("dataset.hdf5")
+        >>> metadata = load_model_metadata("model.pt")
+        >>> sampler = dataset.get_inference_sampler(
+        ...     model_metadata=metadata,
+        ...     detectors=['H1', 'L1'],
+        ...     ref_time=1234567890.0
+        ... )
+        >>> pre_transform = sampler.get_inference_transform_pre()
+        >>> post_transform = sampler.get_inference_transform_post()
+        """
+        # Construct Transform using for_inference factory method
+        transform = Transform.for_inference(
+            model_metadata=model_metadata,
+            detectors=detectors,
+            ref_time=ref_time,
+        )
+
+        # Return Sampler wrapping the transform
+        return Sampler(transform=transform, dataset=self)

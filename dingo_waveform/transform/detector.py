@@ -11,7 +11,17 @@ from bilby.gw.detector.interferometer import Interferometer
 from lal import GreenwichMeanSiderealTime
 from bilby.gw.detector import calibration
 from bilby.gw.prior import CalibrationPriorDict
-from bilby_pipe.utils import CALIBRATION_CORRECTION_TYPE_LOOKUP
+
+# Try to import from bilby_pipe, fallback to default mapping if unavailable
+try:
+    from bilby_pipe.utils import CALIBRATION_CORRECTION_TYPE_LOOKUP
+except ImportError:
+    # Fallback for newer bilby_pipe versions where this constant was removed
+    CALIBRATION_CORRECTION_TYPE_LOOKUP = {
+        "H1": "template",
+        "L1": "template",
+        "V1": "template",
+    }
 
 CC = 299792458.0
 
