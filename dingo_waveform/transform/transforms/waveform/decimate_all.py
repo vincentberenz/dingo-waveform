@@ -54,9 +54,8 @@ class DecimateAllConfig(WaveformTransformConfig):
         ----------
         config_dict : Dict[str, Any]
             Configuration dictionary with 'multibanded_frequency_domain' key.
-            The value can be either:
-            - A MultibandedFrequencyDomain object (direct)
-            - A dict representation (will be converted via build_domain)
+            The value must be a MultibandedFrequencyDomain object
+            (NOT a dict - must already be constructed).
 
         Returns
         -------
@@ -65,30 +64,24 @@ class DecimateAllConfig(WaveformTransformConfig):
 
         Examples
         --------
-        >>> from dingo.gw.domains import MultibandedFrequencyDomain, build_domain
+        >>> from dingo_waveform.domains import MultibandedFrequencyDomain
         >>> mfd = MultibandedFrequencyDomain(...)
         >>> config = DecimateAllConfig.from_dict({
         ...     'multibanded_frequency_domain': mfd
         ... })
 
-        >>> # Or from dict representation
-        >>> config = DecimateAllConfig.from_dict({
-        ...     'multibanded_frequency_domain': {'type': 'MultibandedFrequencyDomain', ...}
-        ... })
+        Notes
+        -----
+        The domain must have decimate() method (MultibandedFrequencyDomain).
+        Users are responsible for building the domain before calling this method.
         """
-        from dingo.gw.domains import MultibandedFrequencyDomain, build_domain
-
         mfd = config_dict['multibanded_frequency_domain']
 
-        # If it's a dict, build the domain object
-        if isinstance(mfd, dict):
-            mfd = build_domain(mfd)
-
-        # Verify it's the right type
-        if not isinstance(mfd, MultibandedFrequencyDomain):
+        # Validate domain using duck typing
+        if not hasattr(mfd, 'decimate'):
             raise TypeError(
-                f"multibanded_frequency_domain must be MultibandedFrequencyDomain, "
-                f"got {type(mfd)}"
+                f"multibanded_frequency_domain must have decimate() method "
+                f"(expected MultibandedFrequencyDomain-like object), got {type(mfd)}"
             )
 
         return cls(multibanded_frequency_domain=mfd)

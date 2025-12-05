@@ -23,31 +23,40 @@ class SampleExtrinsicParametersConfig(WaveformTransformConfig):
 
     Attributes
     ----------
-    extrinsic_prior_dict : ExtrinsicPriorDict
-        Dictionary specifying prior distributions for extrinsic parameters.
-        This is passed to BBHExtrinsicPriorDict from dingo.gw.prior.
+    extrinsic_prior : Any
+        Prior object (duck-typed). Must have sample(n) method that returns
+        a dictionary mapping parameter names to sampled values.
+        Typically dingo.gw.prior.BBHExtrinsicPriorDict or bilby.core.prior.PriorDict.
 
     Examples
     --------
-    >>> config = SampleExtrinsicParametersConfig(
-    ...     extrinsic_prior_dict={
-    ...         'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28},
-    ...         'dec': {'type': 'Cosine', 'minimum': -1.57, 'maximum': 1.57},
-    ...         'psi': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 3.14}
-    ...     }
-    ... )
+    >>> from dingo.gw.prior import BBHExtrinsicPriorDict
+    >>> prior_dict = {
+    ...     'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28},
+    ...     'dec': {'type': 'Cosine', 'minimum': -1.57, 'maximum': 1.57},
+    ...     'psi': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 3.14}
+    ... }
+    >>> prior = BBHExtrinsicPriorDict(prior_dict)
+    >>> config = SampleExtrinsicParametersConfig(extrinsic_prior=prior)
+    >>> hasattr(config.extrinsic_prior, 'sample')
+    True
+
+    Notes
+    -----
+    This configuration cannot be serialized to JSON/YAML since it contains
+    an object reference. Use factory functions from transform.factory module
+    to build transform chains with explicit object dependencies.
     """
 
-    extrinsic_prior_dict: ExtrinsicPriorDict
+    extrinsic_prior: Any
 
     def __post_init__(self) -> None:
-        """Validate configuration."""
-        if not isinstance(self.extrinsic_prior_dict, dict):
+        """Validate configuration using duck typing."""
+        if not hasattr(self.extrinsic_prior, 'sample'):
             raise TypeError(
-                f"extrinsic_prior_dict must be a dict, got {type(self.extrinsic_prior_dict)}"
+                f"extrinsic_prior must have sample() method, "
+                f"got {type(self.extrinsic_prior)}"
             )
-        if len(self.extrinsic_prior_dict) == 0:
-            raise ValueError("extrinsic_prior_dict cannot be empty")
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'SampleExtrinsicParametersConfig':
@@ -57,7 +66,8 @@ class SampleExtrinsicParametersConfig(WaveformTransformConfig):
         Parameters
         ----------
         config_dict : Dict[str, Any]
-            Configuration dictionary with 'extrinsic_prior_dict' key
+            Configuration dictionary with 'extrinsic_prior' key containing
+            a prior object (NOT a dictionary specification)
 
         Returns
         -------
@@ -66,13 +76,18 @@ class SampleExtrinsicParametersConfig(WaveformTransformConfig):
 
         Examples
         --------
+        >>> from dingo.gw.prior import BBHExtrinsicPriorDict
+        >>> prior = BBHExtrinsicPriorDict({'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28}})
         >>> config = SampleExtrinsicParametersConfig.from_dict({
-        ...     'extrinsic_prior_dict': {
-        ...         'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28}
-        ...     }
+        ...     'extrinsic_prior': prior
         ... })
+
+        Notes
+        -----
+        The extrinsic_prior value must be an object (not a dict specification).
+        Users are responsible for loading the prior before calling this method.
         """
-        return cls(extrinsic_prior_dict=config_dict['extrinsic_prior_dict'])
+        return cls(extrinsic_prior=config_dict['extrinsic_prior'])
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -83,15 +98,13 @@ class SampleExtrinsicParametersConfig(WaveformTransformConfig):
         Dict[str, Any]
             Dictionary representation
 
-        Examples
-        --------
-        >>> config = SampleExtrinsicParametersConfig(
-        ...     extrinsic_prior_dict={'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28}}
-        ... )
-        >>> config.to_dict()
-        {'extrinsic_prior_dict': {'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28}}}
+        Notes
+        -----
+        This returns a dict with the object reference, which cannot be
+        serialized to JSON/YAML. This method exists for API compatibility
+        but should not be used for persistence.
         """
-        return {'extrinsic_prior_dict': self.extrinsic_prior_dict}
+        return {'extrinsic_prior': self.extrinsic_prior}
 
 
 class SampleExtrinsicParameters(WaveformTransform[SampleExtrinsicParametersConfig]):
@@ -109,19 +122,21 @@ class SampleExtrinsicParameters(WaveformTransform[SampleExtrinsicParametersConfi
 
     Examples
     --------
+    >>> from dingo.gw.prior import BBHExtrinsicPriorDict
     >>> from dingo_waveform.transform.transforms.parameters import (
     ...     SampleExtrinsicParameters,
     ...     SampleExtrinsicParametersConfig
     ... )
     >>>
-    >>> config = SampleExtrinsicParametersConfig(
-    ...     extrinsic_prior_dict={
-    ...         'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28},
-    ...         'dec': {'type': 'Cosine', 'minimum': -1.57, 'maximum': 1.57},
-    ...         'psi': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 3.14},
-    ...         'luminosity_distance': {'type': 'UniformSourceFrame', 'minimum': 100, 'maximum': 5000}
-    ...     }
-    ... )
+    >>> # Load prior first
+    >>> prior_dict = {
+    ...     'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28},
+    ...     'dec': {'type': 'Cosine', 'minimum': -1.57, 'maximum': 1.57},
+    ...     'psi': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 3.14},
+    ...     'luminosity_distance': {'type': 'UniformSourceFrame', 'minimum': 100, 'maximum': 5000}
+    ... }
+    >>> prior = BBHExtrinsicPriorDict(prior_dict)
+    >>> config = SampleExtrinsicParametersConfig(extrinsic_prior=prior)
     >>> transform = SampleExtrinsicParameters.from_config(config)
     >>>
     >>> # Single sample
@@ -146,14 +161,14 @@ class SampleExtrinsicParameters(WaveformTransform[SampleExtrinsicParametersConfi
 
     Notes
     -----
-    This transform uses dingo.gw.prior.BBHExtrinsicPriorDict to construct
-    the prior from the configuration dictionary.
+    The extrinsic_prior object is passed directly to the config and must be
+    loaded before creating the transform. This makes dependencies explicit
+    and allows the transform package to be standalone (no dingo imports).
 
-    The extrinsic_prior_dict follows bilby's prior specification format.
-    Each parameter can specify:
-    - type: Prior distribution type (Uniform, Cosine, etc.)
-    - minimum, maximum: Bounds for bounded distributions
-    - Additional distribution-specific parameters
+    The prior object must have a sample(n) method that returns a dictionary
+    mapping parameter names to sampled values. Typical implementations include:
+    - dingo.gw.prior.BBHExtrinsicPriorDict
+    - bilby.core.prior.PriorDict
 
     See Also
     --------
@@ -161,20 +176,44 @@ class SampleExtrinsicParameters(WaveformTransform[SampleExtrinsicParametersConfi
     GetDetectorTimes : Computes detector times from extrinsic parameters
     """
 
-    def __init__(self, config: SampleExtrinsicParametersConfig):
+    def __init__(self, prior_or_config):
         """
         Initialize SampleExtrinsicParameters transform.
 
         Parameters
         ----------
-        config : SampleExtrinsicParametersConfig
-            Configuration with extrinsic prior dictionary
+        prior_or_config : Any or SampleExtrinsicParametersConfig
+            Either an extrinsic prior object (with sample method)
+            or a SampleExtrinsicParametersConfig instance.
+
+        Notes
+        -----
+        The prior object is validated via duck typing (checking for sample method).
+
+        Examples
+        --------
+        >>> from dingo.gw.prior import BBHExtrinsicPriorDict
+        >>> prior_dict = {'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28}}
+        >>> prior = BBHExtrinsicPriorDict(prior_dict)
+        >>>
+        >>> # Direct instantiation (recommended)
+        >>> transform = SampleExtrinsicParameters(prior)
+        >>>
+        >>> # Or with config object
+        >>> config = SampleExtrinsicParametersConfig(extrinsic_prior=prior)
+        >>> transform = SampleExtrinsicParameters(config)
         """
+        # Handle both direct object and config wrapper
+        if isinstance(prior_or_config, SampleExtrinsicParametersConfig):
+            config = prior_or_config
+        else:
+            # Assume it's a prior object - wrap in config
+            config = SampleExtrinsicParametersConfig(extrinsic_prior=prior_or_config)
+
         super().__init__(config)
 
-        # Initialize prior from config
-        from dingo.gw.prior import BBHExtrinsicPriorDict
-        self.prior = BBHExtrinsicPriorDict(config.extrinsic_prior_dict)
+        # Store reference to prior object
+        self.prior = config.extrinsic_prior
 
     def __call__(self, input_sample: PolarizationSample) -> ExtrinsicSample:  # type: ignore[override]
         """
@@ -196,9 +235,9 @@ class SampleExtrinsicParameters(WaveformTransform[SampleExtrinsicParametersConfi
 
         Examples
         --------
-        >>> config = SampleExtrinsicParametersConfig(
-        ...     extrinsic_prior_dict={'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28}}
-        ... )
+        >>> from dingo.gw.prior import BBHExtrinsicPriorDict
+        >>> prior = BBHExtrinsicPriorDict({'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28}})
+        >>> config = SampleExtrinsicParametersConfig(extrinsic_prior=prior)
         >>> transform = SampleExtrinsicParameters.from_config(config)
         >>> sample = {'parameters': {'mass_1': 30.0}}
         >>> result = transform(sample)

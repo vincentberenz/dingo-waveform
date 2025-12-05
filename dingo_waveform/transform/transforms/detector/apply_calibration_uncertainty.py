@@ -95,9 +95,25 @@ class ApplyCalibrationUncertaintyConfig(WaveformTransformConfig):
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'ApplyCalibrationUncertaintyConfig':
-        """Create config from dictionary."""
-        from dingo.gw.domains import build_domain
+        """
+        Create config from dictionary.
 
+        Parameters
+        ----------
+        config_dict : Dict[str, Any]
+            Configuration dictionary with 'data_domain' key containing a Domain object
+            (NOT a dict - must already be constructed).
+
+        Returns
+        -------
+        ApplyCalibrationUncertaintyConfig
+            Validated configuration instance
+
+        Notes
+        -----
+        The domain must have sample_frequencies attribute.
+        Users are responsible for building the domain before calling this method.
+        """
         ifo_list = config_dict['ifo_list']
         data_domain = config_dict['data_domain']
 
@@ -105,9 +121,12 @@ class ApplyCalibrationUncertaintyConfig(WaveformTransformConfig):
         if not isinstance(ifo_list, list):
             ifo_list = [ifo.name for ifo in ifo_list]
 
-        # Convert dict to Domain object if needed
-        if isinstance(data_domain, dict):
-            data_domain = build_domain(data_domain)
+        # Validate domain using duck typing
+        if not hasattr(data_domain, 'sample_frequencies'):
+            raise TypeError(
+                f"data_domain must have sample_frequencies attribute "
+                f"(expected Domain-like object), got {type(data_domain)}"
+            )
 
         return cls(
             ifo_list=ifo_list,

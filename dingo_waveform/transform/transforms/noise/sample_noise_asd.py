@@ -18,29 +18,34 @@ class SampleNoiseASDConfig(WaveformTransformConfig):
 
     Attributes
     ----------
-    asd_dataset_path : str
-        Path to HDF5 file containing ASD dataset.
-        The dataset is loaded lazily in __init__ to avoid serialization issues.
+    asd_dataset : Any
+        ASD dataset object (duck-typed). Must have sample_random_asds(n) method
+        that returns a dictionary mapping detector names to ASD arrays.
 
     Examples
     --------
-    >>> config = SampleNoiseASDConfig(
-    ...     asd_dataset_path='/path/to/asd_dataset.hdf5'
-    ... )
-    >>> config.asd_dataset_path
-    '/path/to/asd_dataset.hdf5'
+    >>> from dingo.gw.noise.asd_dataset import ASDDataset
+    >>> asd_dataset = ASDDataset('/path/to/asd_dataset.hdf5')
+    >>> config = SampleNoiseASDConfig(asd_dataset=asd_dataset)
+    >>> hasattr(config.asd_dataset, 'sample_random_asds')
+    True
+
+    Notes
+    -----
+    This configuration cannot be serialized to JSON/YAML since it contains
+    an object reference. Use factory functions from transform.factory module
+    to build transform chains with explicit object dependencies.
     """
 
-    asd_dataset_path: str
+    asd_dataset: Any
 
     def __post_init__(self) -> None:
-        """Validate configuration."""
-        if not isinstance(self.asd_dataset_path, str):
+        """Validate configuration using duck typing."""
+        if not hasattr(self.asd_dataset, 'sample_random_asds'):
             raise TypeError(
-                f"asd_dataset_path must be a str, got {type(self.asd_dataset_path)}"
+                f"asd_dataset must have sample_random_asds() method, "
+                f"got {type(self.asd_dataset)}"
             )
-        if len(self.asd_dataset_path) == 0:
-            raise ValueError("asd_dataset_path cannot be empty")
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'SampleNoiseASDConfig':
@@ -50,7 +55,8 @@ class SampleNoiseASDConfig(WaveformTransformConfig):
         Parameters
         ----------
         config_dict : Dict[str, Any]
-            Configuration dictionary with 'asd_dataset_path' key
+            Configuration dictionary with 'asd_dataset' key containing
+            an ASD dataset object (NOT a path string)
 
         Returns
         -------
@@ -59,13 +65,18 @@ class SampleNoiseASDConfig(WaveformTransformConfig):
 
         Examples
         --------
+        >>> from dingo.gw.noise.asd_dataset import ASDDataset
+        >>> asd_dataset = ASDDataset('/path/to/asd.hdf5')
         >>> config = SampleNoiseASDConfig.from_dict({
-        ...     'asd_dataset_path': '/path/to/asd_dataset.hdf5'
+        ...     'asd_dataset': asd_dataset
         ... })
-        >>> config.asd_dataset_path
-        '/path/to/asd_dataset.hdf5'
+
+        Notes
+        -----
+        The asd_dataset value must be an object (not a path string).
+        Users are responsible for loading the dataset before calling this method.
         """
-        return cls(asd_dataset_path=config_dict['asd_dataset_path'])
+        return cls(asd_dataset=config_dict['asd_dataset'])
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -76,13 +87,13 @@ class SampleNoiseASDConfig(WaveformTransformConfig):
         Dict[str, Any]
             Dictionary representation
 
-        Examples
-        --------
-        >>> config = SampleNoiseASDConfig(asd_dataset_path='/path/to/asd.hdf5')
-        >>> config.to_dict()
-        {'asd_dataset_path': '/path/to/asd.hdf5'}
+        Notes
+        -----
+        This returns a dict with the object reference, which cannot be
+        serialized to JSON/YAML. This method exists for API compatibility
+        but should not be used for persistence.
         """
-        return {'asd_dataset_path': self.asd_dataset_path}
+        return {'asd_dataset': self.asd_dataset}
 
 
 class SampleNoiseASD(WaveformTransform[SampleNoiseASDConfig]):
@@ -100,14 +111,15 @@ class SampleNoiseASD(WaveformTransform[SampleNoiseASDConfig]):
     Examples
     --------
     >>> import numpy as np
+    >>> from dingo.gw.noise.asd_dataset import ASDDataset
     >>> from dingo_waveform.transform.transforms.noise import (
     ...     SampleNoiseASD,
     ...     SampleNoiseASDConfig
     ... )
     >>>
-    >>> config = SampleNoiseASDConfig(
-    ...     asd_dataset_path='/path/to/asd_dataset.hdf5'
-    ... )
+    >>> # Load ASD dataset first
+    >>> asd_dataset = ASDDataset('/path/to/asd_dataset.hdf5')
+    >>> config = SampleNoiseASDConfig(asd_dataset=asd_dataset)
     >>> transform = SampleNoiseASD.from_config(config)
     >>>
     >>> # Single sample
@@ -132,9 +144,9 @@ class SampleNoiseASD(WaveformTransform[SampleNoiseASDConfig]):
 
     Notes
     -----
-    The ASD dataset is loaded in __init__ from the specified HDF5 file path.
-    This approach allows the configuration to be serialized (only storing the
-    path) while the actual dataset object is created when needed.
+    The asd_dataset object is passed directly to the config and must be
+    loaded before creating the transform. This makes dependencies explicit
+    and allows the transform package to be standalone (no dingo imports).
 
     The asd_dataset object must have a sample_random_asds(n) method that
     returns a dictionary mapping detector names to ASD arrays.
@@ -146,20 +158,44 @@ class SampleNoiseASD(WaveformTransform[SampleNoiseASDConfig]):
     AddWhiteNoiseComplex : Adds white noise after whitening
     """
 
-    def __init__(self, config: SampleNoiseASDConfig):
+    def __init__(self, asd_dataset_or_config):
         """
         Initialize SampleNoiseASD transform.
 
         Parameters
         ----------
-        config : SampleNoiseASDConfig
-            Configuration with ASD dataset path
+        asd_dataset_or_config : Any or SampleNoiseASDConfig
+            Either an ASD dataset object (with sample_random_asds method)
+            or a SampleNoiseASDConfig instance.
+
+        Notes
+        -----
+        The asd_dataset object is validated via duck typing (checking for
+        sample_random_asds method).
+
+        Examples
+        --------
+        >>> from dingo.gw.noise.asd_dataset import ASDDataset
+        >>> asd_dataset = ASDDataset('/path/to/asd.hdf5')
+        >>>
+        >>> # Direct instantiation (recommended)
+        >>> transform = SampleNoiseASD(asd_dataset)
+        >>>
+        >>> # Or with config object
+        >>> config = SampleNoiseASDConfig(asd_dataset=asd_dataset)
+        >>> transform = SampleNoiseASD(config)
         """
+        # Handle both direct object and config wrapper
+        if isinstance(asd_dataset_or_config, SampleNoiseASDConfig):
+            config = asd_dataset_or_config
+        else:
+            # Assume it's an asd_dataset object - wrap in config
+            config = SampleNoiseASDConfig(asd_dataset=asd_dataset_or_config)
+
         super().__init__(config)
 
-        # Load ASD dataset from path
-        from dingo.gw.noise.asd_dataset import ASDDataset
-        self.asd_dataset = ASDDataset(config.asd_dataset_path)
+        # Store reference to ASD dataset object
+        self.asd_dataset = config.asd_dataset
 
     def __call__(self, input_sample: DetectorStrainSample) -> NoiseASDSample:  # type: ignore[override]
         """
@@ -180,7 +216,9 @@ class SampleNoiseASD(WaveformTransform[SampleNoiseASDConfig]):
 
         Examples
         --------
-        >>> config = SampleNoiseASDConfig(asd_dataset_path='/path/to/asd.hdf5')
+        >>> from dingo.gw.noise.asd_dataset import ASDDataset
+        >>> asd_dataset = ASDDataset('/path/to/asd.hdf5')
+        >>> config = SampleNoiseASDConfig(asd_dataset=asd_dataset)
         >>> transform = SampleNoiseASD.from_config(config)
         >>> sample = {
         ...     'parameters': {'mass_1': 30.0},

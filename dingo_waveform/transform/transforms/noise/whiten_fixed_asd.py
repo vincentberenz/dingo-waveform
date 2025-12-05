@@ -68,7 +68,7 @@ class WhitenFixedASDConfig(WaveformTransformConfig):
         ----------
         config_dict : Dict[str, Any]
             Configuration dictionary with keys:
-            - 'domain': Domain object or dict representation
+            - 'domain': Domain object (NOT a dict - must already be constructed)
             - 'asd_file': Optional path to ASD file
             - 'inverse': Optional bool (default False)
             - 'precision': Optional str ('single' or 'double')
@@ -80,7 +80,7 @@ class WhitenFixedASDConfig(WaveformTransformConfig):
 
         Examples
         --------
-        >>> from dingo.gw.domains import UniformFrequencyDomain
+        >>> from dingo_waveform.domains import UniformFrequencyDomain
         >>> domain = UniformFrequencyDomain(...)
         >>> config = WhitenFixedASDConfig.from_dict({
         ...     'domain': domain,
@@ -88,14 +88,20 @@ class WhitenFixedASDConfig(WaveformTransformConfig):
         ...     'inverse': False,
         ...     'precision': 'single'
         ... })
-        """
-        from dingo.gw.domains import build_domain
 
+        Notes
+        -----
+        The domain must be a Domain object with sample_frequencies attribute.
+        Users are responsible for building the domain before calling this method.
+        """
         domain = config_dict['domain']
 
-        # Convert dict to Domain object if needed
-        if isinstance(domain, dict):
-            domain = build_domain(domain)
+        # Validate domain using duck typing
+        if not hasattr(domain, 'sample_frequencies'):
+            raise TypeError(
+                f"domain must have sample_frequencies attribute "
+                f"(expected Domain-like object), got {type(domain)}"
+            )
 
         return cls(
             domain=domain,
@@ -212,7 +218,6 @@ class WhitenFixedASD(WaveformTransform[WhitenFixedASDConfig]):
 
         from bilby.gw.detector import PowerSpectralDensity
         from scipy.interpolate import interp1d
-        from dingo.gw.domains import UniformFrequencyDomain
 
         # Load PSD from file or use default
         if config.asd_file is not None:

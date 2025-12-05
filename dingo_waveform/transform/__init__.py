@@ -1,10 +1,21 @@
 """
 Dingo Transform Package
 
-Provides unified Transform class for managing gravitational wave data transforms.
+Provides factory functions for building gravitational wave transform chains.
+
+Key components:
+- TransformCompose: Compose multiple transforms into a pipeline
+- Factory functions: build_training_transform, build_svd_transform, etc.
+- Individual transform classes: SampleNoiseASD, ProjectOntoDetectors, etc.
 """
 
-from .transform import Transform, TransformConfig
+from .compose import TransformCompose
+from .factory import (
+    build_training_transform,
+    build_svd_transform,
+    build_inference_transform_pre,
+    build_inference_transform_post,
+)
 from .base import TransformProtocol
 
 # Configuration types
@@ -21,14 +32,14 @@ from .data_transform import DataTransform, ComposeDataTransforms
 from .svd_transform import ApplySVD
 from .whitening_transform import WhitenUnwhitenTransform
 
-# Export all transform classes for direct import
-from .detector import (
+# Export all transform classes for direct import (from new transforms/ subdirectories)
+from .transforms.detector import (
     GetDetectorTimes,
     ProjectOntoDetectors,
     TimeShiftStrain,
     ApplyCalibrationUncertainty,
 )
-from .noise import (
+from .transforms.noise import (
     SampleNoiseASD,
     WhitenStrain,
     WhitenFixedASD,
@@ -36,20 +47,20 @@ from .noise import (
     AddWhiteNoiseComplex,
     RepackageStrainsAndASDS,
 )
-from .parameters import (
+from .transforms.parameters import (
     SampleExtrinsicParameters,
     SelectStandardizeRepackageParameters,
     StandardizeParameters,
 )
-from .waveform import (
+from .transforms.waveform import (
     DecimateAll,
     DecimateWaveformsAndASDS,
     CropMaskStrainRandom,
     MaskDataForFrequencyRangeUpdate,
 )
-from .general import UnpackDict
-from .gnpe import GNPEBase, GNPECoalescenceTimes
-from .inference import (
+from .transforms.general import UnpackDict
+from .transforms.gnpe import GNPEBase, GNPECoalescenceTimes
+from .transforms.inference import (
     PostCorrectGeocentTime,
     CopyToExtrinsicParameters,
     ExpandStrain,
@@ -59,9 +70,12 @@ from .inference import (
 from .utils import get_batch_size_of_input_sample
 
 __all__ = [
-    # Main API
-    "Transform",
-    "TransformConfig",
+    # Main API - Transform composition and factory functions
+    "TransformCompose",
+    "build_training_transform",
+    "build_svd_transform",
+    "build_inference_transform_pre",
+    "build_inference_transform_post",
     "TransformProtocol",
     # Configuration types
     "StandardizationConfig",

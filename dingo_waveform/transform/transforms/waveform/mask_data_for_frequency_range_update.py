@@ -42,12 +42,33 @@ class MaskDataForFrequencyRangeUpdateConfig(WaveformTransformConfig):
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'MaskDataForFrequencyRangeUpdateConfig':
-        """Create config from dictionary."""
-        from dingo.gw.domains import build_domain
+        """
+        Create config from dictionary.
 
+        Parameters
+        ----------
+        config_dict : Dict[str, Any]
+            Configuration dictionary with 'domain' key containing a Domain object
+            (NOT a dict - must already be constructed).
+
+        Returns
+        -------
+        MaskDataForFrequencyRangeUpdateConfig
+            Validated configuration instance
+
+        Notes
+        -----
+        The domain must have sample_frequencies attribute.
+        Users are responsible for building the domain before calling this method.
+        """
         domain = config_dict['domain']
-        if isinstance(domain, dict):
-            domain = build_domain(domain)
+
+        # Validate domain using duck typing
+        if not hasattr(domain, 'sample_frequencies'):
+            raise TypeError(
+                f"domain must have sample_frequencies attribute "
+                f"(expected Domain-like object), got {type(domain)}"
+            )
 
         return cls(
             domain=domain,

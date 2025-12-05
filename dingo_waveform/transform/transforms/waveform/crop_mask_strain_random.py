@@ -47,8 +47,6 @@ class CropMaskStrainRandomConfig(WaveformTransformConfig):
 
     def __post_init__(self) -> None:
         """Validate configuration."""
-        from dingo.gw.domains import UniformFrequencyDomain, MultibandedFrequencyDomain
-
         if self.domain is None:
             raise ValueError("domain cannot be None")
 
@@ -82,12 +80,32 @@ class CropMaskStrainRandomConfig(WaveformTransformConfig):
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'CropMaskStrainRandomConfig':
-        """Create config from dictionary."""
-        from dingo.gw.domains import build_domain
+        """
+        Create config from dictionary.
 
+        Parameters
+        ----------
+        config_dict : Dict[str, Any]
+            Configuration dictionary with 'domain' key containing a Domain object
+            (NOT a dict - must already be constructed).
+
+        Returns
+        -------
+        CropMaskStrainRandomConfig
+            Validated configuration instance
+
+        Notes
+        -----
+        The domain must be callable (Domain object).
+        Users are responsible for building the domain before calling this method.
+        """
         domain = config_dict['domain']
-        if isinstance(domain, dict):
-            domain = build_domain(domain)
+
+        # Validate domain using duck typing
+        if not hasattr(domain, '__call__'):
+            raise TypeError(
+                f"domain must be callable (expected Domain-like object), got {type(domain)}"
+            )
 
         return cls(
             domain=domain,

@@ -10,6 +10,7 @@ Reference: https://arxiv.org/abs/2111.13139
 from dataclasses import dataclass
 from typing import Dict, Any, List
 from dingo_waveform.transform.transforms.gnpe.gnpe_base import GNPEBase, GNPEBaseConfig
+from dingo_waveform.transform.types import TransformSample
 
 
 @dataclass(frozen=True)

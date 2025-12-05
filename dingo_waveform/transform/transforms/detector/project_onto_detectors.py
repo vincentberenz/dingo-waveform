@@ -69,7 +69,7 @@ class ProjectOntoDetectorsConfig(WaveformTransformConfig):
         config_dict : Dict[str, Any]
             Configuration dictionary with keys:
             - 'ifo_list': List of IFO names or InterferometerList
-            - 'domain': Domain object or dict representation
+            - 'domain': Domain object (NOT a dict - must already be constructed)
             - 'ref_time': Reference GPS time
 
         Returns
@@ -79,16 +79,19 @@ class ProjectOntoDetectorsConfig(WaveformTransformConfig):
 
         Examples
         --------
-        >>> from dingo.gw.domains import UniformFrequencyDomain
+        >>> from dingo_waveform.domains import UniformFrequencyDomain
         >>> domain = UniformFrequencyDomain(...)
         >>> config = ProjectOntoDetectorsConfig.from_dict({
         ...     'ifo_list': ['H1', 'L1'],
         ...     'domain': domain,
         ...     'ref_time': 1234567890.0
         ... })
-        """
-        from dingo.gw.domains import build_domain
 
+        Notes
+        -----
+        The domain must be a Domain object with time_translate_data() method.
+        Users are responsible for building the domain before calling this method.
+        """
         ifo_list = config_dict['ifo_list']
         domain = config_dict['domain']
 
@@ -96,9 +99,12 @@ class ProjectOntoDetectorsConfig(WaveformTransformConfig):
         if not isinstance(ifo_list, list):
             ifo_list = [ifo.name for ifo in ifo_list]
 
-        # Convert dict to Domain object if needed
-        if isinstance(domain, dict):
-            domain = build_domain(domain)
+        # Validate domain using duck typing
+        if not hasattr(domain, 'time_translate_data'):
+            raise TypeError(
+                f"domain must have time_translate_data() method "
+                f"(expected Domain-like object), got {type(domain)}"
+            )
 
         return cls(
             ifo_list=ifo_list,

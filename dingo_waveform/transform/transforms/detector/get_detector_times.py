@@ -228,7 +228,7 @@ class GetDetectorTimes(WaveformTransform[GetDetectorTimesConfig]):
         >>> 'H1_time' in result['extrinsic_parameters']
         True
         """
-        from dingo_waveform.transform.detector import time_delay_from_geocenter
+        from .detector_utils import time_delay_from_geocenter
 
         sample = input_sample.copy()
         extrinsic_parameters = sample["extrinsic_parameters"].copy()

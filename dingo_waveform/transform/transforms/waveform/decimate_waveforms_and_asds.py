@@ -77,7 +77,8 @@ class DecimateWaveformsAndASDSConfig(WaveformTransformConfig):
         ----------
         config_dict : Dict[str, Any]
             Configuration dictionary with keys:
-            - 'multibanded_frequency_domain': MultibandedFrequencyDomain or dict
+            - 'multibanded_frequency_domain': MultibandedFrequencyDomain object
+              (NOT a dict - must already be constructed)
             - 'decimation_mode': str ('whitened' or 'unwhitened')
 
         Returns
@@ -87,26 +88,25 @@ class DecimateWaveformsAndASDSConfig(WaveformTransformConfig):
 
         Examples
         --------
-        >>> from dingo.gw.domains import MultibandedFrequencyDomain
+        >>> from dingo_waveform.domains import MultibandedFrequencyDomain
         >>> mfd = MultibandedFrequencyDomain(...)
         >>> config = DecimateWaveformsAndASDSConfig.from_dict({
         ...     'multibanded_frequency_domain': mfd,
         ...     'decimation_mode': 'whitened'
         ... })
-        """
-        from dingo.gw.domains import MultibandedFrequencyDomain, build_domain
 
+        Notes
+        -----
+        The domain must have decimate() method (MultibandedFrequencyDomain).
+        Users are responsible for building the domain before calling this method.
+        """
         mfd = config_dict['multibanded_frequency_domain']
 
-        # If it's a dict, build the domain object
-        if isinstance(mfd, dict):
-            mfd = build_domain(mfd)
-
-        # Verify it's the right type
-        if not isinstance(mfd, MultibandedFrequencyDomain):
+        # Validate domain using duck typing
+        if not hasattr(mfd, 'decimate'):
             raise TypeError(
-                f"multibanded_frequency_domain must be MultibandedFrequencyDomain, "
-                f"got {type(mfd)}"
+                f"multibanded_frequency_domain must have decimate() method "
+                f"(expected MultibandedFrequencyDomain-like object), got {type(mfd)}"
             )
 
         return cls(
@@ -312,8 +312,6 @@ class DecimateWaveformsAndASDS(WaveformTransform[DecimateWaveformsAndASDSConfig]
         bool
             True if all arrays match domain length
         """
-        from dingo.gw.domains import UniformFrequencyDomain
-
         lengths = []
         base_domain_length = len(domain)
         for k in ["waveform", "asds"]:
