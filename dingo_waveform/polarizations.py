@@ -106,7 +106,7 @@ class BatchPolarizations:
 
 
 def sum_contributions_m(
-    x_m: Dict[Modes, Polarization], phase_shift: float = 0.0
+    x_m: Dict[Mode, Polarization], phase_shift: float = 0.0
 ) -> Polarization:
     """
     Sum the contributions over m-components, optionally introducing a phase shift.
@@ -114,7 +114,7 @@ def sum_contributions_m(
     Parameters
     ----------
     x_m
-        Dictionary mapping modes to their corresponding Polarization objects.
+        Dictionary mapping m values (int) to their corresponding Polarization objects.
     phase_shift
         Optional phase shift to apply to each mode.
 
@@ -124,16 +124,15 @@ def sum_contributions_m(
     """
     result = Polarization(h_plus=0.0, h_cross=0.0)  # type: ignore
     for mode in x_m.keys():
-        # mode is (ℓ, m), use m value for phase shift
-        m_value = mode[1]
-        result.h_plus += x_m[mode].h_plus * np.exp(-1j * m_value * phase_shift)
-        result.h_cross += x_m[mode].h_cross * np.exp(-1j * m_value * phase_shift)
+        # mode is an int (m value), use directly for phase shift
+        result.h_plus += x_m[mode].h_plus * np.exp(-1j * mode * phase_shift)
+        result.h_cross += x_m[mode].h_cross * np.exp(-1j * mode * phase_shift)
     return result
 
 
 def get_polarizations_from_fd_modes_m(
     hlm_fd: Dict[Modes, FrequencySeries], iota: Iota, phase: float
-) -> Dict[Mode, Polarization]:  # type: ignore[return]
+) -> Dict[Mode, Polarization]:
     """
     Compute polarizations from frequency domain modes.
 
@@ -148,14 +147,17 @@ def get_polarizations_from_fd_modes_m(
 
     Returns
     -------
-    Dictionary mapping modes to their corresponding Polarization objects.
+    Dictionary mapping m values to their corresponding Polarization objects.
+    Note: The function groups contributions by m value (summing over all l),
+    and returns a dict with int keys (just m, not (l,m) tuples).
     """
     pol_m: Dict[Mode, Dict[str, FrequencySeries]] = {}
     polarizations: List[str] = [f.name for f in fields(Polarization)]
 
     for (_, m), __ in hlm_fd.items():
-        pol_m[m] = {"h_plus": 0.0, "h_cross": 0.0}  # type: ignore
-        pol_m[-m] = {"h_plus": 0.0, "h_cross": 0.0}  # type: ignore
+        if m not in pol_m:
+            pol_m[m] = {"h_plus": 0.0, "h_cross": 0.0}  # type: ignore
+            pol_m[-m] = {"h_plus": 0.0, "h_cross": 0.0}  # type: ignore
 
     for (l, m), h in hlm_fd.items():
 
@@ -179,18 +181,18 @@ def get_polarizations_from_fd_modes_m(
         #   https://lscsoft.docs.ligo.org/lalsuite/lalsimulation/
         #   _l_a_l_sim_inspiral_8c_source.html#l04801
         pol_m[m]["h_plus"] += 0.5 * h1 * ylm
-        pol_m[Mode(-m)]["h_plus"] += 0.5 * h2 * ylmstar
+        pol_m[-m]["h_plus"] += 0.5 * h2 * ylmstar
         pol_m[m]["h_cross"] += 0.5 * 1j * h1 * ylm
-        pol_m[Mode(-m)]["h_cross"] += -0.5 * 1j * h2 * ylmstar
+        pol_m[-m]["h_cross"] += -0.5 * 1j * h2 * ylmstar
 
-    # Convert pol_m to a Dict[int, Polarization]
+    # Convert pol_m to Dict[Mode, Polarization]
     return {
         m: Polarization(h_plus=pol["h_plus"], h_cross=pol["h_cross"])
         for m, pol in pol_m.items()
     }
 
 
-def polarizations_to_table(pol: Dict[Modes, Polarization]) -> str:
+def polarizations_to_table(pol: Dict[Mode, Polarization]) -> str:
     """
     Convert polarizations to a formatted table string.
 

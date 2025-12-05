@@ -3,31 +3,43 @@ Main Transform class and configuration for gravitational wave data transforms.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable, Union
 import torch.utils.data
 from torchvision.transforms import Compose
 from bilby.gw.detector import InterferometerList
+
+# Import proper type definitions
+from .config_types import (
+    StandardizationConfig,
+    RandomStrainCroppingConfig,
+    GNPETimeShiftsConfig,
+    DomainUpdateConfig,
+    ExtrinsicPriorConfig,
+)
 
 
 @dataclass(frozen=True)
 class TransformConfig:
     """
-    Immutable configuration for transforms.
+    Immutable configuration for transforms with proper type annotations.
+
+    This configuration uses dataclasses instead of opaque dictionaries,
+    following dingo-waveform's design principle of type safety and clarity.
     All attributes must be initialized (no None values except where explicitly Optional).
     """
 
     detectors: List[str]
-    domain: Any  # Domain type from dingo.gw.domains
+    domain: Any  # Domain type from dingo.gw.domains (UniformFrequencyDomain, MultibandedFrequencyDomain, etc.)
     ref_time: float
     asd_dataset_path: Optional[str]
-    extrinsic_prior: Dict[str, Any]
+    extrinsic_prior: ExtrinsicPriorConfig
     inference_parameters: List[str]
     context_parameters: List[str] = field(default_factory=list)
-    standardization: Dict[str, Dict[str, float]] = field(default_factory=dict)
-    random_strain_cropping: Optional[Dict[str, Any]] = None
-    gnpe_time_shifts: Optional[Dict[str, Any]] = None
+    standardization: StandardizationConfig = field(default_factory=lambda: StandardizationConfig())
+    random_strain_cropping: Optional[RandomStrainCroppingConfig] = None
+    gnpe_time_shifts: Optional[GNPETimeShiftsConfig] = None
     zero_noise: bool = False
-    domain_update: Optional[Dict[str, float]] = None
+    domain_update: Optional[DomainUpdateConfig] = None
 
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
@@ -56,11 +68,35 @@ class TransformConfig:
         if not isinstance(self.context_parameters, list):
             raise ValueError("context_parameters must be a list")
 
-        # Validate standardization dict structure
-        if self.standardization:
-            if "mean" not in self.standardization or "std" not in self.standardization:
+        # Validate extrinsic_prior is proper type
+        if not isinstance(self.extrinsic_prior, ExtrinsicPriorConfig):
+            raise ValueError(
+                f"extrinsic_prior must be ExtrinsicPriorConfig, got {type(self.extrinsic_prior)}"
+            )
+
+        # Validate standardization is proper type
+        if not isinstance(self.standardization, StandardizationConfig):
+            raise ValueError(
+                f"standardization must be StandardizationConfig, got {type(self.standardization)}"
+            )
+
+        # Validate optional configs are proper types if not None
+        if self.random_strain_cropping is not None:
+            if not isinstance(self.random_strain_cropping, RandomStrainCroppingConfig):
                 raise ValueError(
-                    "standardization dict must have 'mean' and 'std' keys"
+                    f"random_strain_cropping must be RandomStrainCroppingConfig, got {type(self.random_strain_cropping)}"
+                )
+
+        if self.gnpe_time_shifts is not None:
+            if not isinstance(self.gnpe_time_shifts, GNPETimeShiftsConfig):
+                raise ValueError(
+                    f"gnpe_time_shifts must be GNPETimeShiftsConfig, got {type(self.gnpe_time_shifts)}"
+                )
+
+        if self.domain_update is not None:
+            if not isinstance(self.domain_update, DomainUpdateConfig):
+                raise ValueError(
+                    f"domain_update must be DomainUpdateConfig, got {type(self.domain_update)}"
                 )
 
         # Validate zero_noise is bool
@@ -80,48 +116,54 @@ class Transform:
         domain: Any,
         ref_time: float,
         asd_dataset_path: Optional[str],
-        extrinsic_prior: Dict[str, Any],
+        extrinsic_prior: Union[ExtrinsicPriorConfig, Dict[str, Any]],
         inference_parameters: List[str],
         context_parameters: List[str] = [],
-        standardization: Optional[Dict[str, Dict[str, float]]] = None,
-        random_strain_cropping: Optional[Dict[str, Any]] = None,
-        gnpe_time_shifts: Optional[Dict[str, Any]] = None,
+        standardization: Optional[Union[StandardizationConfig, Dict[str, Dict[str, float]]]] = None,
+        random_strain_cropping: Optional[Union[RandomStrainCroppingConfig, Dict[str, Any]]] = None,
+        gnpe_time_shifts: Optional[Union[GNPETimeShiftsConfig, Dict[str, Any]]] = None,
         zero_noise: bool = False,
-        domain_update: Optional[Dict[str, float]] = None,
+        domain_update: Optional[Union[DomainUpdateConfig, Dict[str, float]]] = None,
     ) -> None:
         """
         Initialize Transform with explicit parameters.
+
+        This constructor accepts both proper dataclass types (ExtrinsicPriorConfig, etc.)
+        and legacy dictionary formats for backward compatibility.
 
         Parameters
         ----------
         detectors : List[str]
             List of detector names (e.g., ["H1", "L1"])
         domain : Domain
-            Frequency domain object
+            Frequency domain object (UniformFrequencyDomain, MultibandedFrequencyDomain, etc.)
         ref_time : float
             Reference GPS time
         asd_dataset_path : Optional[str]
             Path to ASD dataset (None for inference with fixed ASDs)
-        extrinsic_prior : Dict[str, Any]
-            Prior dictionary for extrinsic parameters
+        extrinsic_prior : Union[ExtrinsicPriorConfig, Dict[str, Any]]
+            Extrinsic parameter prior configuration or legacy dict
         inference_parameters : List[str]
             Parameters for inference
         context_parameters : List[str]
             GNPE context parameters (empty list if not used)
-        standardization : Optional[Dict[str, Dict[str, float]]]
-            Parameter standardization (mean/std), will be initialized if None
-        random_strain_cropping : Optional[Dict[str, Any]]
-            Random cropping config (None if not used)
-        gnpe_time_shifts : Optional[Dict[str, Any]]
-            GNPE time shift config (None if not used)
+        standardization : Optional[Union[StandardizationConfig, Dict[str, Dict[str, float]]]]
+            Parameter standardization config or legacy dict (mean/std)
+        random_strain_cropping : Optional[Union[RandomStrainCroppingConfig, Dict[str, Any]]]
+            Random cropping config or legacy dict (None if not used)
+        gnpe_time_shifts : Optional[Union[GNPETimeShiftsConfig, Dict[str, Any]]]
+            GNPE time shift config or legacy dict (None if not used)
         zero_noise : bool
             Whether to omit noise addition (default False)
-        domain_update : Optional[Dict[str, float]]
-            Domain update settings (None if not needed)
+        domain_update : Optional[Union[DomainUpdateConfig, Dict[str, float]]]
+            Domain update config or legacy dict (None if not needed)
         """
-        # Initialize standardization if not provided
-        if standardization is None:
-            standardization = {}
+        # Convert legacy dict formats to proper types
+        extrinsic_prior_config = self._convert_extrinsic_prior(extrinsic_prior)
+        standardization_config = self._convert_standardization(standardization)
+        random_strain_cropping_config = self._convert_random_strain_cropping(random_strain_cropping)
+        gnpe_time_shifts_config = self._convert_gnpe_time_shifts(gnpe_time_shifts)
+        domain_update_config = self._convert_domain_update(domain_update)
 
         # Create config (this will validate via __post_init__)
         self._config = TransformConfig(
@@ -129,14 +171,14 @@ class Transform:
             domain=domain,
             ref_time=ref_time,
             asd_dataset_path=asd_dataset_path,
-            extrinsic_prior=extrinsic_prior,
+            extrinsic_prior=extrinsic_prior_config,
             inference_parameters=inference_parameters,
             context_parameters=context_parameters,
-            standardization=standardization,
-            random_strain_cropping=random_strain_cropping,
-            gnpe_time_shifts=gnpe_time_shifts,
+            standardization=standardization_config,
+            random_strain_cropping=random_strain_cropping_config,
+            gnpe_time_shifts=gnpe_time_shifts_config,
             zero_noise=zero_noise,
-            domain_update=domain_update,
+            domain_update=domain_update_config,
         )
 
         # Initialize cached attributes (lazy initialization)
@@ -145,6 +187,65 @@ class Transform:
         self._svd_transform: Optional[Compose] = None
         self._inference_transform_pre: Optional[Compose] = None
         self._inference_transform_post: Optional[Callable] = None
+
+    @staticmethod
+    def _convert_extrinsic_prior(
+        extrinsic_prior: Union[ExtrinsicPriorConfig, Dict[str, Any]]
+    ) -> ExtrinsicPriorConfig:
+        """Convert extrinsic_prior to ExtrinsicPriorConfig if needed."""
+        if isinstance(extrinsic_prior, ExtrinsicPriorConfig):
+            return extrinsic_prior
+        return ExtrinsicPriorConfig.from_dict(extrinsic_prior)
+
+    @staticmethod
+    def _convert_standardization(
+        standardization: Optional[Union[StandardizationConfig, Dict[str, Dict[str, float]]]]
+    ) -> StandardizationConfig:
+        """Convert standardization to StandardizationConfig if needed."""
+        if standardization is None:
+            return StandardizationConfig()
+        if isinstance(standardization, StandardizationConfig):
+            return standardization
+        # Handle legacy dict format
+        if not standardization:
+            return StandardizationConfig()
+        return StandardizationConfig(
+            mean=standardization.get("mean", {}),
+            std=standardization.get("std", {})
+        )
+
+    @staticmethod
+    def _convert_random_strain_cropping(
+        random_strain_cropping: Optional[Union[RandomStrainCroppingConfig, Dict[str, Any]]]
+    ) -> Optional[RandomStrainCroppingConfig]:
+        """Convert random_strain_cropping to RandomStrainCroppingConfig if needed."""
+        if random_strain_cropping is None:
+            return None
+        if isinstance(random_strain_cropping, RandomStrainCroppingConfig):
+            return random_strain_cropping
+        return RandomStrainCroppingConfig.from_dict(random_strain_cropping)
+
+    @staticmethod
+    def _convert_gnpe_time_shifts(
+        gnpe_time_shifts: Optional[Union[GNPETimeShiftsConfig, Dict[str, Any]]]
+    ) -> Optional[GNPETimeShiftsConfig]:
+        """Convert gnpe_time_shifts to GNPETimeShiftsConfig if needed."""
+        if gnpe_time_shifts is None:
+            return None
+        if isinstance(gnpe_time_shifts, GNPETimeShiftsConfig):
+            return gnpe_time_shifts
+        return GNPETimeShiftsConfig.from_dict(gnpe_time_shifts)
+
+    @staticmethod
+    def _convert_domain_update(
+        domain_update: Optional[Union[DomainUpdateConfig, Dict[str, float]]]
+    ) -> Optional[DomainUpdateConfig]:
+        """Convert domain_update to DomainUpdateConfig if needed."""
+        if domain_update is None:
+            return None
+        if isinstance(domain_update, DomainUpdateConfig):
+            return domain_update
+        return DomainUpdateConfig.from_dict(domain_update)
 
     # Factory methods
     @classmethod
@@ -449,8 +550,15 @@ class Transform:
 
     @property
     def standardization(self) -> Dict[str, Dict[str, float]]:
-        """Parameter standardization dictionary (mean/std)."""
-        return self._config.standardization
+        """
+        Parameter standardization dictionary (mean/std).
+
+        Returns dict format for backward compatibility with existing code.
+        """
+        return {
+            "mean": self._config.standardization.mean,
+            "std": self._config.standardization.std
+        }
 
     @property
     def config(self) -> TransformConfig:
@@ -500,8 +608,8 @@ class Transform:
         # Load ASD dataset
         asd_dataset = self._load_asd_dataset()
 
-        # Get extrinsic prior
-        extrinsic_prior_dict = get_extrinsic_prior_dict(self._config.extrinsic_prior)
+        # Get extrinsic prior (convert to dict for compatibility with dingo.gw.prior)
+        extrinsic_prior_dict = get_extrinsic_prior_dict(self._config.extrinsic_prior.to_dict())
 
         # Build transform chain
         transforms = [
@@ -511,12 +619,12 @@ class Transform:
 
         # Add GNPE if configured
         if self._config.gnpe_time_shifts is not None:
-            d = self._config.gnpe_time_shifts
+            gnpe_config = self._config.gnpe_time_shifts
             transforms.append(
                 GNPECoalescenceTimes(
                     ifo_list,
-                    d["kernel"],
-                    d["exact_equiv"],
+                    gnpe_config.kernel,
+                    gnpe_config.exact_equiv,
                     inference=False,
                 )
             )
@@ -539,7 +647,10 @@ class Transform:
                     "inference_parameters": self._config.inference_parameters,
                     "context_parameters": self._config.context_parameters,
                 },
-                self._config.standardization,
+                {
+                    "mean": self._config.standardization.mean,
+                    "std": self._config.standardization.std,
+                },
             ),
             RepackageStrainsAndASDS(
                 self._config.detectors,
@@ -552,7 +663,7 @@ class Transform:
             transforms.append(
                 CropMaskStrainRandom(
                     self._config.domain,
-                    **self._config.random_strain_cropping,
+                    **self._config.random_strain_cropping.to_dict(),
                 )
             )
 
@@ -598,8 +709,8 @@ class Transform:
         # Load ASD dataset
         asd_dataset = self._load_asd_dataset()
 
-        # Get extrinsic prior
-        extrinsic_prior_dict = get_extrinsic_prior_dict(self._config.extrinsic_prior)
+        # Get extrinsic prior (convert to dict for compatibility with dingo.gw.prior)
+        extrinsic_prior_dict = get_extrinsic_prior_dict(self._config.extrinsic_prior.to_dict())
 
         # Build transform chain (similar to training but without noise/repackaging)
         transforms = [
@@ -609,12 +720,12 @@ class Transform:
 
         # Add GNPE if configured
         if self._config.gnpe_time_shifts is not None:
-            d = self._config.gnpe_time_shifts
+            gnpe_config = self._config.gnpe_time_shifts
             transforms.append(
                 GNPECoalescenceTimes(
                     ifo_list,
-                    d["kernel"],
-                    d["exact_equiv"],
+                    gnpe_config.kernel,
+                    gnpe_config.exact_equiv,
                     inference=False,
                 )
             )
@@ -667,8 +778,9 @@ class Transform:
 
         # Add frequency range masking if domain_update is specified
         if self._config.domain_update is not None:
-            minimum_frequency = self._config.domain_update.get("f_min", None)
-            maximum_frequency = self._config.domain_update.get("f_max", None)
+            domain_update_config = self._config.domain_update
+            minimum_frequency = domain_update_config.f_min
+            maximum_frequency = domain_update_config.f_max
             if minimum_frequency is not None or maximum_frequency is not None:
                 transforms.append(
                     MaskDataForFrequencyRangeUpdate(
@@ -706,7 +818,10 @@ class Transform:
         # Create inverse transform for de-standardization
         return SelectStandardizeRepackageParameters(
             {"inference_parameters": self._config.inference_parameters},
-            self._config.standardization,
+            {
+                "mean": self._config.standardization.mean,
+                "std": self._config.standardization.std,
+            },
             inverse=True,
             as_type="dict",
         )

@@ -9,7 +9,7 @@ import pytest
 
 from dingo_waveform.svd import SVDBasis, SVDGenerationConfig
 from dingo_waveform.domains import UniformFrequencyDomain
-from dingo_waveform.transforms import ApplySVD, ComposeTransforms, Transform, WhitenAndUnwhiten
+from dingo_waveform.transform import ApplySVD, ComposeDataTransforms, DataTransform, WhitenUnwhitenTransform
 
 
 class TestApplySVD:
@@ -88,7 +88,7 @@ class TestApplySVD:
         assert "compress" in repr_str
 
 
-class TestWhitenAndUnwhiten:
+class TestWhitenUnwhitenTransform:
     """Test cases for whitening transform."""
 
     @pytest.fixture
@@ -116,7 +116,7 @@ class TestWhitenAndUnwhiten:
     def test_whiten_transform(self, asd_file, sample_polarizations_whitening):
         """Test whitening transform."""
         domain, asd_path = asd_file
-        transform = WhitenAndUnwhiten(domain, asd_path, inverse=False)
+        transform = WhitenUnwhitenTransform(domain, asd_path, inverse=False)
 
         result = transform(sample_polarizations_whitening)
 
@@ -127,7 +127,7 @@ class TestWhitenAndUnwhiten:
     def test_unwhiten_transform(self, asd_file, sample_polarizations_whitening):
         """Test unwhitening transform."""
         domain, asd_path = asd_file
-        transform = WhitenAndUnwhiten(domain, asd_path, inverse=True)
+        transform = WhitenUnwhitenTransform(domain, asd_path, inverse=True)
 
         result = transform(sample_polarizations_whitening)
 
@@ -136,8 +136,8 @@ class TestWhitenAndUnwhiten:
     def test_whitening_roundtrip(self, asd_file, sample_polarizations_whitening):
         """Test whitening followed by unwhitening."""
         domain, asd_path = asd_file
-        whiten = WhitenAndUnwhiten(domain, asd_path, inverse=False)
-        unwhiten = WhitenAndUnwhiten(domain, asd_path, inverse=True)
+        whiten = WhitenUnwhitenTransform(domain, asd_path, inverse=False)
+        unwhiten = WhitenUnwhitenTransform(domain, asd_path, inverse=True)
 
         whitened = whiten(sample_polarizations_whitening)
         reconstructed = unwhiten(whitened)
@@ -155,7 +155,7 @@ class TestWhitenAndUnwhiten:
         domain = UniformFrequencyDomain(f_min=20.0, f_max=1024.0, delta_f=0.25)
 
         with pytest.raises(FileNotFoundError):
-            WhitenAndUnwhiten(domain, "/nonexistent/asd.hdf5", inverse=False)
+            WhitenUnwhitenTransform(domain, "/nonexistent/asd.hdf5", inverse=False)
 
     def test_error_wrong_asd_length(self, tmp_path):
         """Test error when ASD length doesn't match domain."""
@@ -167,25 +167,25 @@ class TestWhitenAndUnwhiten:
             f.create_dataset("asd", data=np.ones(100))  # Wrong length
 
         with pytest.raises(ValueError, match="does not match domain length"):
-            WhitenAndUnwhiten(domain, asd_path, inverse=False)
+            WhitenUnwhitenTransform(domain, asd_path, inverse=False)
 
     def test_repr(self, asd_file):
         """Test string representation."""
         domain, asd_path = asd_file
-        transform = WhitenAndUnwhiten(domain, asd_path, inverse=False)
+        transform = WhitenUnwhitenTransform(domain, asd_path, inverse=False)
         repr_str = repr(transform)
 
-        assert "WhitenAndUnwhiten" in repr_str
+        assert "WhitenUnwhitenTransform" in repr_str
         assert "whiten" in repr_str
 
 
-class TestComposeTransforms:
+class TestComposeDataTransforms:
     """Test cases for transform composition."""
 
     @pytest.fixture
     def mock_transform(self):
         """Create a mock transform for testing."""
-        class MockTransform(Transform):
+        class MockTransform(DataTransform):
             def __init__(self, multiplier):
                 self.multiplier = multiplier
 
@@ -198,7 +198,7 @@ class TestComposeTransforms:
 
     def test_empty_composition(self):
         """Test composition with no transforms."""
-        compose = ComposeTransforms([])
+        compose = ComposeDataTransforms([])
 
         data = {"h_plus": np.array([1, 2, 3]), "h_cross": np.array([4, 5, 6])}
         result = compose(data)
@@ -208,7 +208,7 @@ class TestComposeTransforms:
 
     def test_single_transform(self, mock_transform):
         """Test composition with single transform."""
-        compose = ComposeTransforms([mock_transform(2.0)])
+        compose = ComposeDataTransforms([mock_transform(2.0)])
 
         data = {"h_plus": np.array([1, 2, 3]), "h_cross": np.array([4, 5, 6])}
         result = compose(data)
@@ -218,7 +218,7 @@ class TestComposeTransforms:
 
     def test_multiple_transforms(self, mock_transform):
         """Test composition with multiple transforms."""
-        compose = ComposeTransforms([
+        compose = ComposeDataTransforms([
             mock_transform(2.0),
             mock_transform(3.0),
         ])
@@ -247,8 +247,8 @@ class TestComposeTransforms:
         basis = SVDBasis.from_training_data(train_data, config)
 
         # Create pipeline: whiten then compress
-        pipeline = ComposeTransforms([
-            WhitenAndUnwhiten(domain, asd_path, inverse=False),
+        pipeline = ComposeDataTransforms([
+            WhitenUnwhitenTransform(domain, asd_path, inverse=False),
             ApplySVD(basis, inverse=False),
         ])
 
@@ -266,11 +266,11 @@ class TestComposeTransforms:
 
     def test_repr(self, mock_transform):
         """Test string representation."""
-        compose = ComposeTransforms([
+        compose = ComposeDataTransforms([
             mock_transform(2.0),
             mock_transform(3.0),
         ])
         repr_str = repr(compose)
 
-        assert "ComposeTransforms" in repr_str
+        assert "ComposeDataTransforms" in repr_str
         assert "MockTransform" in repr_str

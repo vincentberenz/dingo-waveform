@@ -1,5 +1,4 @@
-"""
-Whitening and unwhitening transforms using fixed ASD.
+"""Whitening and unwhitening transforms using fixed ASD.
 
 ASD (Amplitude Spectral Density) Files
 ---------------------------------------
@@ -54,15 +53,13 @@ from typing import Dict, Union
 import h5py
 import numpy as np
 
-from ..domains import Domain
-from dingo_waveform.svd import Transform
+from .data_transform import DataTransform
 
 _logger = logging.getLogger(__name__)
 
 
-class WhitenAndUnwhiten(Transform):
-    """
-    Transform that whitens or unwhitens waveforms using a fixed ASD.
+class WhitenUnwhitenTransform(DataTransform):
+    """Transform that whitens or unwhitens waveforms using a fixed ASD.
 
     Whitening normalizes the waveform by dividing by the amplitude spectral
     density (ASD), which represents the detector noise characteristics. This
@@ -117,37 +114,37 @@ class WhitenAndUnwhiten(Transform):
 
     See Also
     --------
-    dingo_waveform.transforms.ApplySVD : SVD compression transform
-    dingo_waveform.transforms.ComposeTransforms : Compose multiple transforms
+    dingo_waveform.transform.ApplySVD : SVD compression transform
+    dingo_waveform.transform.ComposeDataTransforms : Compose multiple transforms
 
     Examples
     --------
     Basic whitening:
 
     >>> from dingo_waveform.domains import UniformFrequencyDomain
-    >>> from dingo_waveform.transforms import WhitenAndUnwhiten
+    >>> from dingo_waveform.transform import WhitenUnwhitenTransform
     >>> domain = UniformFrequencyDomain(f_min=20.0, f_max=1024.0, delta_f=0.125)
-    >>> whiten = WhitenAndUnwhiten(domain, "asd.hdf5", inverse=False)
+    >>> whiten = WhitenUnwhitenTransform(domain, "asd.hdf5", inverse=False)
     >>> whitened_polarizations = whiten(polarizations)
 
     Full compression pipeline with whitening and SVD:
 
-    >>> from dingo_waveform.transforms import ComposeTransforms, ApplySVD
+    >>> from dingo_waveform.transform import ComposeDataTransforms, ApplySVD
     >>> from dingo_waveform.svd import SVDBasis
     >>>
     >>> # Load SVD basis
     >>> basis = SVDBasis.from_file("svd_basis.hdf5")
     >>>
     >>> # Create compression pipeline
-    >>> compress_pipeline = ComposeTransforms([
-    ...     WhitenAndUnwhiten(domain, "asd.hdf5", inverse=False),  # Whiten
-    ...     ApplySVD(basis, inverse=False)                          # Compress
+    >>> compress_pipeline = ComposeDataTransforms([
+    ...     WhitenUnwhitenTransform(domain, "asd.hdf5", inverse=False),  # Whiten
+    ...     ApplySVD(basis, inverse=False)                               # Compress
     ... ])
     >>>
     >>> # Create decompression pipeline (reverse order, inverse operations)
-    >>> decompress_pipeline = ComposeTransforms([
-    ...     ApplySVD(basis, inverse=True),                          # Decompress
-    ...     WhitenAndUnwhiten(domain, "asd.hdf5", inverse=True)    # Unwhiten
+    >>> decompress_pipeline = ComposeDataTransforms([
+    ...     ApplySVD(basis, inverse=True),                               # Decompress
+    ...     WhitenUnwhitenTransform(domain, "asd.hdf5", inverse=True)    # Unwhiten
     ... ])
     >>>
     >>> # Apply pipelines
@@ -157,12 +154,11 @@ class WhitenAndUnwhiten(Transform):
 
     def __init__(
         self,
-        domain: Domain,
+        domain,
         asd_file: Union[str, Path],
         inverse: bool = False
     ):
-        """
-        Initialize whitening transform.
+        """Initialize whitening transform.
 
         Parameters
         ----------
@@ -196,8 +192,7 @@ class WhitenAndUnwhiten(Transform):
         )
 
     def _load_asd(self) -> np.ndarray:
-        """
-        Load ASD array from HDF5 file.
+        """Load ASD array from HDF5 file.
 
         The loader attempts to find ASD data using common key conventions:
         1. 'asd' - Generic/preferred key
@@ -255,27 +250,26 @@ class WhitenAndUnwhiten(Transform):
 
         return asd
 
-    def __call__(self, polarizations: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-        """
-        Apply whitening or unwhitening.
+    def __call__(self, data: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        """Apply whitening or unwhitening.
 
         Parameters
         ----------
-        polarizations
+        data
             Dictionary with polarization arrays
 
         Returns
         -------
-        Transformed polarizations dictionary
+        Transformed data dictionary
         """
         if self.inverse:
             # Unwhitening: multiply by ASD
-            return {key: value * self.asd for key, value in polarizations.items()}
+            return {key: value * self.asd for key, value in data.items()}
         else:
             # Whitening: divide by ASD
-            return {key: value / self.asd for key, value in polarizations.items()}
+            return {key: value / self.asd for key, value in data.items()}
 
     def __repr__(self) -> str:
         """String representation."""
         mode = "unwhiten" if self.inverse else "whiten"
-        return f"WhitenAndUnwhiten(asd_file={self.asd_file.name}, mode={mode})"
+        return f"WhitenUnwhitenTransform(asd_file={self.asd_file.name}, mode={mode})"

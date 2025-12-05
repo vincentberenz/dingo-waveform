@@ -118,7 +118,8 @@ class TestComposeTransforms:
         pipeline = ComposeTransforms([DummyTransform(), DummyTransform()])
         repr_str = repr(pipeline)
 
-        assert "ComposeTransforms" in repr_str
+        # Note: ComposeTransforms now maps to ComposeDataTransforms
+        assert "ComposeDataTransforms" in repr_str
         assert "DummyTransform" in repr_str
 
 

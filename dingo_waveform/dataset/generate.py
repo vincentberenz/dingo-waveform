@@ -13,7 +13,7 @@ from dingo_waveform.svd import SVDBasis, SVDGenerationConfig, SVDMetadata, Valid
 from ..domains import Domain, DomainParameters, build_domain
 from ..polarizations import BatchPolarizations
 from ..prior import build_prior_with_defaults
-from ..transforms import ApplySVD, ComposeTransforms, Transform, WhitenAndUnwhiten
+from ..transform import ApplySVD, ComposeDataTransforms, DataTransform, WhitenUnwhitenTransform
 from ..waveform_generator import WaveformGenerator, build_waveform_generator
 from ..waveform_parameters import WaveformParameters
 from .compression_settings import CompressionSettings
@@ -570,7 +570,7 @@ def train_svd_basis(
 
 def apply_transforms_to_polarizations(
     polarizations: BatchPolarizations,
-    transforms: Optional[ComposeTransforms],
+    transforms: Optional[ComposeDataTransforms],
 ) -> BatchPolarizations:
     """
     Apply transform pipeline to polarizations.
@@ -611,7 +611,7 @@ def build_compression_transforms(
     prior: BBHPriorDict,
     waveform_generator: WaveformGenerator,
     num_processes: int,
-) -> Tuple[Optional[ComposeTransforms], Optional[SVDBasis]]:
+) -> Tuple[Optional[ComposeDataTransforms], Optional[SVDBasis]]:
     """
     Build compression transform pipeline from settings.
 
@@ -634,14 +634,14 @@ def build_compression_transforms(
         transform_pipeline is None if no compression
         svd_basis is None if SVD not used
     """
-    transforms: List[Transform] = []
+    transforms: List[DataTransform] = []
     svd_basis: Optional[SVDBasis] = None
 
     # Whitening transform
     if compression_settings.whitening is not None:
         _logger.info(f"Adding whitening transform with ASD from {compression_settings.whitening}")
         transforms.append(
-            WhitenAndUnwhiten(domain, compression_settings.whitening, inverse=False)
+            WhitenUnwhitenTransform(domain, compression_settings.whitening, inverse=False)
         )
 
     # SVD compression
@@ -659,7 +659,7 @@ def build_compression_transforms(
 
             # Apply whitening to training waveforms if needed
             if transforms:
-                waveform_generator.transform = ComposeTransforms(transforms)
+                waveform_generator.transform = ComposeDataTransforms(transforms)
 
             # Generate training waveforms
             n_total = svd_settings.num_training_samples + svd_settings.num_validation_samples
@@ -684,7 +684,7 @@ def build_compression_transforms(
 
     # Return composed transforms if any
     if transforms:
-        return ComposeTransforms(transforms), svd_basis
+        return ComposeDataTransforms(transforms), svd_basis
     else:
         return None, None
 

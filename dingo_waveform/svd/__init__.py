@@ -41,7 +41,6 @@ from .results import (
     SVDDecompositionResult,
     ValidationResult,
 )
-from .transforms import ApplySVD, ComposeTransforms, Transform
 from .utils import (
     compute_explained_variance_ratio,
     estimate_reconstruction_error,
@@ -53,6 +52,48 @@ try:
     from .__version__ import __version__
 except ImportError:
     __version__ = "unknown"
+
+
+def __getattr__(name):
+    """Provide backward compatibility for transform classes.
+
+    Transform classes have been moved to dingo_waveform.transform.
+    This provides deprecation warnings when importing from the old location.
+    """
+    import warnings
+
+    if name == "Transform":
+        warnings.warn(
+            "Importing Transform from dingo_waveform.svd is deprecated. "
+            "Please import DataTransform from dingo_waveform.transform instead. "
+            "Note: The class has been renamed from Transform to DataTransform.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from dingo_waveform.transform import DataTransform
+        return DataTransform
+    elif name == "ComposeTransforms":
+        warnings.warn(
+            "Importing ComposeTransforms from dingo_waveform.svd is deprecated. "
+            "Please import ComposeDataTransforms from dingo_waveform.transform instead. "
+            "Note: The class has been renamed from ComposeTransforms to ComposeDataTransforms.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from dingo_waveform.transform import ComposeDataTransforms
+        return ComposeDataTransforms
+    elif name == "ApplySVD":
+        warnings.warn(
+            "Importing ApplySVD from dingo_waveform.svd is deprecated. "
+            "Please import from dingo_waveform.transform instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from dingo_waveform.transform import ApplySVD
+        return ApplySVD
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     # Main class
@@ -67,10 +108,6 @@ __all__ = [
     "ValidationResult",
     "CompressionResult",
     "DecompressionResult",
-    # Transform classes
-    "Transform",
-    "ComposeTransforms",
-    "ApplySVD",
     # Core functions
     "generate_svd_basis",
     "generate_svd_bases_from_dict",
