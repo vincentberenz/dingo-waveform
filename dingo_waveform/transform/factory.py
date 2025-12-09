@@ -11,22 +11,38 @@ Key design principles:
 - Users responsible for loading/building ASDDataset, priors, domains, etc.
 """
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
+# Import type infrastructure from types.py for precise type hints
+from .types import (
+    # Protocols for external objects (duck-typed interfaces)
+    ASDDatasetLike,
+    DomainProtocol,
+    ExtrinsicPriorLike,
+    InterferometerListLike,
+    # TypedDicts for configuration dictionaries
+    StandardizationDict,
+    GNPETimeShiftsDict,
+    RandomStrainCroppingDict,
+    DomainUpdateDict,
+    # Type aliases for semantic clarity
+    DetectorList,
+    ParameterNames,
+)
 from .compose import TransformCompose
 
 
 def build_training_transform(
-    ifo_list: Any,  # bilby.gw.detector.InterferometerList
-    domain: Any,  # Domain object with time_translate_data, noise_std attributes
+    ifo_list: InterferometerListLike,
+    domain: DomainProtocol,
     ref_time: float,
-    asd_dataset: Any,  # ASDDataset with sample_random_asds(n) method
-    extrinsic_prior: Any,  # Prior with sample(n) method (returns dict)
-    inference_parameters: List[str],
-    context_parameters: Optional[List[str]] = None,
-    standardization: Optional[Dict[str, Dict[str, float]]] = None,
-    random_strain_cropping: Optional[Dict[str, Any]] = None,
-    gnpe_time_shifts: Optional[Dict[str, Any]] = None,
+    asd_dataset: ASDDatasetLike,
+    extrinsic_prior: ExtrinsicPriorLike,
+    inference_parameters: ParameterNames,
+    context_parameters: Optional[ParameterNames] = None,
+    standardization: Optional[StandardizationDict] = None,
+    random_strain_cropping: Optional[RandomStrainCroppingDict] = None,
+    gnpe_time_shifts: Optional[GNPETimeShiftsDict] = None,
     zero_noise: bool = False,
 ) -> TransformCompose:
     """
@@ -209,12 +225,12 @@ def build_training_transform(
 
 
 def build_svd_transform(
-    ifo_list: Any,
-    domain: Any,
+    ifo_list: InterferometerListLike,
+    domain: DomainProtocol,
     ref_time: float,
-    asd_dataset: Any,
-    extrinsic_prior: Any,
-    gnpe_time_shifts: Optional[Dict[str, Any]] = None,
+    asd_dataset: ASDDatasetLike,
+    extrinsic_prior: ExtrinsicPriorLike,
+    gnpe_time_shifts: Optional[GNPETimeShiftsDict] = None,
 ) -> TransformCompose:
     """
     Build SVD transform chain (6 transforms, no noise/repackaging).
@@ -308,10 +324,10 @@ def build_svd_transform(
 
 
 def build_inference_transform_pre(
-    domain: Any,
-    detectors: List[str],
-    standardization: Optional[Dict[str, Dict[str, float]]] = None,
-    domain_update: Optional[Dict[str, float]] = None,
+    domain: DomainProtocol,
+    detectors: DetectorList,
+    standardization: Optional[StandardizationDict] = None,
+    domain_update: Optional[DomainUpdateDict] = None,
 ) -> TransformCompose:
     """
     Build inference pre-transform chain (5 transforms).
@@ -398,9 +414,9 @@ def build_inference_transform_pre(
 
 
 def build_inference_transform_post(
-    inference_parameters: List[str],
-    standardization: Dict[str, Dict[str, float]],
-) -> Callable:
+    inference_parameters: ParameterNames,
+    standardization: StandardizationDict,
+) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
     """
     Build inference post-transform (1 transform).
 

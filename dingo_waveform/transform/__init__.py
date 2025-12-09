@@ -18,6 +18,24 @@ from .factory import (
 )
 from .base import TransformProtocol
 
+# Type infrastructure for user type hints
+from .types import (
+    # Protocols for external objects
+    ASDDatasetLike,
+    DomainProtocol,
+    ExtrinsicPriorLike,
+    InterferometerLike,
+    InterferometerListLike,
+    # TypedDicts for configuration dictionaries
+    StandardizationDict,
+    GNPETimeShiftsDict,
+    RandomStrainCroppingDict,
+    DomainUpdateDict,
+    # Type aliases for semantic clarity
+    DetectorList,
+    ParameterNames,
+)
+
 # Configuration types
 from .config_types import (
     StandardizationConfig,
@@ -77,6 +95,18 @@ __all__ = [
     "build_inference_transform_pre",
     "build_inference_transform_post",
     "TransformProtocol",
+    # Type infrastructure (Protocols, TypedDicts, TypeAliases)
+    "ASDDatasetLike",
+    "DomainProtocol",
+    "ExtrinsicPriorLike",
+    "InterferometerLike",
+    "InterferometerListLike",
+    "StandardizationDict",
+    "GNPETimeShiftsDict",
+    "RandomStrainCroppingDict",
+    "DomainUpdateDict",
+    "DetectorList",
+    "ParameterNames",
     # Configuration types
     "StandardizationConfig",
     "RandomStrainCroppingConfig",

@@ -18,6 +18,7 @@ from typing import (
     runtime_checkable,
     TypeAlias,
     List,
+    Sequence,
 )
 import numpy as np
 import torch
@@ -90,6 +91,173 @@ class StandardizationDict(TypedDict):
 
     mean: Dict[str, float]
     std: Dict[str, float]
+
+
+class GNPETimeShiftsDict(TypedDict):
+    """
+    Configuration for GNPE (Group Equivariant NPE) time shifts.
+
+    Used by GNPECoalescenceTimes transform to enforce time translation
+    equivariance in neural posterior estimation. This enables the network
+    to learn symmetries in the gravitational wave parameter space.
+
+    Attributes
+    ----------
+    kernel : str
+        Bilby prior specification string for time shift distribution.
+        Example: "Uniform(minimum=-0.1, maximum=0.1)"
+        The kernel defines the random time shifts applied to enforce equivariance.
+    exact_equiv : bool
+        If True, enforce exact global time translation symmetry by applying
+        the same time shift to all detectors. If False, apply independent
+        shifts per detector.
+
+    Examples
+    --------
+    >>> gnpe_config: GNPETimeShiftsDict = {
+    ...     'kernel': 'Uniform(minimum=-0.1, maximum=0.1)',
+    ...     'exact_equiv': True
+    ... }
+
+    Notes
+    -----
+    GNPE (Group-equivariant Neural Posterior Estimation) leverages symmetries
+    in the parameter space to improve sample efficiency. Time translation
+    equivariance means the posterior is invariant to global time shifts.
+    """
+
+    kernel: str
+    exact_equiv: bool
+
+
+class RandomStrainCroppingDict(TypedDict, total=False):
+    """
+    Configuration for random frequency-domain cropping.
+
+    Used by CropMaskStrainRandom transform to randomly mask waveforms
+    outside sampled frequency bounds. Supports both stochastic (random)
+    and deterministic (fixed) cropping modes.
+
+    All keys are optional (total=False) since the transform has defaults.
+
+    Attributes
+    ----------
+    f_min_upper : Optional[float]
+        Upper bound for random f_min sampling: f_min ~ Uniform[domain.f_min, f_min_upper].
+        Example: If domain.f_min=20 Hz and f_min_upper=50 Hz, each sample gets
+        a random f_min in [20, 50] Hz.
+    f_max_lower : Optional[float]
+        Lower bound for random f_max sampling: f_max ~ Uniform[f_max_lower, domain.f_max].
+        Example: If f_max_lower=512 Hz and domain.f_max=1024 Hz, f_max ~ [512, 1024] Hz.
+    cropping_probability : float
+        Probability of applying crop to a sample. Default 1.0 (always crop).
+        Example: 0.8 means 80% of samples are cropped, 20% are unchanged.
+    independent_detectors : bool
+        If True, sample crop bounds independently per detector (H1, L1 get different bounds).
+        If False, use same bounds for all detectors. Default True.
+    independent_lower_upper : bool
+        If True, apply cropping_probability independently to lower and upper bounds.
+        If False, apply probability once to both bounds. Default True.
+    deterministic_fmin_fmax : Optional[Union[List[float], List[List[float]]]]
+        Fixed [f_min, f_max] bounds (disables random sampling).
+        Can be:
+        - Single pair [f_min, f_max]: Same bounds for all detectors
+        - List of pairs [[f_min1, f_max1], [f_min2, f_max2], ...]: Per-detector bounds
+        When set, f_min_upper/f_max_lower are ignored and cropping_probability must be 1.0.
+
+    Examples
+    --------
+    >>> # Stochastic mode: random bounds
+    >>> stochastic_config: RandomStrainCroppingDict = {
+    ...     'f_min_upper': 50.0,
+    ...     'f_max_lower': 512.0,
+    ...     'cropping_probability': 0.8,
+    ...     'independent_detectors': True,
+    ...     'independent_lower_upper': True
+    ... }
+
+    >>> # Deterministic mode: fixed bounds
+    >>> deterministic_config: RandomStrainCroppingDict = {
+    ...     'deterministic_fmin_fmax': [30.0, 600.0]
+    ... }
+
+    >>> # Per-detector deterministic bounds
+    >>> per_det_config: RandomStrainCroppingDict = {
+    ...     'deterministic_fmin_fmax': [[30.0, 600.0], [25.0, 700.0]]
+    ... }
+
+    Notes
+    -----
+    This transform helps neural networks learn robustness to different
+    frequency ranges, simulating varying detector sensitivities.
+
+    Waveform is set to zero outside the sampled/fixed bounds.
+    """
+
+    f_min_upper: float
+    f_max_lower: float
+    cropping_probability: float
+    independent_detectors: bool
+    independent_lower_upper: bool
+    deterministic_fmin_fmax: Union[List[float], List[List[float]]]
+
+
+class DomainUpdateDict(TypedDict, total=False):
+    """
+    Configuration for frequency range masking in inference.
+
+    Used by MaskDataForFrequencyRangeUpdate transform to mask data
+    outside specified frequency bounds. This allows narrowing the
+    frequency range at inference time compared to training.
+
+    All keys are optional (total=False).
+
+    Attributes
+    ----------
+    f_min : Union[float, Dict[str, float]]
+        Minimum frequency (Hz) for masking.
+        Can be:
+        - float: Same f_min for all detectors
+        - Dict[str, float]: Per-detector f_min {'H1': 30.0, 'L1': 25.0}
+        Data below f_min is masked (waveform → 0, ASD → 1).
+    f_max : Union[float, Dict[str, float]]
+        Maximum frequency (Hz) for masking.
+        Can be:
+        - float: Same f_max for all detectors
+        - Dict[str, float]: Per-detector f_max {'H1': 512.0, 'L1': 600.0}
+        Data above f_max is masked (waveform → 0, ASD → 1).
+
+    Examples
+    --------
+    >>> # Global bounds (all detectors)
+    >>> global_config: DomainUpdateDict = {
+    ...     'f_min': 30.0,
+    ...     'f_max': 512.0
+    ... }
+
+    >>> # Per-detector bounds
+    >>> per_det_config: DomainUpdateDict = {
+    ...     'f_min': {'H1': 30.0, 'L1': 25.0, 'V1': 35.0},
+    ...     'f_max': {'H1': 512.0, 'L1': 600.0, 'V1': 500.0}
+    ... }
+
+    >>> # Only mask lower bound
+    >>> lower_only_config: DomainUpdateDict = {
+    ...     'f_min': 30.0
+    ... }
+
+    Notes
+    -----
+    This masking operation modifies the sample in-place:
+    - waveform[f < f_min or f > f_max] = 0.0
+    - asd[f < f_min or f > f_max] = 1.0
+
+    Setting ASD to 1.0 outside the range tells the neural network to
+    ignore those frequencies (unit noise variance = no information).
+    """
+
+    f_min: Union[float, Dict[str, float]]
+    f_max: Union[float, Dict[str, float]]
 
 
 class PolarizationDict(TypedDict, total=False):
@@ -459,58 +627,159 @@ class TorchSample(TypedDict, total=False):
 @runtime_checkable
 class DomainProtocol(Protocol):
     """
-    Minimal protocol for Domain objects used in transforms.
+    Protocol for Domain objects used in transform chains.
 
-    This protocol avoids circular imports by not importing the actual Domain
-    classes from dingo_waveform.domains. Instead, it defines the minimal
-    interface that transforms actually use.
+    This protocol captures the duck-typed interface for Domain objects
+    (UniformFrequencyDomain, MultibandedFrequencyDomain, TimeDomain) without
+    importing them directly, avoiding circular dependencies.
 
-    Methods
-    -------
+    Typical implementations:
+    - dingo_waveform.domains.UniformFrequencyDomain
+    - dingo_waveform.domains.MultibandedFrequencyDomain
+    - dingo_waveform.domains.TimeDomain
+
+    Required Attributes/Methods (used by all transforms)
+    -----------------------------------------------------
     time_translate_data(data, dt)
-        Time-shift data by dt
-    decimate(data)
-        Decimate uniform-frequency data to multibanded representation
-
-    Attributes
-    ----------
+        Time-shift waveform data by dt seconds
+    noise_std : Union[float, NDArray[np.float64]]
+        Standard deviation of noise for whitening
+    min_idx : int
+        Minimum index in frequency array
+    max_idx : int
+        Maximum index in frequency array
     domain_dict : Dict[str, Any]
         Dictionary representation for serialization
+    sample_frequencies : NDArray[np.float64]
+        Array of sample frequencies (Hz)
+    __call__()
+        Return frequency array (callable interface)
+
+    Optional Attributes (domain-specific)
+    --------------------------------------
+    f_min : float
+        Minimum frequency (Hz) - for frequency domains
+    f_max : float
+        Maximum frequency (Hz) - for frequency domains
+    delta_f : float
+        Frequency spacing (Hz) - for uniform frequency domains only
+    decimate(data)
+        Decimate uniform-frequency data to multibanded - for MultibandedFrequencyDomain only
+
+    Examples
+    --------
+    >>> from dingo_waveform.domains import UniformFrequencyDomain
+    >>> domain = UniformFrequencyDomain(f_min=20.0, f_max=1024.0, delta_f=0.125)
+    >>> domain.sample_frequencies.shape
+    (8032,)
+    >>> domain.noise_std
+    1.0
+    >>> data_shifted = domain.time_translate_data(data, dt=0.1)
+
+    Notes
+    -----
+    Not all domains have all attributes. For example:
+    - Only MultibandedFrequencyDomain has decimate() method
+    - Only frequency domains have f_min, f_max attributes
+    - TimeDomain has different attributes
+
+    Factory functions check for required attributes with hasattr() before use.
     """
 
+    # REQUIRED: Methods used by multiple transforms
     def time_translate_data(
-        self, data: NDArray[np.complex128], dt: Union[float, NDArray[np.float64]]
-    ) -> NDArray[np.complex128]:
+        self,
+        data: Union[NDArray[np.complex128], Any],
+        dt: Union[float, NDArray[np.float64]]
+    ) -> Union[NDArray[np.complex128], Any]:
         """
-        Time-shift data by dt.
+        Time-translate waveform data by dt seconds.
 
         Parameters
         ----------
-        data : NDArray[np.complex128]
+        data : Union[NDArray[np.complex128], torch.Tensor]
             Frequency-domain data
         dt : Union[float, NDArray[np.float64]]
-            Time shift in seconds
+            Time shift in seconds (can be batched)
 
         Returns
         -------
-        NDArray[np.complex128]
+        Union[NDArray[np.complex128], torch.Tensor]
             Time-shifted data
         """
         ...
 
-    def decimate(self, data: NDArray[np.complex128]) -> NDArray[np.complex128]:
+    def update_data(
+        self,
+        data: NDArray[np.float64],
+        low_value: float = 1e-22
+    ) -> NDArray[np.float64]:
         """
-        Decimate uniform-frequency data to multibanded representation.
+        Update low-frequency bins to avoid numerical issues.
+
+        Used by WhitenFixedASD to avoid division by very small ASD values.
 
         Parameters
         ----------
-        data : NDArray[np.complex128]
-            Uniform-frequency data
+        data : NDArray[np.float64]
+            Data array to update
+        low_value : float
+            Value to use for low-frequency bins
 
         Returns
         -------
-        NDArray[np.complex128]
-            Decimated data
+        NDArray[np.float64]
+            Updated data with low-frequency bins set to low_value
+        """
+        ...
+
+    def __call__(self) -> NDArray[np.float64]:
+        """
+        Return frequency array (callable interface).
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Array of frequencies (Hz)
+        """
+        ...
+
+    # REQUIRED: Properties used by multiple transforms
+    @property
+    def noise_std(self) -> Union[float, NDArray[np.float64]]:
+        """
+        Standard deviation of noise for whitening.
+
+        Used by WhitenAndScaleStrain to compute scale factors.
+
+        Returns
+        -------
+        Union[float, NDArray[np.float64]]
+            Noise standard deviation
+        """
+        ...
+
+    @property
+    def min_idx(self) -> int:
+        """
+        Minimum index in frequency array.
+
+        Returns
+        -------
+        int
+            Index of first valid frequency bin
+        """
+        ...
+
+    @property
+    def max_idx(self) -> int:
+        """
+        Maximum index in frequency array.
+
+        Returns
+        -------
+        int
+            Index of last valid frequency bin
         """
         ...
 
@@ -525,6 +794,261 @@ class DomainProtocol(Protocol):
             Domain parameters as dictionary
         """
         ...
+
+    @property
+    def sample_frequencies(self) -> NDArray[np.float64]:
+        """
+        Array of sample frequencies (Hz).
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Frequency array
+        """
+        ...
+
+    @property
+    def frequency_mask(self) -> NDArray[np.bool_]:
+        """
+        Boolean mask for valid frequency bins.
+
+        Used by ApplyCalibrationUncertainty to select calibration frequencies.
+
+        Returns
+        -------
+        NDArray[np.bool_]
+            Boolean mask (True for valid bins)
+        """
+        ...
+
+    # OPTIONAL: Frequency domain attributes (not present in TimeDomain)
+    @property
+    def f_min(self) -> float:
+        """
+        Minimum frequency (Hz).
+
+        Only present in frequency domains (UniformFrequencyDomain,
+        MultibandedFrequencyDomain).
+
+        Returns
+        -------
+        float
+            Minimum frequency
+        """
+        ...
+
+    @property
+    def f_max(self) -> float:
+        """
+        Maximum frequency (Hz).
+
+        Only present in frequency domains.
+
+        Returns
+        -------
+        float
+            Maximum frequency
+        """
+        ...
+
+    @property
+    def delta_f(self) -> float:
+        """
+        Frequency spacing (Hz).
+
+        Only present in UniformFrequencyDomain.
+
+        Returns
+        -------
+        float
+            Frequency spacing
+        """
+        ...
+
+    # OPTIONAL: MultibandedFrequencyDomain-specific method
+    def decimate(self, data: NDArray[np.complex128]) -> NDArray[np.complex128]:
+        """
+        Decimate uniform-frequency data to multibanded representation.
+
+        Only present in MultibandedFrequencyDomain.
+
+        Parameters
+        ----------
+        data : NDArray[np.complex128]
+            Uniform-frequency data
+
+        Returns
+        -------
+        NDArray[np.complex128]
+            Decimated data
+        """
+        ...
+
+
+@runtime_checkable
+class ASDDatasetLike(Protocol):
+    """
+    Protocol for ASD dataset objects.
+
+    This protocol captures the duck-typed interface for ASD (Amplitude Spectral Density)
+    dataset objects used in transform factories. Objects conforming to this protocol
+    can sample random ASD realizations for noise simulation.
+
+    Typical implementations:
+    - dingo.gw.noise.asd_dataset.ASDDataset
+
+    Methods
+    -------
+    sample_random_asds(n)
+        Sample n random ASD realizations from the dataset
+
+    Examples
+    --------
+    >>> from dingo.gw.noise.asd_dataset import ASDDataset
+    >>> asd_dataset = ASDDataset('/path/to/asd_dataset.hdf5')
+    >>> # Sample single ASD
+    >>> asds = asd_dataset.sample_random_asds(None)
+    >>> # asds = {'H1': array(...), 'L1': array(...)}
+    >>> # Sample batch of 10 ASDs
+    >>> asds_batch = asd_dataset.sample_random_asds(10)
+    >>> # asds_batch = {'H1': array(10, D), 'L1': array(10, D)}
+
+    Notes
+    -----
+    The return type uses Dict[str, NDArray[np.float64]] where keys are detector
+    names ('H1', 'L1', 'V1', etc.) and values are ASD arrays.
+
+    When n=None, returns single sample without batch dimension: shape (D,)
+    When n is int, returns batched samples with batch dimension: shape (n, D)
+    """
+
+    def sample_random_asds(
+        self, n: Any = None
+    ) -> Dict[str, NDArray[np.float64]]:
+        """
+        Sample n random ASD realizations (or single if n=None).
+
+        Parameters
+        ----------
+        n : Optional[int]
+            Number of samples. If None, returns single sample without batch dim.
+
+        Returns
+        -------
+        Dict[str, NDArray[np.float64]]
+            Mapping of detector names to ASD arrays.
+            Shape: (n, D) if batched, (D,) if single.
+        """
+        ...
+
+
+@runtime_checkable
+class ExtrinsicPriorLike(Protocol):
+    """
+    Protocol for extrinsic parameter prior objects.
+
+    This protocol captures the duck-typed interface for prior objects that sample
+    extrinsic parameters (sky location, orientation, distance, time, etc.) for
+    gravitational wave events.
+
+    Typical implementations:
+    - dingo.gw.prior.BBHExtrinsicPriorDict
+    - bilby.core.prior.PriorDict
+    - bilby.gw.prior.BBHPriorDict
+
+    Methods
+    -------
+    sample(n)
+        Sample n extrinsic parameter sets from the prior
+
+    Examples
+    --------
+    >>> from dingo.gw.prior import BBHExtrinsicPriorDict
+    >>> prior_dict = {
+    ...     'ra': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 6.28},
+    ...     'dec': {'type': 'Cosine', 'minimum': -1.57, 'maximum': 1.57},
+    ...     'psi': {'type': 'Uniform', 'minimum': 0.0, 'maximum': 3.14},
+    ...     'luminosity_distance': {'type': 'UniformSourceFrame', 'minimum': 100, 'maximum': 5000}
+    ... }
+    >>> prior = BBHExtrinsicPriorDict(prior_dict)
+    >>> # Sample single parameter set
+    >>> params = prior.sample(None)
+    >>> # params = {'ra': 1.23, 'dec': 0.45, 'psi': 2.1, 'luminosity_distance': 1200.0}
+    >>> # Sample batch of 10 parameter sets
+    >>> params_batch = prior.sample(10)
+    >>> # params_batch = {'ra': array([...]), 'dec': array([...]), ...}
+
+    Notes
+    -----
+    The return type uses Dict[str, Union[float, NDArray[np.float32]]] where:
+    - When n=None: values are floats (single parameter set)
+    - When n is int: values are arrays (batch of parameter sets)
+
+    Extrinsic parameters typically include: ra, dec, psi, luminosity_distance,
+    geocent_time, and potentially detector-specific times.
+    """
+
+    def sample(
+        self, n: Any = None
+    ) -> Dict[str, Union[float, NDArray[np.float32]]]:
+        """
+        Sample n extrinsic parameter sets.
+
+        Parameters
+        ----------
+        n : Optional[int]
+            Number of samples. If None, returns single sample (floats).
+
+        Returns
+        -------
+        Dict[str, Union[float, NDArray[np.float32]]]
+            Mapping of parameter names to sampled values.
+            Values are floats if n=None, arrays if batched.
+        """
+        ...
+
+
+@runtime_checkable
+class InterferometerLike(Protocol):
+    """
+    Protocol for interferometer objects.
+
+    This protocol captures the minimal duck-typed interface for interferometer
+    objects used in transform factories. Objects conforming to this protocol
+    represent gravitational wave detectors (LIGO Hanford, LIGO Livingston,
+    Virgo, KAGRA, etc.).
+
+    Typical implementations:
+    - bilby.gw.detector.Interferometer
+
+    Attributes
+    ----------
+    name : str
+        Detector identifier (e.g., 'H1', 'L1', 'V1', 'K1')
+
+    Examples
+    --------
+    >>> from bilby.gw.detector import Interferometer
+    >>> ifo = Interferometer('H1')
+    >>> ifo.name
+    'H1'
+    >>> # Often used in lists/iterables:
+    >>> from bilby.gw.detector import InterferometerList
+    >>> ifo_list = InterferometerList(['H1', 'L1'])
+    >>> for ifo in ifo_list:
+    ...     print(ifo.name)
+    'H1'
+    'L1'
+
+    Notes
+    -----
+    This protocol only specifies the 'name' attribute since that's the minimal
+    interface used by factory functions. Actual Interferometer objects have
+    many more attributes (antenna_response, strain_data, etc.) but those are
+    accessed via specific methods, not required by the Protocol.
+    """
+
+    name: str
 
 
 @runtime_checkable
@@ -619,6 +1143,80 @@ Generic nested dictionary type (used pervasively in transforms).
 This is an alias for Dict[str, Any] that provides semantic clarity
 when a dict contains nested structure but we cannot be more specific
 about the type without circular imports or excessive complexity.
+"""
+
+# Type aliases for factory function parameters
+InterferometerListLike: TypeAlias = Union[
+    Sequence[InterferometerLike],
+    Sequence[str]
+]
+"""
+Type alias for interferometer list parameter in factory functions.
+
+Accepts either:
+- Sequence of InterferometerLike objects (e.g., bilby.gw.detector.InterferometerList)
+- Sequence of detector name strings (e.g., ['H1', 'L1', 'V1'])
+
+Examples
+--------
+>>> from bilby.gw.detector import InterferometerList
+>>> # Full interferometer objects
+>>> ifo_list: InterferometerListLike = InterferometerList(['H1', 'L1'])
+>>>
+>>> # Simple list of detector names
+>>> ifo_list: InterferometerListLike = ['H1', 'L1', 'V1']
+
+Notes
+-----
+Factory functions iterate over the list and access the .name attribute
+(or use the string directly if it's a list of strings). This flexibility
+allows users to pass either full Interferometer objects or simple name lists.
+"""
+
+DetectorList: TypeAlias = List[str]
+"""
+Type alias for detector name lists.
+
+Used in factory functions that require explicit detector names
+(e.g., for inference transforms that don't need full Interferometer objects).
+
+Examples
+--------
+>>> detectors: DetectorList = ['H1', 'L1']
+>>> detectors: DetectorList = ['H1', 'L1', 'V1', 'K1']
+
+Notes
+-----
+Detector names follow LIGO/Virgo/KAGRA conventions:
+- H1: LIGO Hanford
+- L1: LIGO Livingston
+- V1: Virgo
+- K1: KAGRA
+"""
+
+ParameterNames: TypeAlias = List[str]
+"""
+Type alias for parameter name lists.
+
+Used in factory functions to specify which parameters are used for
+inference, context, or standardization.
+
+Examples
+--------
+>>> inference_params: ParameterNames = [
+...     'mass_1', 'mass_2', 'luminosity_distance',
+...     'theta_jn', 'phase', 'a_1', 'a_2'
+... ]
+>>> context_params: ParameterNames = ['geocent_time']
+
+Notes
+-----
+Common parameter names include:
+- Intrinsic: mass_1, mass_2, a_1, a_2, tilt_1, tilt_2, phi_12, phi_jl
+- Extrinsic: ra, dec, psi, luminosity_distance, geocent_time, theta_jn, phase
+
+The parameter names must match keys in the parameter dictionaries
+flowing through the transform pipeline.
 """
 
 # Union of all pipeline stage types for generic handling
