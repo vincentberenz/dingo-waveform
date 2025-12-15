@@ -18,9 +18,10 @@ classifiers = [
 ]
 
 dependencies = [
+    "dingo-gw",
     "bilby",
-    "bilby_pipe==1.4.2",
-    "lalsuite>=7.15",
+    "bilby_pipe",
+    "lalsuite",
     "matplotlib",
     "numpy",
     "nptyping",
@@ -33,9 +34,8 @@ dependencies = [
     "tomli",
     "torch",
     "gwpy",
-    "plotly>=5.0.0",
-    "kaleido"
-    #"dingo-gw"
+    "plotly",
+    "kaleido",
 ]
 
 [project.scripts]
