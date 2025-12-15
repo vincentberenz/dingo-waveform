@@ -3,28 +3,35 @@
 SVD compression example.
 
 Demonstrates how to:
-1. Use build_waveform_generator to create a generator from config
-2. Generate a training dataset for SVD basis construction
+1. Load configuration and build waveform generator
+2. Use the dataset API to generate training and validation data
 3. Build an SVD basis from training waveforms
-4. Compress waveforms using the SVD basis
-5. Reconstruct waveforms and measure compression error
+4. Compress and reconstruct validation waveforms
+5. Measure compression error (mismatch)
 
 Usage:
     python generate_with_svd.py
 """
 
 import logging
-import yaml
-import numpy as np
 from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
-from dingo_waveform.waveform_generator import build_waveform_generator
-from dingo_waveform.waveform_parameters import WaveformParameters
-from dingo_waveform.prior import build_prior_with_defaults
+import numpy as np
+import pandas as pd
+from bilby.gw.prior import BBHPriorDict
+
+from dingo_waveform.approximant import Approximant
 from dingo_waveform.compression.svd import SVDBasis
+from dingo_waveform.dataset.generate import generate_parameters_and_polarizations
+from dingo_waveform.domains import Domain
+from dingo_waveform.imports import read_file
 from dingo_waveform.logs import set_logging
+from dingo_waveform.polarizations import BatchPolarizations
+from dingo_waveform.prior import build_prior_with_defaults
+from dingo_waveform.waveform_generator import WaveformGenerator, build_waveform_generator
 
-def calculate_mismatch(wf1, wf2):
+def calculate_mismatch(wf1: np.ndarray, wf2: np.ndarray) -> float:
     """Calculate normalized mismatch between two waveforms."""
     # Inner product
     inner_product = np.vdot(wf1, wf2)
@@ -40,20 +47,23 @@ def calculate_mismatch(wf1, wf2):
     return mismatch
 
 
-def main():
+def main() -> None:
 
     set_logging()
-    logger = logging.getLogger(__name__)
+    logger: logging.Logger = logging.getLogger(__name__)
 
-    # Create waveform generator directly from config file
-    config_file = Path(__file__).parent / "svd_compression_small.yaml"
+    # Load configuration
+    config_file: Path = Path(__file__).parent / "svd_compression_small.yaml"
     logger.info(f"Loading configuration from: {config_file.name}")
 
-    wfg = build_waveform_generator(config_file)
+    config: Dict[str, Any] = read_file(config_file)
+
+    # Create waveform generator
+    wfg: WaveformGenerator = build_waveform_generator(config_file)
 
     # Access domain from the generator
-    domain = wfg._waveform_gen_params.domain
-    approximant = wfg._waveform_gen_params.approximant
+    domain: Domain = wfg._waveform_gen_params.domain
+    approximant: Approximant = wfg._waveform_gen_params.approximant
 
     logger.info(f"Domain: {type(domain).__name__}")
     logger.info(f"  Frequency range: {domain.f_min:.1f} - {domain.f_max:.1f} Hz")
@@ -62,15 +72,11 @@ def main():
     logger.info(f"Waveform Generator:")
     logger.info(f"  Approximant: {approximant}")
 
-    # Load configuration for SVD settings and prior
-    with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)
-
     # Get SVD settings
-    svd_config = config['svd']
-    n_components = svd_config['n_components']
-    num_training = svd_config['num_training']
-    num_validation = svd_config['num_validation']
+    svd_config: Dict[str, Any] = config['svd']
+    n_components: int = svd_config['n_components']
+    num_training: int = svd_config['num_training']
+    num_validation: int = svd_config['num_validation']
 
     logger.info(f"SVD Configuration:")
     logger.info(f"  Number of components: {n_components}")
@@ -79,31 +85,34 @@ def main():
     logger.info(f"  Compression ratio: {len(domain) / n_components:.1f}x")
 
     # Create prior
-    prior_key = 'prior' if 'prior' in config else 'intrinsic_prior'
-    prior = build_prior_with_defaults(config[prior_key])
+    prior_key: str = 'prior' if 'prior' in config else 'intrinsic_prior'
+    prior: BBHPriorDict = build_prior_with_defaults(config[prior_key])
 
-    # Generate training dataset
-    logger.info(f"Generating {num_training} training waveforms...")
-    training_waveforms = []
+    # Generate training dataset using the dataset API
+    logger.info(f"Generating {num_training} training waveforms using dataset API...")
+    train_parameters: pd.DataFrame
+    train_polarizations: BatchPolarizations
+    train_parameters, train_polarizations = generate_parameters_and_polarizations(
+        waveform_generator=wfg,
+        prior=prior,
+        num_samples=num_training,
+        num_processes=1,  # Use 1 for this small example
+    )
 
-    for i in range(num_training):
-        sampled_params = prior.sample()
-        params = WaveformParameters(**sampled_params)
-        pol = wfg.generate_hplus_hcross(params)
-
-        # Stack h_plus and h_cross into a single array
-        stacked = np.concatenate([pol.h_plus, pol.h_cross])
-        training_waveforms.append(stacked)
-
-        if (i + 1) % 10 == 0:
-            logger.info(f"  Generated {i + 1}/{num_training} waveforms...")
-
-    # Stack into array: shape (num_training, 2*n_freq_bins)
-    training_data = np.array(training_waveforms)
+    logger.info(f"  ✓ Generated {len(train_parameters)} training waveforms")
 
     # Build SVD basis
+    # Note: We stack h_plus and h_cross into single vectors for each waveform
     logger.info(f"Building SVD basis from training data...")
-    svd_basis = SVDBasis()
+
+    # Prepare training data: stack h_plus and h_cross for each waveform
+    # Result shape: (num_training, 2*n_freq_bins)
+    training_data: np.ndarray = np.concatenate(
+        [train_polarizations.h_plus, train_polarizations.h_cross],
+        axis=1  # Concatenate along feature dimension
+    )
+
+    svd_basis: SVDBasis = SVDBasis()
     svd_basis.generate_basis(
         training_data=training_data,
         n_components=n_components,
@@ -114,39 +123,49 @@ def main():
     logger.info(f"  Basis shape: {svd_basis.Vh.shape}")
     logger.info(f"  Number of components: {svd_basis.n_components}")
 
-    # Generate validation dataset
-    logger.info(f"Generating {num_validation} validation waveforms...")
-    validation_waveforms = []
+    # Generate validation dataset using the dataset API
+    logger.info(f"Generating {num_validation} validation waveforms using dataset API...")
+    val_parameters: pd.DataFrame
+    val_polarizations: BatchPolarizations
+    val_parameters, val_polarizations = generate_parameters_and_polarizations(
+        waveform_generator=wfg,
+        prior=prior,
+        num_samples=num_validation,
+        num_processes=1,
+    )
 
-    for i in range(num_validation):
-        sampled_params = prior.sample()
-        params = WaveformParameters(**sampled_params)
-        pol = wfg.generate_hplus_hcross(params)
-        validation_waveforms.append(pol)
+    logger.info(f"  ✓ Generated {len(val_parameters)} validation waveforms")
 
     # Test compression on validation set
     logger.info(f"Testing compression on validation set...")
-    mismatches_plus = []
-    mismatches_cross = []
+    mismatches_plus: List[float] = []
+    mismatches_cross: List[float] = []
 
-    n_freq_bins = len(domain)
-    for i, pol in enumerate(validation_waveforms):
+    n_freq_bins: int = len(domain)
+    num_val_samples: int = len(val_parameters)
+
+    # Process each validation waveform
+    for i in range(num_val_samples):
+        # Get individual waveform from batch
+        h_plus_original: np.ndarray = val_polarizations.h_plus[i]  # shape: (n_freq_bins,)
+        h_cross_original: np.ndarray = val_polarizations.h_cross[i]  # shape: (n_freq_bins,)
+
         # Stack h_plus and h_cross
-        stacked = np.concatenate([pol.h_plus, pol.h_cross])
+        stacked: np.ndarray = np.concatenate([h_plus_original, h_cross_original])  # shape: (2*n_freq_bins,)
 
         # Compress
-        coeffs = svd_basis.compress(stacked)
+        coeffs: np.ndarray = svd_basis.compress(stacked)  # shape: (n_components,)
 
         # Reconstruct
-        reconstructed = svd_basis.decompress(coeffs)
+        reconstructed: np.ndarray = svd_basis.decompress(coeffs)  # shape: (2*n_freq_bins,)
 
         # Separate back into h_plus and h_cross
-        h_plus_reconstructed = reconstructed[:n_freq_bins]
-        h_cross_reconstructed = reconstructed[n_freq_bins:]
+        h_plus_reconstructed: np.ndarray = reconstructed[:n_freq_bins]
+        h_cross_reconstructed: np.ndarray = reconstructed[n_freq_bins:]
 
         # Calculate mismatch
-        mismatch_plus = calculate_mismatch(pol.h_plus, h_plus_reconstructed)
-        mismatch_cross = calculate_mismatch(pol.h_cross, h_cross_reconstructed)
+        mismatch_plus: float = calculate_mismatch(h_plus_original, h_plus_reconstructed)
+        mismatch_cross: float = calculate_mismatch(h_cross_original, h_cross_reconstructed)
 
         mismatches_plus.append(mismatch_plus)
         mismatches_cross.append(mismatch_cross)

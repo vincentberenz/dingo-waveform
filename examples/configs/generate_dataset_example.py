@@ -3,9 +3,9 @@
 Dataset generation example.
 
 Demonstrates how to:
-1. Use build_waveform_generator to create a generator from config
-2. Sample parameters from a prior distribution
-3. Generate multiple waveforms efficiently
+1. Load dataset settings from a configuration file
+2. Use the dingo_waveform.dataset API to generate datasets
+3. Access and analyze dataset parameters and polarizations
 4. Display dataset statistics
 
 Note: For large-scale dataset generation with parallel processing and HDF5 output,
@@ -16,105 +16,104 @@ Usage:
 """
 
 import logging
-import yaml
-import numpy as np
 from pathlib import Path
+from typing import Any, Dict
 
-from dingo_waveform.waveform_generator import build_waveform_generator
-from dingo_waveform.waveform_parameters import WaveformParameters
-from dingo_waveform.prior import build_prior_with_defaults
+import numpy as np
+import pandas as pd
+
+from dingo_waveform.dataset.dataset_settings import DatasetSettings
+from dingo_waveform.dataset.generate import generate_waveform_dataset
+from dingo_waveform.dataset.waveform_dataset import WaveformDataset
+from dingo_waveform.imports import read_file
 from dingo_waveform.logs import set_logging
+from dingo_waveform.polarizations import BatchPolarizations
 
-def main():
+def main() -> None:
 
     set_logging()
-    logger = logging.getLogger(__name__)
+    logger: logging.Logger = logging.getLogger(__name__)
 
-    # Create waveform generator directly from config file
-    config_file = Path(__file__).parent / "dataset_quick_imrphenomd.yaml"
+    # Load configuration from YAML file
+    config_file: Path = Path(__file__).parent / "dataset_quick_imrphenomd.yaml"
     logger.info(f"Loading configuration from: {config_file.name}")
 
-    wfg = build_waveform_generator(config_file)
+    # Read config and create DatasetSettings
+    config: Dict[str, Any] = read_file(config_file)
 
-    # Access domain and approximant from the generator
-    domain = wfg._waveform_gen_params.domain
-    approximant = wfg._waveform_gen_params.approximant
-    f_ref = wfg._waveform_gen_params.f_ref
+    # Override num_samples for this example (original config may have different value)
+    config['num_samples'] = 10
 
-    logger.info(f"Domain: {type(domain).__name__}")
-    logger.info(f"  Frequency range: {domain.f_min:.1f} - {domain.f_max:.1f} Hz")
-    logger.info(f"  Frequency bins: {len(domain)}")
+    settings: DatasetSettings = DatasetSettings.from_dict(config)
+
+    # Display configuration
+    logger.info(f"Domain: {type(settings.domain).__name__}")
+    logger.info(f"  f_min: {settings.domain.f_min:.1f} Hz")
+    logger.info(f"  f_max: {settings.domain.f_max:.1f} Hz")
+    logger.info(f"  delta_f: {settings.domain.delta_f} Hz")
 
     logger.info(f"Waveform Generator:")
-    logger.info(f"  Approximant: {approximant}")
-    logger.info(f"  Reference frequency: {f_ref} Hz")
-
-    # Load prior configuration
-    with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)
-
-    # Create prior distribution
-    logger.info("Creating prior distribution...")
-    prior = build_prior_with_defaults(config['intrinsic_prior'])
+    logger.info(f"  Approximant: {settings.waveform_generator.approximant}")
+    logger.info(f"  Reference frequency: {settings.waveform_generator.f_ref} Hz")
 
     logger.info(f"Prior parameters:")
-    for param_name in prior.keys():
-        param_prior = prior[param_name]
-        logger.info(f"  {param_name}: {param_prior}")
+    for param_name, param_value in settings.intrinsic_prior.__dict__.items():
+        if param_value is not None:
+            logger.info(f"  {param_name}: {param_value}")
 
-    # Generate sample dataset
-    num_samples = 10
-    logger.info(f"Generating {num_samples} waveforms...")
+    logger.info(f"Generating {settings.num_samples} waveforms...")
 
-    waveforms = []
-    parameters = []
+    # Generate dataset using the dataset API
+    # num_processes=1 for this small example (use more for production)
+    dataset: WaveformDataset = generate_waveform_dataset(settings, num_processes=1)
 
-    for i in range(num_samples):
-        # Sample parameters from prior
-        sampled_params = prior.sample()
+    logger.info(f"✓ Generated {len(dataset.parameters)} waveforms successfully!")
 
-        # Create WaveformParameters object
-        # Note: sampled_params may contain chirp_mass/mass_ratio or mass_1/mass_2
-        params = WaveformParameters(**sampled_params)
-
-        # Generate waveform
-        polarizations = wfg.generate_hplus_hcross(params)
-
-        waveforms.append(polarizations)
-        parameters.append(params)
-
-        if (i + 1) % 5 == 0:
-            logger.info(f"  Generated {i + 1}/{num_samples} waveforms...")
-
-    logger.info(f"✓ Generated {num_samples} waveforms successfully!")
+    # Access dataset components
+    parameters: pd.DataFrame = dataset.parameters  # pandas DataFrame with waveform parameters
+    polarizations: BatchPolarizations = dataset.polarizations  # BatchPolarizations dataclass
 
     # Display dataset statistics
     logger.info("Dataset statistics:")
 
-    # Mass statistics (handle both mass_1/mass_2 and chirp_mass/mass_ratio cases)
-    if parameters[0].mass_1 is not None:
-        masses_1 = [p.mass_1 for p in parameters]
-        masses_2 = [p.mass_2 for p in parameters]
-        logger.info(f"  Mass 1: min={min(masses_1):.1f}, max={max(masses_1):.1f}, mean={np.mean(masses_1):.1f} M☉")
-        logger.info(f"  Mass 2: min={min(masses_2):.1f}, max={max(masses_2):.1f}, mean={np.mean(masses_2):.1f} M☉")
+    # Mass statistics
+    if 'mass_1' in parameters.columns:
+        logger.info(f"  Mass 1: min={parameters['mass_1'].min():.1f}, "
+                   f"max={parameters['mass_1'].max():.1f}, "
+                   f"mean={parameters['mass_1'].mean():.1f} M☉")
+        logger.info(f"  Mass 2: min={parameters['mass_2'].min():.1f}, "
+                   f"max={parameters['mass_2'].max():.1f}, "
+                   f"mean={parameters['mass_2'].mean():.1f} M☉")
 
-    if parameters[0].chirp_mass is not None:
-        chirp_masses = [p.chirp_mass for p in parameters]
-        logger.info(f"  Chirp mass: min={min(chirp_masses):.1f}, max={max(chirp_masses):.1f}, mean={np.mean(chirp_masses):.1f} M☉")
+    if 'chirp_mass' in parameters.columns:
+        logger.info(f"  Chirp mass: min={parameters['chirp_mass'].min():.1f}, "
+                   f"max={parameters['chirp_mass'].max():.1f}, "
+                   f"mean={parameters['chirp_mass'].mean():.1f} M☉")
 
-    if parameters[0].mass_ratio is not None:
-        mass_ratios = [p.mass_ratio for p in parameters]
-        logger.info(f"  Mass ratio: min={min(mass_ratios):.2f}, max={max(mass_ratios):.2f}, mean={np.mean(mass_ratios):.2f}")
+    if 'mass_ratio' in parameters.columns:
+        logger.info(f"  Mass ratio: min={parameters['mass_ratio'].min():.2f}, "
+                   f"max={parameters['mass_ratio'].max():.2f}, "
+                   f"mean={parameters['mass_ratio'].mean():.2f}")
 
     # Spin statistics
-    spins_1 = [p.a_1 for p in parameters]
-    spins_2 = [p.a_2 for p in parameters]
-    logger.info(f"  Spin a_1: min={min(spins_1):.2f}, max={max(spins_1):.2f}, mean={np.mean(spins_1):.2f}")
-    logger.info(f"  Spin a_2: min={min(spins_2):.2f}, max={max(spins_2):.2f}, mean={np.mean(spins_2):.2f}")
+    logger.info(f"  Spin a_1: min={parameters['a_1'].min():.2f}, "
+               f"max={parameters['a_1'].max():.2f}, "
+               f"mean={parameters['a_1'].mean():.2f}")
+    logger.info(f"  Spin a_2: min={parameters['a_2'].min():.2f}, "
+               f"max={parameters['a_2'].max():.2f}, "
+               f"mean={parameters['a_2'].mean():.2f}")
 
     # Waveform amplitude statistics
-    amplitudes = [np.abs(w.h_plus).max() for w in waveforms]
-    logger.info(f"  Max amplitude: min={min(amplitudes):.3e}, max={max(amplitudes):.3e}, mean={np.mean(amplitudes):.3e}")
+    amplitudes: np.ndarray = np.abs(polarizations.h_plus).max(axis=1)  # shape: (num_samples,)
+    logger.info(f"  Max amplitude: min={amplitudes.min():.3e}, "
+               f"max={amplitudes.max():.3e}, "
+               f"mean={amplitudes.mean():.3e}")
+
+    # Show dataset structure
+    logger.info(f"Dataset structure:")
+    logger.info(f"  Parameters shape: {parameters.shape}")
+    logger.info(f"  h_plus shape: {polarizations.h_plus.shape}")
+    logger.info(f"  h_cross shape: {polarizations.h_cross.shape}")
 
     logger.info("Note: For production-scale dataset generation with parallel processing,")
     logger.info("use the dingo_generate_dataset command-line tool:")

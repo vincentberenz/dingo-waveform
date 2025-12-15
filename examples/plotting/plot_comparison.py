@@ -8,70 +8,75 @@ This script demonstrates how to:
 3. Create overlay plots for comparison
 
 Usage:
-    python plot_comparison.py config1.yaml config2.yaml [config3.yaml ...]
+    python plot_comparison.py
 
-Example:
-    python plot_comparison.py config_basic_frequency.yaml config_precessing.yaml
+The script compares waveforms from several default configurations.
 """
 
-import sys
 from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
-import yaml
-import plotly.graph_objects as go
 import numpy as np
+import plotly.graph_objects as go
 
-from dingo_waveform.waveform_generator import build_waveform_generator
+from dingo_waveform.domains import Domain
+from dingo_waveform.imports import read_file
+from dingo_waveform.polarizations import Polarization
+from dingo_waveform.waveform_generator import WaveformGenerator, build_waveform_generator
 from dingo_waveform.waveform_parameters import WaveformParameters
 
 
-def main():
-    if len(sys.argv) < 3:
-        print("Usage: python plot_comparison.py config1.yaml config2.yaml [config3.yaml ...]")
-        print("\nExample:")
-        print("  python plot_comparison.py config_basic_frequency.yaml config_precessing.yaml")
-        sys.exit(1)
+def main() -> None:
+    # Use default configuration files for comparison
+    script_dir: Path = Path(__file__).parent
+    config_files: List[Path] = [
+        script_dir / "config_basic_frequency.yaml",
+        script_dir / "config_precessing.yaml",
+        script_dir / "config_high_mass.yaml",
+    ]
 
-    config_files = [Path(f) for f in sys.argv[1:]]
+    print("Comparing waveforms from the following configurations:")
+    for config_file in config_files:
+        print(f"  - {config_file.name}")
+    print()
 
     # Load and generate all waveforms
-    waveforms = []
-    labels = []
+    waveforms: List[Tuple[Domain, Polarization]] = []
+    labels: List[str] = []
 
     for config_file in config_files:
         print(f"\nProcessing: {config_file.name}")
 
         # Load configuration
-        with open(config_file) as f:
-            config = yaml.safe_load(f)
+        config: Dict[str, Any] = read_file(config_file)
 
         # Build generator and generate waveform
-        wfg = build_waveform_generator(config)
-        params = WaveformParameters(**config["waveform_parameters"])
-        polarization = wfg.generate_hplus_hcross(params)
+        wfg: WaveformGenerator = build_waveform_generator(config)
+        params: WaveformParameters = WaveformParameters(**config["waveform_parameters"])
+        polarization: Polarization = wfg.generate_hplus_hcross(params)
 
         # Store results
-        domain = wfg._waveform_gen_params.domain
+        domain: Domain = wfg._waveform_gen_params.domain
         waveforms.append((domain, polarization))
 
         # Create label
-        approximant = config["waveform_generator"]["approximant"]
-        mass_1 = params.mass_1
-        mass_2 = params.mass_2
-        label = f"{approximant} (M1={mass_1:.0f}, M2={mass_2:.0f})"
+        approximant: str = config["waveform_generator"]["approximant"]
+        mass_1: float = params.mass_1
+        mass_2: float = params.mass_2
+        label: str = f"{approximant} (M1={mass_1:.0f}, M2={mass_2:.0f})"
         labels.append(label)
 
     # Create comparison plot for h_plus
     print("\nCreating comparison plot...")
-    fig = go.Figure()
+    fig: go.Figure = go.Figure()
 
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+    colors: List[str] = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 
     for idx, ((domain, polarization), label) in enumerate(zip(waveforms, labels)):
-        frequencies = domain.sample_frequencies
-        h_plus_amp = np.abs(polarization.h_plus)
+        frequencies: np.ndarray = domain.sample_frequencies()
+        h_plus_amp: np.ndarray = np.abs(polarization.h_plus)
 
-        color = colors[idx % len(colors)]
+        color: str = colors[idx % len(colors)]
         fig.add_trace(
             go.Scatter(
                 x=frequencies,

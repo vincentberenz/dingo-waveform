@@ -15,18 +15,23 @@ If no config file is specified, uses config_multibanded.yaml
 
 import sys
 from pathlib import Path
+from typing import Any, Dict, List
 
-import yaml
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import numpy as np
 
-from dingo_waveform.waveform_generator import build_waveform_generator
+from dingo_waveform.approximant import Approximant
+from dingo_waveform.domains import Domain, MultibandedFrequencyDomain
+from dingo_waveform.imports import read_file
+from dingo_waveform.polarizations import Polarization
+from dingo_waveform.waveform_generator import WaveformGenerator, build_waveform_generator
 from dingo_waveform.waveform_parameters import WaveformParameters
 
 
-def main():
+def main() -> None:
     # Determine config file
+    config_file: Path
     if len(sys.argv) > 1:
         config_file = Path(sys.argv[1])
     else:
@@ -35,16 +40,14 @@ def main():
     print(f"Loading configuration from: {config_file}")
 
     # Load configuration
-    with open(config_file) as f:
-        config = yaml.safe_load(f)
+    config: Dict[str, Any] = read_file(config_file)
 
     # Build waveform generator
     print("\nBuilding waveform generator...")
-    wfg = build_waveform_generator(config)
+    wfg: WaveformGenerator = build_waveform_generator(config)
 
     # Get domain and verify it's multibanded
-    domain = wfg._waveform_gen_params.domain
-    from dingo_waveform.domains import MultibandedFrequencyDomain
+    domain: Domain = wfg._waveform_gen_params.domain
     if not isinstance(domain, MultibandedFrequencyDomain):
         print(f"\nError: Domain type is {type(domain).__name__}, not MultibandedFrequencyDomain")
         print("Please use a configuration with MultibandedFrequencyDomain")
@@ -59,15 +62,15 @@ def main():
 
     # Create waveform parameters
     print("\nCreating waveform parameters...")
-    params = WaveformParameters(**config["waveform_parameters"])
+    params: WaveformParameters = WaveformParameters(**config["waveform_parameters"])
 
     # Generate waveform
     print("Generating waveform...")
-    polarization = wfg.generate_hplus_hcross(params)
+    polarization: Polarization = wfg.generate_hplus_hcross(params)
 
     # Create subplots: top shows frequency sampling, bottom shows waveform
     print("\nCreating visualization...")
-    fig = make_subplots(
+    fig: go.Figure = make_subplots(
         rows=2,
         cols=1,
         subplot_titles=(
@@ -78,12 +81,12 @@ def main():
         row_heights=[0.3, 0.7],
     )
 
-    frequencies = domain.sample_frequencies
-    h_plus_amp = np.abs(polarization.h_plus)
+    frequencies: np.ndarray = domain.sample_frequencies
+    h_plus_amp: np.ndarray = np.abs(polarization.h_plus)
 
     # Top plot: Show frequency sampling structure
     # Create step function showing delta_f at each frequency
-    delta_fs = np.diff(frequencies)
+    delta_fs: np.ndarray = np.diff(frequencies)
     delta_fs = np.append(delta_fs, delta_fs[-1])  # Extend last value
 
     fig.add_trace(
@@ -102,7 +105,8 @@ def main():
     )
 
     # Add vertical lines at nodes
-    for node in domain.nodes:
+    nodes: List[float] = domain.nodes
+    for node in nodes:
         if domain.f_min <= node <= domain.f_max:
             fig.add_vline(
                 x=node,
@@ -133,7 +137,7 @@ def main():
     fig.update_yaxes(title_text="|h<sub>+</sub>|", type="log", row=2, col=1)
 
     # Update layout
-    approximant = wfg._waveform_gen_params.approximant
+    approximant: Approximant = wfg._waveform_gen_params.approximant
     fig.update_layout(
         title=f"Multibanded Waveform: {approximant} (M1={params.mass_1}M☉, M2={params.mass_2}M☉)",
         height=800,
@@ -146,7 +150,7 @@ def main():
     print("Displaying plot in browser...")
     fig.show()
 
-    output_file = config_file.stem + "_multibanded_plot.html"
+    output_file: str = config_file.stem + "_multibanded_plot.html"
     fig.write_html(output_file)
     print(f"\nPlot saved to: {output_file}")
 

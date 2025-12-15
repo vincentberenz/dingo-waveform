@@ -15,16 +15,22 @@ If no config file is specified, uses config_basic_frequency.yaml
 
 import sys
 from pathlib import Path
+from typing import Any, Dict
 
-import yaml
+import plotly.graph_objects as go
 
-from dingo_waveform.waveform_generator import build_waveform_generator
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.approximant import Approximant
+from dingo_waveform.domains import Domain
+from dingo_waveform.imports import read_file
 from dingo_waveform.plotting import plot_polarizations_frequency
+from dingo_waveform.polarizations import Polarization
+from dingo_waveform.waveform_generator import WaveformGenerator, build_waveform_generator
+from dingo_waveform.waveform_parameters import WaveformParameters
 
 
-def main():
+def main() -> None:
     # Determine config file
+    config_file: Path
     if len(sys.argv) > 1:
         config_file = Path(sys.argv[1])
     else:
@@ -33,26 +39,25 @@ def main():
     print(f"Loading configuration from: {config_file}")
 
     # Load configuration
-    with open(config_file) as f:
-        config = yaml.safe_load(f)
+    config: Dict[str, Any] = read_file(config_file)
 
     # Build waveform generator
     print("\nBuilding waveform generator...")
-    wfg = build_waveform_generator(config)
+    wfg: WaveformGenerator = build_waveform_generator(config)
 
     # Create waveform parameters
     print("Creating waveform parameters...")
-    params = WaveformParameters(**config["waveform_parameters"])
+    params: WaveformParameters = WaveformParameters(**config["waveform_parameters"])
 
     # Generate waveform
     print("\nGenerating waveform...")
-    polarization = wfg.generate_hplus_hcross(params)
+    polarization: Polarization = wfg.generate_hplus_hcross(params)
 
     # Create plot
     print("Creating interactive plot...")
-    domain = wfg._waveform_gen_params.domain
-    approximant = wfg._waveform_gen_params.approximant
-    fig = plot_polarizations_frequency(
+    domain: Domain = wfg._waveform_gen_params.domain
+    approximant: Approximant = wfg._waveform_gen_params.approximant
+    fig: go.Figure = plot_polarizations_frequency(
         polarization,
         domain,
         title=f"Waveform: {approximant} (M1={params.mass_1}M☉, M2={params.mass_2}M☉)",
@@ -64,7 +69,7 @@ def main():
     fig.show()
 
     # Optionally save to HTML
-    output_file = config_file.stem + "_plot.html"
+    output_file: str = config_file.stem + "_plot.html"
     fig.write_html(output_file)
     print(f"Plot saved to: {output_file}")
 

@@ -17,20 +17,27 @@ Note: Only certain approximants support mode separation (e.g., IMRPhenomXPHM, SE
 
 import sys
 from pathlib import Path
+from typing import Any, Dict, List
 
-import yaml
+import plotly.graph_objects as go
 
-from dingo_waveform.waveform_generator import build_waveform_generator
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.approximant import Approximant
+from dingo_waveform.domains import Domain
+from dingo_waveform.imports import read_file
 from dingo_waveform.plotting import (
     plot_mode_amplitudes,
     plot_individual_modes,
     plot_mode_reconstruction,
 )
+from dingo_waveform.polarizations import Polarization
+from dingo_waveform.types import Mode
+from dingo_waveform.waveform_generator import WaveformGenerator, build_waveform_generator
+from dingo_waveform.waveform_parameters import WaveformParameters
 
 
-def main():
+def main() -> None:
     # Determine config file
+    config_file: Path
     if len(sys.argv) > 1:
         config_file = Path(sys.argv[1])
     else:
@@ -39,44 +46,44 @@ def main():
     print(f"Loading configuration from: {config_file}")
 
     # Load configuration
-    with open(config_file) as f:
-        config = yaml.safe_load(f)
+    config: Dict[str, Any] = read_file(config_file)
 
     # Build waveform generator
     print("\nBuilding waveform generator...")
-    wfg = build_waveform_generator(config)
+    wfg: WaveformGenerator = build_waveform_generator(config)
 
     # Check if approximant supports modes
-    approximant = config["waveform_generator"]["approximant"]
-    supported_approximants = ["IMRPhenomXPHM", "SEOBNRv4PHM", "SEOBNRv5PHM", "SEOBNRv5HM"]
-    if approximant not in supported_approximants:
-        print(f"\nWARNING: {approximant} may not support mode separation.")
+    approximant_str: str = config["waveform_generator"]["approximant"]
+    supported_approximants: List[str] = ["IMRPhenomXPHM", "SEOBNRv4PHM", "SEOBNRv5PHM", "SEOBNRv5HM"]
+    if approximant_str not in supported_approximants:
+        print(f"\nWARNING: {approximant_str} may not support mode separation.")
         print(f"Recommended approximants: {', '.join(supported_approximants)}")
         print("Continuing anyway...\n")
 
     # Create waveform parameters
     print("Creating waveform parameters...")
-    params = WaveformParameters(**config["waveform_parameters"])
+    params: WaveformParameters = WaveformParameters(**config["waveform_parameters"])
 
     # Generate mode-separated waveform
     print("\nGenerating mode-separated waveform...")
+    modes: Dict[Mode, Polarization]
     try:
         modes = wfg.generate_hplus_hcross_m(params)
         print(f"Generated {len(modes)} modes: {list(modes.keys())}")
     except Exception as e:
         print(f"\nError: Failed to generate mode-separated waveform:")
         print(f"  {e}")
-        print(f"\nThis approximant ({approximant}) may not support mode separation.")
+        print(f"\nThis approximant ({approximant_str}) may not support mode separation.")
         sys.exit(1)
 
     # Create plots
     print("\nCreating plots...")
-    domain = wfg._waveform_gen_params.domain
-    approximant = wfg._waveform_gen_params.approximant
+    domain: Domain = wfg._waveform_gen_params.domain
+    approximant: Approximant = wfg._waveform_gen_params.approximant
 
     # 1. Mode amplitudes comparison
     print("  - Mode amplitudes plot")
-    fig_amplitudes = plot_mode_amplitudes(
+    fig_amplitudes: go.Figure = plot_mode_amplitudes(
         modes,
         domain,
         title=f"Mode Amplitudes: {approximant}",
@@ -86,7 +93,7 @@ def main():
 
     # 2. Individual modes
     print("  - Individual modes plot")
-    fig_individual = plot_individual_modes(
+    fig_individual: go.Figure = plot_individual_modes(
         modes,
         domain,
         title=f"Individual Modes: {approximant}",
@@ -96,7 +103,7 @@ def main():
 
     # 3. Mode reconstruction (shows how modes sum to total polarization)
     print("  - Mode reconstruction plot")
-    fig_reconstruction = plot_mode_reconstruction(
+    fig_reconstruction: go.Figure = plot_mode_reconstruction(
         modes,
         domain,
         title=f"Mode Reconstruction: {approximant}",
