@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class _GenerateTDModesParameters(GwSignalParameters):
+class _GWSignals_GenerateTDModesParameters(GwSignalParameters):
     # To see the list of fiels: see the superclass GwSignalParameters.
     # The superclass also implement the from_waveform_parameters
     # method.
@@ -33,7 +33,7 @@ class _GenerateTDModesParameters(GwSignalParameters):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         f_start: Optional[float] = None,
-    ) -> "_GenerateTDModesParameters":
+    ) -> "_GWSignals_GenerateTDModesParameters":
 
         gw_signal_params: (
             GwSignalParameters
@@ -61,12 +61,12 @@ class _GenerateTDModesParameters(GwSignalParameters):
         return Polarization(h_cross=hpc.hp.value, h_plus=hpc.hp.value)
 
 
-def generate_TD_modes(
+def gwsignals_generate_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Polarization:
     """
-    Wrapper over lalsimulation.gwsignal.core.waveform.GenerateTDModes
+    Wrapper over lalsimulation.gwsignal.core.waveform.GenerateTDWaveform
 
     Arguments
     ---------
@@ -83,8 +83,8 @@ def generate_TD_modes(
     # note: from_waveform_parameters is implemented by the superclass
     #  of _GenerateTDModesParameters (GwSignalParameters).
     instance = cast(
-        _GenerateTDModesParameters,
-        _GenerateTDModesParameters.from_waveform_parameters(
+        _GWSignals_GenerateTDModesParameters,
+        _GWSignals_GenerateTDModesParameters.from_waveform_parameters(
             waveform_params,
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.f_ref,

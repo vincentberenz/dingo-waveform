@@ -121,7 +121,7 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
         )
 
 
-def generate_FD_modes_LO(
+def gwsignals_generate_FD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:

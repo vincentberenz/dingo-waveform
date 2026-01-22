@@ -193,7 +193,7 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
         return get_polarizations_from_fd_modes_m(h, Iota(self.inclination.value), phase)
 
 
-def generate_TD_modes_LO_cond_extra_time(
+def gwsignals_generate_TD_modes_SEOBNRv5(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:

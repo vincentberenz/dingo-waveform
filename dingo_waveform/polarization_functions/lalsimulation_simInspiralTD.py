@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class _InspiralTDParameters(TableStr):
+class _LALSim_InspiralTDParameters(TableStr):
 
     # Order matters ! The arguments to SimInspiralFD will
     # be these attributes, in the order they are defined here:
@@ -57,7 +57,7 @@ class _InspiralTDParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
         f_ref: float,
-    ) -> "_InspiralTDParameters":
+    ) -> "_LALSim_InspiralTDParameters":
         # Creates an instance from binary black hole parameters.
 
         spins: Spins = bbh_parameters.get_spins(spin_conversion_phase)
@@ -84,7 +84,7 @@ class _InspiralTDParameters(TableStr):
         spin_conversion_phase: Optional[float],
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
-    ) -> "_InspiralTDParameters":
+    ) -> "_LALSim_InspiralTDParameters":
         # Creates an instance from waveform parameters.
 
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
@@ -111,7 +111,7 @@ class _InspiralTDParameters(TableStr):
         return Polarization(h_plus=hp.data.data, h_cross=hc.data.data)
 
 
-def inspiral_TD(
+def lalsim_inspiral_TD(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Polarization:
@@ -130,7 +130,7 @@ def inspiral_TD(
     Polarizations
     """
 
-    inspiral_td_params = _InspiralTDParameters.from_waveform_parameters(
+    inspiral_td_params = _LALSim_InspiralTDParameters.from_waveform_parameters(
         waveform_params,
         waveform_gen_params.f_ref,
         waveform_gen_params.domain.get_parameters(),

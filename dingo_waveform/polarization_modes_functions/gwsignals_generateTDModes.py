@@ -92,7 +92,7 @@ class _GenerateTDModesLO(GwSignalParameters):
         return get_polarizations_from_fd_modes_m(h, Iota(self.inclination), phase)
 
 
-def generate_TD_modes_LO(
+def gwsignals_generate_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:

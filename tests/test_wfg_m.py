@@ -23,8 +23,8 @@ from scipy.interpolate import interp1d
 
 from dingo_waveform.approximant import Approximant
 from dingo_waveform.domains import UniformFrequencyDomain
-from dingo_waveform.polarization_functions import inspiral_FD
-from dingo_waveform.polarization_modes_functions import inspiral_choose_FD_modes
+from dingo_waveform.polarization_functions import lalsim_inspiral_FD
+from dingo_waveform.polarization_modes_functions import lalsim_inspiral_choose_FD_modes
 from dingo_waveform.polarizations import Polarization, sum_contributions_m
 from dingo_waveform.prior import IntrinsicPriors
 from dingo_waveform.types import FrequencySeries, Mode
