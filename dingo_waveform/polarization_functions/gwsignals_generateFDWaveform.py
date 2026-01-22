@@ -96,13 +96,7 @@ class _GWSignals_GenerateFDModesParameters(GwSignalParameters):
         if isinstance(domain, MultibandedFrequencyDomain):
             # Create a base uniform domain for processing
             # Start from f_min=0 to match the full frequency grid
-            from dingo_waveform.domains import UniformFrequencyDomain
-            base = UniformFrequencyDomain(
-                f_min=0.0,
-                f_max=domain.f_max,
-                delta_f=domain.base_delta_f,
-                window_factor=domain.window_factor,
-            )
+            base = domain.to_uniform_frequency_domain()
             # hp/hc are generated on a uniform grid with spacing hp.df.value, aligned to base domain
             h_plus_full = hp.value
             h_cross_full = hc.value

@@ -176,6 +176,26 @@ class MultibandedFrequencyDomain(BaseFrequencyDomain):
     # Construction helpers
     # ---------------------------
 
+    def to_uniform_frequency_domain(self) -> UniformFrequencyDomain:
+        """
+        Create a UniformFrequencyDomain that covers the same frequency range with uniform spacing.
+
+        This is useful when generating waveforms that need to be computed on a uniform grid
+        before being decimated to the multibanded representation.
+
+        Returns
+        -------
+        UniformFrequencyDomain
+            A uniform frequency domain starting at f_min=0, with f_max and delta_f
+            matching this domain's base parameters.
+        """
+        return UniformFrequencyDomain(
+            f_min=0.0,
+            f_max=self.f_max,
+            delta_f=self.base_delta_f,
+            window_factor=self.window_factor,
+        )
+
     def narrowed(
         self,
         f_min: Optional[float] = None,
