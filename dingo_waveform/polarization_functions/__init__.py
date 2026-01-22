@@ -1,4 +1,4 @@
-from .gwsignals_generateFDWaveform import gwsignals_generate_FD_modes
-from .gwsignals_generateTDWaveform import gwsignals_generate_TD_modes
+from .gwsignal_generateFDWaveform import gwsignal_generate_FD_modes
+from .gwsignal_generateTDWaveform import gwsignal_generate_TD_modes
 from .lalsimulation_simInspiralFD import lalsim_inspiral_FD
 from .lalsimulation_simInspiralTD import lalsim_inspiral_TD

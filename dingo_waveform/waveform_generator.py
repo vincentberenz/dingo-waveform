@@ -65,8 +65,8 @@ modes in a single function call.
 PolarizationFunctions: Dict[str, PolarizationFunction] = {
     "inspiral_TD": polarization_functions.lalsim_inspiral_TD,
     "inspiral_FD": polarization_functions.lalsim_inspiral_FD,
-    "generate_FD_modes": polarization_functions.gwsignals_generate_FD_modes,
-    "generate_TD_modes": polarization_functions.gwsignals_generate_TD_modes,
+    "generate_FD_modes": polarization_functions.gwsignal_generate_FD_modes,
+    "generate_TD_modes": polarization_functions.gwsignal_generate_TD_modes,
 }
 """
 Exhaustive list of PolarizationFunctions implemented by the dingo-waveform package.
@@ -76,9 +76,9 @@ Exhaustive list of PolarizationFunctions implemented by the dingo-waveform packa
 PolarizationModesFunctions: Dict[str, PolarizationModesFunction] = {
     "inspiral_choose_TD_modes": polarization_modes_functions.lalsim_inspiral_choose_TD_modes,
     "inspiral_choose_FD_modes": polarization_modes_functions.lalsim_inspiral_choose_FD_modes,
-    "generate_FD_modes_LO": polarization_modes_functions.gwsignals_generate_FD_modes,
-    "generate_TD_modes_LO_cond_extra_time": polarization_modes_functions.gwsignals_generate_TD_modes,
-    "generate_TD_modes_LO": polarization_modes_functions.gwsignals_generate_TD_modes,
+    "generate_FD_modes_LO": polarization_modes_functions.gwsignal_generate_FD_modes,
+    "generate_TD_modes_LO_cond_extra_time": polarization_modes_functions.gwsignal_generate_TD_modes,
+    "generate_TD_modes_LO": polarization_modes_functions.gwsignal_generate_TD_modes,
 }
 """
 Exhaustive list of PolarizationModesFunctions implemented by the dingo-waveform package.
@@ -280,9 +280,9 @@ class WaveformGenerator:
             Approximant("SEOBNRv5HM"),
         ):
             polarization_method = (
-                polarization_functions.gwsignals_generate_FD_modes
+                polarization_functions.gwsignal_generate_FD_modes
                 if isinstance(self._waveform_gen_params.domain, BaseFrequencyDomain)
-                else polarization_functions.gwsignals_generate_TD_modes
+                else polarization_functions.gwsignal_generate_TD_modes
             )
         # "old" interface (any other approximant)
         else:
@@ -356,7 +356,7 @@ class WaveformGenerator:
             Approximant("SEOBNRv5PHM"),
             Approximant("SEOBNRv5HM"),
         ):
-            return polarization_modes_functions.gwsignals_generate_TD_modes_SEOBNRv5
+            return polarization_modes_functions.gwsignal_generate_TD_modes_SEOBNRv5
 
         raise ValueError(f"Approximant {approximant} not supported")
 

@@ -26,7 +26,7 @@ from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters, BaseFrequencyDomain
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
-from ..types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
+from ..types import FrequencySeries, GWSignalGenerators, Iota, Mode, Modes
 from ..waveform_generator_parameters import WaveformGeneratorParameters
 from ..waveform_parameters import WaveformParameters
 
@@ -168,7 +168,7 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
             self.to_table("generating polarization using waveform.GenerateFDModes")
         )
 
-        generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
+        generator: GWSignalGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
         params["f22_start"] = SEOBRNRv5_conditioning.new_f_start * astropy.units.Hz
         hlm_td: GravitationalWaveModes = waveform.GenerateTDModes(params, generator)
@@ -193,7 +193,7 @@ class _GenerateTDModesLOConditionalExtraTimeParameters(GwSignalParameters):
         return get_polarizations_from_fd_modes_m(h, Iota(self.inclination.value), phase)
 
 
-def gwsignals_generate_TD_modes_SEOBNRv5(
+def gwsignal_generate_TD_modes_SEOBNRv5(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:

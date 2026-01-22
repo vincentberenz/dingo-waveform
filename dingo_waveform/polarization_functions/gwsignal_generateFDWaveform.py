@@ -32,7 +32,7 @@ _Generators = Union[
 
 
 @dataclass
-class _GWSignals_GenerateFDModesParameters(GwSignalParameters):
+class _GWSignal_GenerateFDModesParameters(GwSignalParameters):
     # For the list of Fields, see the superclass GwSignalParameter.
     #
     # This class is private to this module, see generate_FD_modes
@@ -45,7 +45,7 @@ class _GWSignals_GenerateFDModesParameters(GwSignalParameters):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         f_start: Optional[float] = None,
-    ) -> "_GWSignals_GenerateFDModesParameters":
+    ) -> "_GWSignal_GenerateFDModesParameters":
 
         # note: "from_waveform_parameters" is implemented by the superclass
         # GwSignalParameters
@@ -148,7 +148,7 @@ class _GWSignals_GenerateFDModesParameters(GwSignalParameters):
         return Polarization(h_cross=h_cross, h_plus=h_plus)
 
 
-def gwsignals_generate_FD_modes(
+def gwsignal_generate_FD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
     ref_tol: float = 1e-6,
@@ -188,8 +188,8 @@ def gwsignals_generate_FD_modes(
     # note: from_waveform_parameters is implemented by the superclass
     #  of _GenerateFDModesParameters (GwSignalParameters).
     instance = cast(
-        _GWSignals_GenerateFDModesParameters,
-        _GWSignals_GenerateFDModesParameters.from_waveform_parameters(
+        _GWSignal_GenerateFDModesParameters,
+        _GWSignal_GenerateFDModesParameters.from_waveform_parameters(
             waveform_params,
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.f_ref,

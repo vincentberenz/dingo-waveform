@@ -11,7 +11,7 @@ from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization
-from ..types import GWSignalsGenerators
+from ..types import GWSignalGenerators
 from ..waveform_generator_parameters import WaveformGeneratorParameters
 from ..waveform_parameters import WaveformParameters
 
@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class _GWSignals_GenerateTDModesParameters(GwSignalParameters):
+class _GWSignal_GenerateTDModesParameters(GwSignalParameters):
     # To see the list of fiels: see the superclass GwSignalParameters.
     # The superclass also implement the from_waveform_parameters
     # method.
@@ -33,7 +33,7 @@ class _GWSignals_GenerateTDModesParameters(GwSignalParameters):
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
         f_start: Optional[float] = None,
-    ) -> "_GWSignals_GenerateTDModesParameters":
+    ) -> "_GWSignal_GenerateTDModesParameters":
 
         gw_signal_params: (
             GwSignalParameters
@@ -55,13 +55,13 @@ class _GWSignals_GenerateTDModesParameters(GwSignalParameters):
             )
         )
 
-        generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
+        generator: GWSignalGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
         hpc = waveform.GenerateTDWaveform(params, generator)
         return Polarization(h_cross=hpc.hp.value, h_plus=hpc.hp.value)
 
 
-def gwsignals_generate_TD_modes(
+def gwsignal_generate_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Polarization:
@@ -83,8 +83,8 @@ def gwsignals_generate_TD_modes(
     # note: from_waveform_parameters is implemented by the superclass
     #  of _GenerateTDModesParameters (GwSignalParameters).
     instance = cast(
-        _GWSignals_GenerateTDModesParameters,
-        _GWSignals_GenerateTDModesParameters.from_waveform_parameters(
+        _GWSignal_GenerateTDModesParameters,
+        _GWSignal_GenerateTDModesParameters.from_waveform_parameters(
             waveform_params,
             waveform_gen_params.domain.get_parameters(),
             waveform_gen_params.f_ref,
