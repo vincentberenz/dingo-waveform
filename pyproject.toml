@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "dingo-waveform"
 description = "Modular gravitational waveform generator with improved type safety and performance"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10,<3.12"
 dynamic = ["version"]
 license = {text = "MIT"}
 classifiers = [
@@ -18,17 +18,15 @@ classifiers = [
 ]
 
 dependencies = [
+    "pyseobnr @ git+https://git.ligo.org/waveforms/software/pyseobnr.git",
     "dingo-gw",
     "bilby",
     "bilby_pipe",
-    "lalsuite",
     "matplotlib",
-    "numpy",
+    "numpy>=1.23,<2.0",
     "nptyping",
     "multipledispatch",
-    "pyseobnr",
     "rich",
-    "scipy",
     "scipy-stubs[scipy]",
     "toml",
     "tomli",

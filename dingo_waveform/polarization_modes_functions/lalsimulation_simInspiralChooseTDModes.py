@@ -150,7 +150,7 @@ class _InspiralChooseTDModesParameters(TableStr):
         return pol
 
 
-def inspiral_choose_TD_modes(
+def lalsim_inspiral_choose_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:

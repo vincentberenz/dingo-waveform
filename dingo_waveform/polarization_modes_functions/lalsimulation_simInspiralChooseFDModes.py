@@ -177,7 +177,7 @@ class _InspiralChooseFDModesParameters(TableStr):
         return get_polarizations_from_fd_modes_m(hlm_fd, self.iota, self.phase)
 
 
-def inspiral_choose_FD_modes(
+def lalsim_inspiral_choose_FD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:

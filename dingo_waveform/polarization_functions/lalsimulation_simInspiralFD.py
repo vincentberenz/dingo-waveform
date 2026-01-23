@@ -10,9 +10,9 @@ from nptyping import Float32, NDArray, Shape
 
 from ..approximant import Approximant
 from ..binary_black_holes_parameters import BinaryBlackHoleParameters
-from ..domains import DomainParameters, BaseFrequencyDomain, MultibandedFrequencyDomain
+from ..domains import DomainParameters, BaseFrequencyDomain, MultibandedFrequencyDomain, UniformFrequencyDomain
 from ..logs import TableStr
-from ..polarization_modes_functions.inspiral_choose_FD_modes import (
+from ..polarization_modes_functions.lalsimulation_simInspiralChooseFDModes import (
     _InspiralChooseFDModesParameters,
 )
 from ..polarizations import Polarization
@@ -25,7 +25,7 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class _InspiralFDParameters(TableStr):
+class _LALSim_InspiralFDParameters(TableStr):
     """Dataclass for storing parameters for
     lal simulation's SimInspiralFD function.
     """
@@ -126,7 +126,7 @@ class _InspiralFDParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
         f_start: Optional[float],
-    ) -> "_InspiralFDParameters":
+    ) -> "_LALSim_InspiralFDParameters":
 
         inspiral_choose_fd_modes_parameters = (
             _InspiralChooseFDModesParameters.from_binary_black_hole_parameters(
@@ -175,7 +175,7 @@ class _InspiralFDParameters(TableStr):
         lal_params: Optional[lal.Dict],
         approximant: Approximant,
         f_start: Optional[float],
-    ) -> "_InspiralFDParameters":
+    ) -> "_LALSim_InspiralFDParameters":
 
         bbh_parameters = BinaryBlackHoleParameters.from_waveform_parameters(
             waveform_parameters, f_ref
@@ -339,7 +339,7 @@ class _InspiralFDParameters(TableStr):
         return Polarization(h_plus=h_plus, h_cross=h_cross)
 
 
-def inspiral_FD(
+def lalsim_inspiral_FD(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Polarization:
@@ -372,7 +372,7 @@ def inspiral_FD(
             f"(got {type(waveform_gen_params.domain)})"
         )
 
-    inspiral_fd_params = _InspiralFDParameters.from_waveform_parameters(
+    inspiral_fd_params = _LALSim_InspiralFDParameters.from_waveform_parameters(
         waveform_params,
         waveform_gen_params.f_ref,
         waveform_gen_params.domain.get_parameters(),
@@ -390,7 +390,6 @@ def inspiral_FD(
     if isinstance(domain, MultibandedFrequencyDomain):
         # Create a base uniform domain for waveform generation
         # Start from f_min=0 to capture all frequencies the waveform generator will produce
-        from dingo_waveform.domains import UniformFrequencyDomain
         base = UniformFrequencyDomain(
             f_min=0.0,
             f_max=domain.f_max,

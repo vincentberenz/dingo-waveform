@@ -17,7 +17,7 @@ from ..domains import DomainParameters
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
 from ..spins import Spins
-from ..types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
+from ..types import FrequencySeries, GWSignalGenerators, Iota, Mode, Modes
 from ..waveform_generator_parameters import WaveformGeneratorParameters
 from ..waveform_parameters import WaveformParameters
 from .polarization_modes_utils import linked_list_modes_to_dict_modes
@@ -68,7 +68,7 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
             self.to_table("generating polarization using waveform.GenerateFDModes")
         )
 
-        generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
+        generator: GWSignalGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
         hlm_fd: GravitationalWavePolarizations = waveform.GenerateFDModes(
             params, generator
@@ -121,7 +121,7 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
         )
 
 
-def generate_FD_modes_LO(
+def gwsignal_generate_FD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:

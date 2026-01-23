@@ -23,7 +23,7 @@ from ..binary_black_holes_parameters import BinaryBlackHoleParameters
 from ..domains import DomainParameters, BaseFrequencyDomain
 from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
-from ..types import FrequencySeries, GWSignalsGenerators, Iota, Mode, Modes
+from ..types import FrequencySeries, GWSignalGenerators, Iota, Mode, Modes
 from ..waveform_generator_parameters import WaveformGeneratorParameters
 from ..waveform_parameters import WaveformParameters
 from .polarization_modes_utils import taper_td_modes_in_place
@@ -62,7 +62,7 @@ class _GenerateTDModesLO(GwSignalParameters):
             self.to_table("generating polarization using waveform.GenerateFDModes")
         )
 
-        generator: GWSignalsGenerators = gwsignal_get_waveform_generator(approximant)
+        generator: GWSignalGenerators = gwsignal_get_waveform_generator(approximant)
         params = {k: v for k, v in asdict(self).items() if v is not None}
 
         key: SpinWeightedSphericalHarmonicMode
@@ -92,7 +92,7 @@ class _GenerateTDModesLO(GwSignalParameters):
         return get_polarizations_from_fd_modes_m(h, Iota(self.inclination), phase)
 
 
-def generate_TD_modes_LO(
+def gwsignal_generate_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
     waveform_params: WaveformParameters,
 ) -> Dict[Mode, Polarization]:

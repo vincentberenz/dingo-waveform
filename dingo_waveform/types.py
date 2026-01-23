@@ -109,7 +109,7 @@ The compression reduces dimensionality from n_features to n_components while
 preserving the most important information.
 """
 
-GWSignalsGenerators = Union[
+GWSignalGenerators = Union[
     pyseobnr_model.SEOBNRv5HM,
     pyseobnr_model.SEOBNRv5EHM,
     pyseobnr_model.SEOBNRv5PHM,
