@@ -23,7 +23,7 @@ from bilby.gw.prior import BBHPriorDict
 
 from .imports import read_file
 from .logs import TableStr
-from .waveform_parameters import WaveformParameters
+from .waveform_parameters import BBHWaveformParameters
 
 
 class BBHExtrinsicPriorDict(BBHPriorDict):
@@ -177,7 +177,7 @@ class ExtrinsicPriors(TableStr):
             keys, sample_size=sample_size, force_numerical=force_numerical
         )
 
-    def sample(self) -> WaveformParameters:
+    def sample(self) -> BBHWaveformParameters:
         """
         Generate a single sample of waveform parameters.
 
@@ -187,7 +187,7 @@ class ExtrinsicPriors(TableStr):
         """
         return self.samples(1)[0]
 
-    def samples(self, nb_samples) -> List[WaveformParameters]:
+    def samples(self, nb_samples) -> List[BBHWaveformParameters]:
         """
         Generate multiple samples of waveform parameters.
 
@@ -205,7 +205,7 @@ class ExtrinsicPriors(TableStr):
         # only for dataclass. (I tried to use Protocol, but no success)
         bbh_prior_dict = BBHExtrinsicPriorDict(_get_prior_dict(self))  # type: ignore
         return [
-            WaveformParameters(**bbh_prior_dict.sample()) for _ in range(nb_samples)
+            BBHWaveformParameters(**bbh_prior_dict.sample()) for _ in range(nb_samples)
         ]
 
 
@@ -258,7 +258,7 @@ class IntrinsicPriors(TableStr):
         """
         Sample, but returns a dictionary (as opposed to
         the 'sample' function which returns an instance
-        of WaveformParameters)
+        of BBHWaveformParameters)
         Returns:
             Dict[str, float]: sample of priors
         """
@@ -269,7 +269,7 @@ class IntrinsicPriors(TableStr):
         bbh_prior_dict = BBHPriorDict(d)  # type: ignore
         return bbh_prior_dict.sample()
 
-    def sample(self) -> WaveformParameters:
+    def sample(self) -> BBHWaveformParameters:
         """
         Generate a single sample of waveform parameters.
 
@@ -279,7 +279,7 @@ class IntrinsicPriors(TableStr):
         """
         return self.samples(1)[0]
 
-    def samples(self, nb_samples: int) -> List[WaveformParameters]:
+    def samples(self, nb_samples: int) -> List[BBHWaveformParameters]:
         """
         Generate multiple samples of waveform parameters.
 
@@ -297,7 +297,7 @@ class IntrinsicPriors(TableStr):
         # only for dataclass. (I tried to use Protocol, but no success)
         bbh_prior_dict = BBHPriorDict(_get_prior_dict(self))  # type: ignore
         return [
-            WaveformParameters(**bbh_prior_dict.sample()) for _ in range(nb_samples)
+            BBHWaveformParameters(**bbh_prior_dict.sample()) for _ in range(nb_samples)
         ]
 
 
@@ -367,7 +367,7 @@ def _create_priors_dataclass() -> Type:
             """
             return self._get_prior(ExtrinsicPriors)
 
-        def sample(self) -> WaveformParameters:
+        def sample(self) -> BBHWaveformParameters:
             """
             Generate a single sample of waveform parameters.
 
@@ -377,7 +377,7 @@ def _create_priors_dataclass() -> Type:
             """
             return self.samples(1)[0]
 
-        def samples(self, nb_samples: int) -> List[WaveformParameters]:
+        def samples(self, nb_samples: int) -> List[BBHWaveformParameters]:
             """
             Generate multiple samples of waveform parameters.
 
@@ -392,11 +392,11 @@ def _create_priors_dataclass() -> Type:
             """
             ip = self.get_intrinsic_priors()
             ep = self.get_extrinsic_priors()
-            intrinsic_wfs: List[WaveformParameters] = ip.samples(nb_samples)
-            extrinsic_wfs: List[WaveformParameters] = ep.samples(nb_samples)
+            intrinsic_wfs: List[BBHWaveformParameters] = ip.samples(nb_samples)
+            extrinsic_wfs: List[BBHWaveformParameters] = ep.samples(nb_samples)
 
             def _get_wf(
-                intrinsic_wf: WaveformParameters, extrinsic_wf: WaveformParameters
+                intrinsic_wf: BBHWaveformParameters, extrinsic_wf: BBHWaveformParameters
             ):
                 """
                 Combine intrinsic and extrinsic waveform parameters.
@@ -418,7 +418,7 @@ def _create_priors_dataclass() -> Type:
                 for k, v in extrinsic_dict.items():
                     if v is not None:
                         priors_dict[k] = v
-                return WaveformParameters(**priors_dict)
+                return BBHWaveformParameters(**priors_dict)
 
             return [_get_wf(iw, ew) for iw, ew in zip(intrinsic_wfs, extrinsic_wfs)]
 
@@ -431,7 +431,7 @@ def _create_priors_dataclass() -> Type:
 
 
 # Priors is a dataclass that have the combined fields of IntrinsicPriors and ExtrinsicPriors.
-# It also has the 'sample' method which returns a list of WaveformParameters.
+# It also has the 'sample' method which returns a list of BBHWaveformParameters.
 # Once created here (which happens when this module is imported), user can create instances of
 # Priors.
 # This class is created programmatically at runtime. I could not find a simpler way
@@ -443,10 +443,10 @@ Dataclass that includes all fields of the IntrinsicPriors and the ExtrinsicPrior
 
 
 def prior_split(
-    waveform_parameters: WaveformParameters,
+    waveform_parameters: BBHWaveformParameters,
     intrinsic_luminosity_distance: Optional[float] = 100.0,
     intrinsic_geocent_time: Optional[float] = 0.0,
-) -> Tuple[WaveformParameters, WaveformParameters]:
+) -> Tuple[BBHWaveformParameters, BBHWaveformParameters]:
     """
     Split waveform parameters into intrinsic and extrinsic components.
 
@@ -472,7 +472,7 @@ def prior_split(
         intrinsic_dict["luminosity_distance"] = intrinsic_luminosity_distance
     if intrinsic_geocent_time is not None:
         intrinsic_dict["geocent_time"] = intrinsic_geocent_time
-    return WaveformParameters(**intrinsic_dict), WaveformParameters(**extrinsic_dict)
+    return BBHWaveformParameters(**intrinsic_dict), BBHWaveformParameters(**extrinsic_dict)
 
 
 def build_prior_with_defaults(

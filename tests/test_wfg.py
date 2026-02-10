@@ -8,8 +8,8 @@ import torch.distributions
 from dingo_waveform.approximant import Approximant
 from dingo_waveform.domains import DomainParameters, UniformFrequencyDomain
 from dingo_waveform.types import F_ref
-from dingo_waveform.waveform_generator import WaveformGenerator
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_generator import build_waveform_generator
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def uniform_fd_domain() -> UniformFrequencyDomain:
 
 
 @pytest.fixture
-def aligned_spin_wf_parameters() -> Tuple[WaveformParameters, F_ref, str]:
+def aligned_spin_wf_parameters() -> Tuple[BBHWaveformParameters, F_ref, str]:
     parameters = {
         "chirp_mass": 34.0,
         "mass_ratio": 0.35,
@@ -32,12 +32,12 @@ def aligned_spin_wf_parameters() -> Tuple[WaveformParameters, F_ref, str]:
     f_ref = F_ref(20.0)
     approximant = "IMRPhenomPv2"
     # type ignore: no idea why mypy is not happy with the argument
-    waveform_params = WaveformParameters(**parameters)  # type: ignore
+    waveform_params = BBHWaveformParameters(**parameters)  # type: ignore
     return waveform_params, f_ref, approximant
 
 
 @pytest.fixture
-def precessing_spin_wf_parameters() -> Tuple[WaveformParameters, F_ref, str]:
+def precessing_spin_wf_parameters() -> Tuple[BBHWaveformParameters, F_ref, str]:
     parameters = {
         "chirp_mass": 34.0,
         "mass_ratio": 0.35,
@@ -54,7 +54,7 @@ def precessing_spin_wf_parameters() -> Tuple[WaveformParameters, F_ref, str]:
     f_ref = F_ref(100.0)
     approximant = "IMRPhenomPv2"
     # type ignore: no idea why mypy is not happy with the argument
-    waveform_params = WaveformParameters(**parameters)  # type: ignore
+    waveform_params = BBHWaveformParameters(**parameters)  # type: ignore
     return waveform_params, f_ref, approximant
 
 
@@ -69,7 +69,7 @@ def test_waveform_generator_FD(uniform_fd_domain, wf_parameters):
     domain = uniform_fd_domain
     parameters, f_ref, approximant = wf_parameters
 
-    wf_gen = WaveformGenerator(approximant, domain, f_ref)
+    wf_gen = build_waveform_generator({"approximant": approximant, "f_ref": float(f_ref)}, domain)
     wf_dict = wf_gen.generate_hplus_hcross(parameters)
 
     assert len(wf_dict.h_plus) == len(domain)
@@ -116,7 +116,7 @@ def test_waveform_generator_FD_f_max_failure(precessing_spin_wf_parameters):
     p_OK1 = {"f_min": 20.0, "f_max": 896.0, "delta_f": 1.0 / 8.0}
     domain_OK1 = UniformFrequencyDomain(**p_OK1)
 
-    wf_gen = WaveformGenerator(approximant, domain_OK1, f_ref)
+    wf_gen = build_waveform_generator({"approximant": approximant, "f_ref": float(f_ref)}, domain_OK1)
     wf_dict = wf_gen.generate_hplus_hcross(parameters)
 
     # (2)
@@ -124,5 +124,5 @@ def test_waveform_generator_FD_f_max_failure(precessing_spin_wf_parameters):
     p_OK = {"f_min": 20.0, "f_max": 1024.0, "delta_f": 1.0 / 8.0}
     domain_OK = UniformFrequencyDomain(**p_OK)
 
-    wf_gen = WaveformGenerator(approximant, domain_OK, f_ref)
+    wf_gen = build_waveform_generator({"approximant": approximant, "f_ref": float(f_ref)}, domain_OK)
     wf_dict = wf_gen.generate_hplus_hcross(parameters)

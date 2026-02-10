@@ -13,7 +13,7 @@ from .domains import DomainParameters
 from .logs import TableStr
 from .spins import Spins
 from .types import Mode
-from .waveform_parameters import WaveformParameters
+from .waveform_parameters import BBHWaveformParameters
 
 _logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ class GwSignalParameters(TableStr):
     @classmethod
     def from_waveform_parameters(
         cls,
-        waveform_params: WaveformParameters,
+        waveform_params: BBHWaveformParameters,
         domain_params: DomainParameters,
         f_ref: float,
         spin_conversion_phase: Optional[float] = None,

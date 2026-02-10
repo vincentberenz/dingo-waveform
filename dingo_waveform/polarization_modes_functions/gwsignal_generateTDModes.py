@@ -25,7 +25,7 @@ from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
 from ..types import FrequencySeries, GWSignalGenerators, Iota, Mode, Modes
 from ..waveform_generator_parameters import WaveformGeneratorParameters
-from ..waveform_parameters import WaveformParameters
+from ..waveform_parameters import BBHWaveformParameters
 from .polarization_modes_utils import taper_td_modes_in_place
 
 _logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ class _GenerateTDModesLO(GwSignalParameters):
 
 def gwsignal_generate_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
-    waveform_params: WaveformParameters,
+    waveform_params: BBHWaveformParameters,
 ) -> Dict[Mode, Polarization]:
     """
     Wrapper over lalsimulation.gwsignal.core.waveform.GenerateFDModes

@@ -19,8 +19,7 @@ from dingo.gw.waveform_generator.waveform_generator import NewInterfaceWaveformG
 # dingo-waveform imports
 from dingo_waveform.domains import MultibandedFrequencyDomain as RefactoredMFD
 from dingo_waveform.domains import UniformFrequencyDomain as RefactoredUFD
-from dingo_waveform.waveform_generator import WaveformGenerator as RefactoredWFG
-from dingo_waveform.approximant import Approximant
+from dingo_waveform.waveform_generator import build_waveform_generator
 
 
 @dataclass
@@ -173,17 +172,16 @@ def generate_waveform_refactored(
     Dictionary with keys 'h_plus' and 'h_cross' (converted from Polarization)
     """
     from dataclasses import asdict
-    from dingo_waveform.waveform_parameters import WaveformParameters
+    from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
-    wfg = RefactoredWFG(
-        approximant=Approximant(approximant),
-        domain=domain,
-        f_ref=f_ref,
-        f_start=f_start,
-        spin_conversion_phase=spin_conversion_phase,
-    )
-    # Convert dict to WaveformParameters (it's a dataclass)
-    wf_params = WaveformParameters(**parameters)
+    wfg_params = {"approximant": approximant, "f_ref": f_ref}
+    if f_start is not None:
+        wfg_params["f_start"] = f_start
+    if spin_conversion_phase is not None:
+        wfg_params["spin_conversion_phase"] = spin_conversion_phase
+    wfg = build_waveform_generator(wfg_params, domain)
+    # Convert dict to BBHWaveformParameters (it's a dataclass)
+    wf_params = BBHWaveformParameters(**parameters)
     pol = wfg.generate_hplus_hcross(wf_params)
     return asdict(pol)
 
@@ -360,9 +358,7 @@ def compare_waveforms_modes(
 
     # Create waveform generators
     from dingo.gw.waveform_generator import WaveformGenerator as DingoWFG
-    from dingo_waveform.waveform_generator import WaveformGenerator as RefactoredWFG
-    from dingo_waveform.approximant import Approximant
-    from dingo_waveform.waveform_parameters import WaveformParameters
+    from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
     wfg_dingo = DingoWFG(
         domain=domain_dingo,
@@ -372,18 +368,17 @@ def compare_waveforms_modes(
         spin_conversion_phase=spin_conversion_phase,
     )
 
-    wfg_refactored = RefactoredWFG(
-        approximant=Approximant(approximant),
-        domain=domain_refactored,
-        f_ref=f_ref,
-        f_start=f_start,
-        spin_conversion_phase=spin_conversion_phase,
-    )
+    wfg_params = {"approximant": approximant, "f_ref": f_ref}
+    if f_start is not None:
+        wfg_params["f_start"] = f_start
+    if spin_conversion_phase is not None:
+        wfg_params["spin_conversion_phase"] = spin_conversion_phase
+    wfg_refactored = build_waveform_generator(wfg_params, domain_refactored)
 
     # Generate mode-separated waveforms
     pol_m_dingo = wfg_dingo.generate_hplus_hcross_m(waveform_params)
 
-    wf_params_obj = WaveformParameters(**waveform_params)
+    wf_params_obj = BBHWaveformParameters(**waveform_params)
     pol_m_refactored = wfg_refactored.generate_hplus_hcross_m(wf_params_obj)
 
     # Check mode keys match

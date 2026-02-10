@@ -15,7 +15,7 @@ from ..polarizations import BatchPolarizations
 from ..prior import build_prior_with_defaults
 from ..transforms import ApplySVD, ComposeTransforms, Transform, WhitenAndUnwhiten
 from ..waveform_generator import WaveformGenerator, build_waveform_generator
-from ..waveform_parameters import WaveformParameters
+from ..waveform_parameters import BBHWaveformParameters
 from .compression_settings import CompressionSettings
 from .dataset_settings import DatasetSettings
 from .generation_types import WaveformGeneratorConfig, WaveformResult
@@ -98,7 +98,7 @@ def _generate_single_waveform_optimized(parameters_dict: dict) -> WaveformResult
 
     try:
         # Use pre-initialized generator
-        wf_params = WaveformParameters(**parameters_dict)
+        wf_params = BBHWaveformParameters(**parameters_dict)
         polarization = _worker_generator.generate_hplus_hcross(wf_params)
 
         return WaveformResult.success_result(polarization.h_plus, polarization.h_cross)
@@ -129,7 +129,7 @@ def _generate_waveform_batch(params_batch: List[dict]) -> List[WaveformResult]:
     results = []
     for parameters_dict in params_batch:
         try:
-            wf_params = WaveformParameters(**parameters_dict)
+            wf_params = BBHWaveformParameters(**parameters_dict)
             polarization = _worker_generator.generate_hplus_hcross(wf_params)
             results.append(
                 WaveformResult.success_result(polarization.h_plus, polarization.h_cross)
@@ -176,7 +176,7 @@ def _generate_single_waveform(
         wfg = build_waveform_generator(wfg_config.to_dict(), domain)
 
         # Convert dict to WaveformParameters
-        wf_params = WaveformParameters(**parameters_dict)
+        wf_params = BBHWaveformParameters(**parameters_dict)
 
         # Generate waveform
         polarization = wfg.generate_hplus_hcross(wf_params)
@@ -214,7 +214,7 @@ def generate_waveforms_sequential(
 
     for idx, row in parameters.iterrows():
         try:
-            wf_params = WaveformParameters(**row.to_dict())
+            wf_params = BBHWaveformParameters(**row.to_dict())
             polarization = waveform_generator.generate_hplus_hcross(wf_params)
             h_plus_list.append(polarization.h_plus)
             h_cross_list.append(polarization.h_cross)

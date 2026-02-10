@@ -6,10 +6,9 @@ This module adds tests that exercise code paths not heavily covered by existing 
 
 import numpy as np
 import pytest
-from dingo_waveform.approximant import Approximant
 from dingo_waveform.domains import UniformFrequencyDomain
-from dingo_waveform.waveform_generator import WaveformGenerator
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_generator import build_waveform_generator
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 from dingo_waveform.polarizations import Polarization
 
 
@@ -18,7 +17,7 @@ class TestTimeDomainWaveforms:
 
     def get_basic_params(self):
         """Get basic waveform parameters."""
-        return WaveformParameters(
+        return BBHWaveformParameters(
             mass_1=30.0,
             mass_2=25.0,
             luminosity_distance=100.0,
@@ -36,10 +35,9 @@ class TestTimeDomainWaveforms:
     def test_time_domain_imrphenomxphm(self):
         """Test time domain generation with IMRPhenomXPHM."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
         params = self.get_basic_params()
 
@@ -51,11 +49,9 @@ class TestTimeDomainWaveforms:
     def test_time_domain_with_f_start(self):
         """Test time domain with f_start parameter."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0, "f_start": 15.0},
             domain,
-            f_ref=20.0,
-            f_start=15.0,
         )
         params = self.get_basic_params()
 
@@ -65,10 +61,9 @@ class TestTimeDomainWaveforms:
     def test_time_domain_seobnrv5phm(self):
         """Test time domain with SEOBNRv5PHM."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("SEOBNRv5PHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "SEOBNRv5PHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
         params = self.get_basic_params()
 
@@ -79,13 +74,12 @@ class TestTimeDomainWaveforms:
     def test_time_domain_imrphenomd(self):
         """Test time domain with IMRPhenomD."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomD"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomD", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
         # IMRPhenomD requires aligned spins
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=30.0,
             mass_2=25.0,
             luminosity_distance=100.0,
@@ -102,14 +96,13 @@ class TestTimeDomainWaveforms:
     def test_time_domain_aligned_spin(self):
         """Test time domain with aligned spins."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("SEOBNRv4"),
+        wfg = build_waveform_generator(
+            {"approximant": "SEOBNRv4", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
         # Aligned spins
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=35.0,
             mass_2=30.0,
             luminosity_distance=200.0,
@@ -126,13 +119,12 @@ class TestTimeDomainWaveforms:
     def test_time_domain_extreme_spins(self):
         """Test time domain with high spins."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=30.0,
             mass_2=25.0,
             luminosity_distance=150.0,
@@ -153,13 +145,12 @@ class TestTimeDomainWaveforms:
     def test_time_domain_high_mass_ratio(self):
         """Test time domain with high mass ratio."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=50.0,
             mass_2=10.0,  # q = 5
             luminosity_distance=200.0,
@@ -180,14 +171,13 @@ class TestTimeDomainWaveforms:
     def test_time_domain_various_inclinations(self):
         """Test time domain with different inclinations."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
         for theta_jn in [0.1, np.pi/4, np.pi/2, 3*np.pi/4]:
-            params = WaveformParameters(
+            params = BBHWaveformParameters(
                 mass_1=30.0,
                 mass_2=25.0,
                 luminosity_distance=150.0,
@@ -211,7 +201,7 @@ class TestModeSeparatedWaveforms:
 
     def get_basic_params(self):
         """Get basic waveform parameters."""
-        return WaveformParameters(
+        return BBHWaveformParameters(
             mass_1=30.0,
             mass_2=25.0,
             luminosity_distance=100.0,
@@ -229,10 +219,9 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_imrphenomxphm(self):
         """Test mode-separated with IMRPhenomXPHM."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=1024.0, delta_f=0.125)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
         params = self.get_basic_params()
 
@@ -247,12 +236,11 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_different_masses(self):
         """Test mode-separated with different mass configuration."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=40.0,
             mass_2=20.0,  # q = 2
             luminosity_distance=150.0,
@@ -273,12 +261,11 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_lower_frequency(self):
         """Test mode-separated with lower frequency range."""
         domain = UniformFrequencyDomain(f_min=15.0, f_max=256.0, delta_f=0.125)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 15.0},
             domain,
-            f_ref=15.0,
         )
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=35.0,
             mass_2=30.0,
             luminosity_distance=200.0,
@@ -299,11 +286,9 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_with_spin_conversion(self):
         """Test mode-separated with spin_conversion_phase."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0, "spin_conversion_phase": 0.5},
             domain,
-            f_ref=20.0,
-            spin_conversion_phase=0.5,
         )
         params = self.get_basic_params()
 
@@ -313,13 +298,12 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_high_spins(self):
         """Test mode-separated with high spins."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=35.0,
             mass_2=30.0,
             luminosity_distance=200.0,
@@ -340,13 +324,12 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_extreme_mass_ratio(self):
         """Test mode-separated with extreme mass ratio."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=60.0,
             mass_2=10.0,  # q = 6
             luminosity_distance=300.0,
@@ -367,13 +350,12 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_face_on(self):
         """Test mode-separated with face-on orientation."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=30.0,
             mass_2=25.0,
             luminosity_distance=100.0,
@@ -394,13 +376,12 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_edge_on(self):
         """Test mode-separated with edge-on orientation."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=30.0,
             mass_2=25.0,
             luminosity_distance=100.0,
@@ -421,14 +402,13 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_various_phases(self):
         """Test mode-separated with various phase values."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
         for phase in [0.0, np.pi/4, np.pi/2, np.pi, 3*np.pi/2]:
-            params = WaveformParameters(
+            params = BBHWaveformParameters(
                 mass_1=30.0,
                 mass_2=25.0,
                 luminosity_distance=100.0,
@@ -449,13 +429,12 @@ class TestModeSeparatedWaveforms:
     def test_mode_separated_zero_spins(self):
         """Test mode-separated with zero spins."""
         domain = UniformFrequencyDomain(f_min=20.0, f_max=512.0, delta_f=0.25)
-        wfg = WaveformGenerator(
-            Approximant("IMRPhenomXPHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "IMRPhenomXPHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=30.0,
             mass_2=25.0,
             luminosity_distance=100.0,

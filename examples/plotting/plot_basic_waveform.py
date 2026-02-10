@@ -25,7 +25,7 @@ from dingo_waveform.imports import read_file
 from dingo_waveform.plotting import plot_polarizations_frequency
 from dingo_waveform.polarizations import Polarization
 from dingo_waveform.waveform_generator import WaveformGenerator, build_waveform_generator
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
 
 def main() -> None:
@@ -47,7 +47,7 @@ def main() -> None:
 
     # Create waveform parameters
     print("Creating waveform parameters...")
-    params: WaveformParameters = WaveformParameters(**config["waveform_parameters"])
+    params: BBHWaveformParameters = BBHWaveformParameters(**config["waveform_parameters"])
 
     # Generate waveform
     print("\nGenerating waveform...")

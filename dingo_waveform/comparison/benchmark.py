@@ -33,7 +33,7 @@ from dingo_waveform.domains import (
 )
 from dingo_waveform.prior import build_prior_with_defaults
 from dingo_waveform.waveform_generator import WaveformGenerator as RefactoredWFG
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -427,7 +427,7 @@ def benchmark_waveform_generation(
                 t_wf = time.perf_counter()
 
             # Convert dict to WaveformParameters
-            wf_params = WaveformParameters(**params_dict)
+            wf_params = BBHWaveformParameters(**params_dict)
             _ = refactored_wfg.generate_hplus_hcross(wf_params)
 
             if per_waveform_timing:
