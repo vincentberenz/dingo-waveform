@@ -7,7 +7,7 @@ dist/
 .coverage.*
 .cache
 .venv
-venv/
+venv*/
 .mypy_cache/
 .idea/
 .vscode/

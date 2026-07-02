@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass, asdict
 from numbers import Number
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import astropy
 import astropy.units
@@ -12,7 +12,7 @@ from .binary_black_holes_parameters import BinaryBlackHoleParameters
 from .domains import DomainParameters
 from .logs import TableStr
 from .spins import Spins
-from .types import Mode
+from .types import Mode, Modes
 from .waveform_parameters import BBHWaveformParameters
 
 _logger = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ class GwSignalParameters(TableStr):
     lmax_nyquist: Optional[int] = None
     postadiabatic: Optional[Any] = None
     postadiabatic_type: Optional[Any] = None
+    domega_dict: Optional[Dict[str, float]] = None
 
     @classmethod
     def from_binary_black_hole_parameters(
@@ -61,6 +62,7 @@ class GwSignalParameters(TableStr):
         lmax_nyquist: Optional[int] = None,
         postadiabatic: Optional[Any] = None,
         postadiabatic_type: Optional[Any] = None,
+        domega_dict: Optional[Dict[Modes, float]] = None,
     ) -> "GwSignalParameters":
         """
         Create an instance of GwSignalParameters from binary black hole parameters.
@@ -136,6 +138,13 @@ class GwSignalParameters(TableStr):
             "postadiabatic": postadiabatic,  # SEOBNRv5 specific parameters
             "postadiabatic_type": postadiabatic_type,  # SEOBNRv5 specific parameters
             "lmax_nyquist": lmax_nyquist,  # SEOBNRv5 specific parameters
+            # pSEOBNR QNM frequency deviations; translate (ell, m) tuple keys
+            # to the "ell,m" string keys expected by gwsignal/pyseobnr.
+            "domega_dict": (
+                {f"{ell},{m}": v for (ell, m), v in domega_dict.items()}
+                if domega_dict is not None
+                else None
+            ),
         }
 
         return cls(**params)
@@ -192,6 +201,7 @@ class GwSignalParameters(TableStr):
             lmax_nyquist=waveform_params.lmax_nyquist,
             postadiabatic=waveform_params.postadiabatic,
             postadiabatic_type=waveform_params.postadiabatic_type,
+            domega_dict=waveform_params.domega_dict,
         )
 
         _logger.debug(

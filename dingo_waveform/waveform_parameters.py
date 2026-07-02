@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Type
 
 from .logs import TableStr
+from .types import Modes
 
 
 @dataclass
@@ -111,6 +112,9 @@ class BBHWaveformParameters(WaveformParameters):
         Type specification for post-adiabatic corrections
     lmax_nyquist :
         Maximum harmonic index for Nyquist sampling
+    domega_dict :
+        pSEOBNR fractional deviations of the QNM ringdown frequency,
+        keyed by (ell, m) mode, e.g. ``{(2, 2): 0.05, (3, 3): -0.02}``
     """
 
     luminosity_distance: Optional[float] = None
@@ -158,6 +162,20 @@ class BBHWaveformParameters(WaveformParameters):
     postadiabatic: Optional[Any] = None
     postadiabatic_type: Optional[Any] = None
     lmax_nyquist: Optional[int] = None
+    domega_dict: Optional[Dict[Modes, float]] = None
+
+    def __post_init__(self) -> None:
+        # Accept the YAML-native string form "l,m" for domega_dict keys
+        # (PyYAML cannot produce tuple keys) and normalize to (ell, m) tuples.
+        if self.domega_dict is not None:
+            self.domega_dict = {
+                (
+                    k
+                    if isinstance(k, tuple)
+                    else tuple(int(x) for x in k.split(","))
+                ): v
+                for k, v in self.domega_dict.items()
+            }
 
 
 @dataclass
