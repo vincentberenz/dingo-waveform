@@ -1,19 +1,29 @@
 from dataclasses import dataclass
-from typing import Any, Optional
-
-import lal
+from typing import Any, Dict, Optional, Type
 
 from .logs import TableStr
+from .types import Modes
 
 
 @dataclass
 class WaveformParameters(TableStr):
     """
-    Configuration dataclass for generating waveforms.
+    Base class for waveform parameter sets.
 
-    This class contains all parameters necessary for waveform generation,
-    organized by physical categories. All parameters are optional and default
-    to None.
+    Subclass this for each approximant family. Use build_waveform_parameters()
+    to instantiate the correct subclass based on the approximant name.
+    """
+
+    pass
+
+
+@dataclass
+class BBHWaveformParameters(WaveformParameters):
+    """
+    Parameters for binary black hole waveform generation.
+
+    Used by all LALSimulation and GWSignal approximants. All parameters
+    are optional and default to None.
 
     Parameters
     ----------
@@ -102,6 +112,9 @@ class WaveformParameters(TableStr):
         Type specification for post-adiabatic corrections
     lmax_nyquist :
         Maximum harmonic index for Nyquist sampling
+    domega_dict :
+        pSEOBNR fractional deviations of the QNM ringdown frequency,
+        keyed by (ell, m) mode, e.g. ``{(2, 2): 0.05, (3, 3): -0.02}``
     """
 
     luminosity_distance: Optional[float] = None
@@ -149,3 +162,67 @@ class WaveformParameters(TableStr):
     postadiabatic: Optional[Any] = None
     postadiabatic_type: Optional[Any] = None
     lmax_nyquist: Optional[int] = None
+    domega_dict: Optional[Dict[Modes, float]] = None
+
+    def __post_init__(self) -> None:
+        # Accept the YAML-native string form "l,m" for domega_dict keys
+        # (PyYAML cannot produce tuple keys) and normalize to (ell, m) tuples.
+        if self.domega_dict is not None:
+            self.domega_dict = {
+                (
+                    k
+                    if isinstance(k, tuple)
+                    else tuple(int(x) for x in k.split(","))
+                ): v
+                for k, v in self.domega_dict.items()
+            }
+
+
+@dataclass
+class RandomWaveformParameters(WaveformParameters):
+    """
+    Parameters for the RandomApproximant.
+
+    Only requires mass_1, mass_2, luminosity_distance, and phase.
+    All have sensible defaults.
+
+    Parameters
+    ----------
+    mass_1 :
+        Mass of object 1 (in solar masses)
+    mass_2 :
+        Mass of object 2 (in solar masses)
+    luminosity_distance :
+        Luminosity distance to the source in Mpc
+    phase :
+        Orbital phase at reference frequency
+    """
+
+    mass_1: float = 30.0
+    mass_2: float = 25.0
+    luminosity_distance: float = 1000.0
+    phase: float = 0.0
+
+
+_APPROXIMANT_PARAMS_MAP: Dict[str, Type[WaveformParameters]] = {
+    "RandomApproximant": RandomWaveformParameters,
+}
+
+
+def build_waveform_parameters(approximant: str, **kwargs: Any) -> WaveformParameters:
+    """
+    Factory: returns the correct parameter class for the given approximant.
+
+    Parameters
+    ----------
+    approximant
+        Approximant name (e.g. "IMRPhenomD", "RandomApproximant")
+    **kwargs
+        Parameter values to pass to the dataclass constructor
+
+    Returns
+    -------
+    A WaveformParameters subclass instance appropriate for the approximant
+    """
+    cls = _APPROXIMANT_PARAMS_MAP.get(approximant, BBHWaveformParameters)
+    return cls(**kwargs)

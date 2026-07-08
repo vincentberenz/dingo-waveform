@@ -43,6 +43,7 @@ Configurations demonstrating specific approximants and scenarios:
 |------|--------|-------------|-------------|
 | `advanced_seobnrv4phm.yaml` | UniformFrequencyDomain | SEOBNRv4PHM | Precessing binary with SEOBNRv4 |
 | `advanced_seobnrv5hm_multibanded.yaml` | MultibandedFrequencyDomain | SEOBNRv5HM | Higher modes with multibanded domain |
+| `advanced_pseobnrv5hm_domega.yaml` | UniformFrequencyDomain | SEOBNRv5HM | pSEOBNR: per-mode QNM ringdown-frequency deviations via `domega_dict` |
 
 ### Dataset Generation
 

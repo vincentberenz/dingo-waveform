@@ -25,7 +25,7 @@ from dingo_waveform.logs import set_logging
 from dingo_waveform.polarizations import Polarization
 from dingo_waveform.types import Mode
 from dingo_waveform.waveform_generator import WaveformGenerator, build_waveform_generator
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
 
 def main() -> None:
@@ -50,7 +50,7 @@ def main() -> None:
     # Load waveform parameters from config
     config: Dict[str, Any] = read_file(config_file)
 
-    params: WaveformParameters = WaveformParameters(**config['waveform_parameters'])
+    params: BBHWaveformParameters = BBHWaveformParameters(**config['waveform_parameters'])
     logger.info(f"Waveform Parameters:")
     logger.info(f"  Masses: {params.mass_1} M☉, {params.mass_2} M☉")
     logger.info(f"  Inclination: {params.theta_jn:.2f} rad")

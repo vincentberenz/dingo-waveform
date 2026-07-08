@@ -19,7 +19,7 @@ from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization
 from ..types import WaveformGenerationError
 from ..waveform_generator_parameters import WaveformGeneratorParameters
-from ..waveform_parameters import WaveformParameters
+from ..waveform_parameters import BBHWaveformParameters
 
 _logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class _GWSignal_GenerateFDModesParameters(GwSignalParameters):
 
 def gwsignal_generate_FD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
-    waveform_params: WaveformParameters,
+    waveform_params: BBHWaveformParameters,
     ref_tol: float = 1e-6,
 ) -> Polarization:
     """

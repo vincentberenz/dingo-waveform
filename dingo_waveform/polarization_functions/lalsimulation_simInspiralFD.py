@@ -19,7 +19,7 @@ from ..polarizations import Polarization
 from ..spins import Spins
 from ..types import Iota, WaveformGenerationError
 from ..waveform_generator_parameters import WaveformGeneratorParameters
-from ..waveform_parameters import WaveformParameters
+from ..waveform_parameters import BBHWaveformParameters
 
 _logger = logging.getLogger(__name__)
 
@@ -168,7 +168,7 @@ class _LALSim_InspiralFDParameters(TableStr):
     @classmethod
     def from_waveform_parameters(
         cls,
-        waveform_parameters: WaveformParameters,
+        waveform_parameters: BBHWaveformParameters,
         f_ref: float,
         domain_params: DomainParameters,
         spin_conversion_phase: Optional[float],
@@ -341,7 +341,7 @@ class _LALSim_InspiralFDParameters(TableStr):
 
 def lalsim_inspiral_FD(
     waveform_gen_params: WaveformGeneratorParameters,
-    waveform_params: WaveformParameters,
+    waveform_params: BBHWaveformParameters,
 ) -> Polarization:
     """
     Wrapper over lalsimulation.SimInspiralFD

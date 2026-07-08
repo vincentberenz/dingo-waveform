@@ -9,7 +9,7 @@ from bilby.gw.detector import PowerSpectralDensity
 from dingo_waveform.approximant import Approximant
 from dingo_waveform.domains import UniformFrequencyDomain, MultibandedFrequencyDomain
 from dingo_waveform.prior import IntrinsicPriors
-from dingo_waveform.waveform_generator import WaveformGenerator
+from dingo_waveform.waveform_generator import build_waveform_generator
 from dingo_waveform.polarizations import Polarization
 from dingo_waveform.types import Mode
 
@@ -101,12 +101,14 @@ def intrinsic_prior(approximant: Approximant):
 
 @pytest.fixture
 def wfg_mfd(mfd, approximant):
-    return WaveformGenerator(
-        approximant=approximant,
-        domain=mfd,
-        f_ref=10.0,
-        f_start=10.0,
-        spin_conversion_phase=0.0,
+    return build_waveform_generator(
+        {
+            "approximant": str(approximant),
+            "f_ref": 10.0,
+            "f_start": 10.0,
+            "spin_conversion_phase": 0.0,
+        },
+        mfd,
     )
 
 
@@ -115,12 +117,14 @@ def wfg_ufd(approximant, mfd):
     # Create a UniformFrequencyDomain that corresponds to the base grid
     # Start from f_min=0 and match MFD's f_max so waveforms can be properly decimated
     base_domain = UniformFrequencyDomain(delta_f=0.0625, f_min=0.0, f_max=mfd.f_max)
-    return WaveformGenerator(
-        approximant=approximant,
-        domain=base_domain,
-        f_ref=10.0,
-        f_start=10.0,
-        spin_conversion_phase=0.0,
+    return build_waveform_generator(
+        {
+            "approximant": str(approximant),
+            "f_ref": 10.0,
+            "f_start": 10.0,
+            "spin_conversion_phase": 0.0,
+        },
+        base_domain,
     )
 
 

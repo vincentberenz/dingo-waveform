@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional
 
 from ..domains import TimeDomain, UniformFrequencyDomain, MultibandedFrequencyDomain
 from ..waveform_generator import build_waveform_generator
-from ..waveform_parameters import WaveformParameters
+from ..waveform_parameters import BBHWaveformParameters
 from ..logs import set_logging
 from . import (
     plot_polarizations_time,
@@ -88,9 +88,9 @@ def validate_config(config: Dict[str, Any]) -> None:
         raise ValueError("waveform_parameters must be a dictionary")
 
 
-def create_waveform_parameters(params_config: Dict[str, Any]) -> WaveformParameters:
+def create_waveform_parameters(params_config: Dict[str, Any]) -> BBHWaveformParameters:
     """
-    Create WaveformParameters from configuration.
+    Create BBHWaveformParameters from configuration.
 
     Parameters
     ----------
@@ -99,10 +99,10 @@ def create_waveform_parameters(params_config: Dict[str, Any]) -> WaveformParamet
 
     Returns
     -------
-    WaveformParameters
+    BBHWaveformParameters
         Waveform parameters object
     """
-    return WaveformParameters(**params_config)
+    return BBHWaveformParameters(**params_config)
 
 
 def save_or_show_plot(fig, filename: Optional[str], show: bool):
@@ -128,7 +128,7 @@ def save_or_show_plot(fig, filename: Optional[str], show: bool):
 
 def plot_basic_polarizations(
     wfg,
-    params: WaveformParameters,
+    params: BBHWaveformParameters,
     domain,
     output_dir: Path,
     show: bool,
@@ -141,7 +141,7 @@ def plot_basic_polarizations(
     ----------
     wfg : WaveformGenerator
         Waveform generator
-    params : WaveformParameters
+    params : BBHWaveformParameters
         Waveform parameters
     domain : Domain
         Domain object
@@ -190,7 +190,7 @@ def plot_basic_polarizations(
 
 def plot_mode_separated(
     wfg,
-    params: WaveformParameters,
+    params: BBHWaveformParameters,
     domain,
     output_dir: Path,
     show: bool,
@@ -203,7 +203,7 @@ def plot_mode_separated(
     ----------
     wfg : WaveformGenerator
         Waveform generator
-    params : WaveformParameters
+    params : BBHWaveformParameters
         Waveform parameters
     domain : Domain
         Domain object

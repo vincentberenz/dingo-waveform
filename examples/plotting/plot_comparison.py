@@ -23,7 +23,7 @@ from dingo_waveform.domains import Domain
 from dingo_waveform.imports import read_file
 from dingo_waveform.polarizations import Polarization
 from dingo_waveform.waveform_generator import WaveformGenerator, build_waveform_generator
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
 
 def main() -> None:
@@ -52,7 +52,7 @@ def main() -> None:
 
         # Build generator and generate waveform
         wfg: WaveformGenerator = build_waveform_generator(config)
-        params: WaveformParameters = WaveformParameters(**config["waveform_parameters"])
+        params: BBHWaveformParameters = BBHWaveformParameters(**config["waveform_parameters"])
         polarization: Polarization = wfg.generate_hplus_hcross(params)
 
         # Store results

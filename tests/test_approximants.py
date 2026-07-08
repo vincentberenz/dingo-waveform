@@ -15,7 +15,7 @@ from dingo_waveform.waveform_generator import (
     build_waveform_generator,
     polarization_modes_approximants,
 )
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
 
 def get_configuration_dict(approximant: str, f_start: Optional[float]) -> Dict:

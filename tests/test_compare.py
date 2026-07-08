@@ -22,7 +22,7 @@ from dingo_waveform.waveform_generator import (
     build_waveform_generator,
     polarization_modes_approximants,
 )
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
 _approximants = (
     Approximant("IMRPhenomPv2"),
@@ -129,7 +129,7 @@ def get_new_waveform_generator(config_dict: Dict) -> WaveformGenerator:
     return build_waveform_generator(config_dict)
 
 
-def get_new_priors(config_dict: Dict) -> WaveformParameters:
+def get_new_priors(config_dict: Dict) -> BBHWaveformParameters:
     return IntrinsicPriors(**config_dict["intrinsic_prior"]).sample()
 
 

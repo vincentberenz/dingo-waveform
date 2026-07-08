@@ -13,7 +13,7 @@ from ..gw_signals_parameters import GwSignalParameters
 from ..polarizations import Polarization
 from ..types import GWSignalGenerators
 from ..waveform_generator_parameters import WaveformGeneratorParameters
-from ..waveform_parameters import WaveformParameters
+from ..waveform_parameters import BBHWaveformParameters
 
 _logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class _GWSignal_GenerateTDModesParameters(GwSignalParameters):
 
 def gwsignal_generate_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
-    waveform_params: WaveformParameters,
+    waveform_params: BBHWaveformParameters,
 ) -> Polarization:
     """
     Wrapper over lalsimulation.gwsignal.core.waveform.GenerateTDWaveform

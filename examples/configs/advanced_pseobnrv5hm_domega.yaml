@@ -1,0 +1,41 @@
+# pSEOBNR example: SEOBNRv5HM with fractional deviations of the QNM
+# ringdown frequency (parameterized-SEOBNR / "domega" test).
+#
+# The `domega_dict` field on `waveform_parameters` is a mapping from
+# spherical-harmonic mode (ell, m) to a fractional deviation of the QNM
+# ringdown frequency for that mode. It is forwarded to pyseobnr via
+# gwsignal's `domega_dict` parameter. YAML has no tuple keys, so the
+# "ell,m" string form is used here and normalized to (ell, m) tuples
+# inside BBHWaveformParameters. Programmatic users can write the natural
+# tuple form directly, e.g. ``{(2, 2): 0.05, (3, 3): -0.02}``.
+
+domain:
+  type: UniformFrequencyDomain
+  delta_f: 0.125
+  f_min: 20.0
+  f_max: 1024.0
+
+waveform_generator:
+  approximant: SEOBNRv5HM
+  f_ref: 20.0
+  f_start: 20.0
+
+waveform_parameters:
+  mass_1: 36.0
+  mass_2: 29.0
+  luminosity_distance: 1000.0
+  theta_jn: 0.5
+  phase: 0.0
+  a_1: 0.5
+  a_2: 0.3
+  tilt_1: 0.0
+  tilt_2: 0.0
+  phi_12: 0.0
+  phi_jl: 0.0
+  geocent_time: 0.0
+  # Fractional deviations of the (ell, m) QNM ringdown frequencies.
+  # Keys use the YAML-friendly "ell,m" form; they are converted to
+  # (ell, m) tuples at load time.
+  domega_dict:
+    "2,2": 0.05
+    "3,3": -0.02

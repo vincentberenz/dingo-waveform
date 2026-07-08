@@ -1,6 +1,7 @@
 import logging
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, TypeAlias, Union, cast
+from typing import Callable, Dict, List, Optional, Tuple, Type, TypeAlias, Union, cast
 
 import lal
 from multipledispatch import dispatch
@@ -29,9 +30,9 @@ See related functions in subpackage dingo_waveform.polarization_functions
 
 Parameters
 ----------
-WaveformGeneratorParameters : 
+WaveformGeneratorParameters :
     Parameters controlling the waveform generation process
-WaveformParameters : 
+WaveformParameters :
     Parameters specific to the waveform being generated
 
 Returns
@@ -50,9 +51,9 @@ See related functions in subpackage dingo_waveform.polarization_modes_functions
 
 Parameters
 ----------
-WaveformGeneratorParameters : 
+WaveformGeneratorParameters :
     Parameters controlling the waveform generation process
-WaveformParameters : 
+WaveformParameters :
     Parameters specific to the waveform being generated
 
 Returns
@@ -67,6 +68,7 @@ PolarizationFunctions: Dict[str, PolarizationFunction] = {
     "inspiral_FD": polarization_functions.lalsim_inspiral_FD,
     "generate_FD_modes": polarization_functions.gwsignal_generate_FD_modes,
     "generate_TD_modes": polarization_functions.gwsignal_generate_TD_modes,
+    "random_inspiral_FD": polarization_functions.random_inspiral_FD,
 }
 """
 Exhaustive list of PolarizationFunctions implemented by the dingo-waveform package.
@@ -79,6 +81,7 @@ PolarizationModesFunctions: Dict[str, PolarizationModesFunction] = {
     "generate_FD_modes_LO": polarization_modes_functions.gwsignal_generate_FD_modes,
     "generate_TD_modes_LO_cond_extra_time": polarization_modes_functions.gwsignal_generate_TD_modes,
     "generate_TD_modes_LO": polarization_modes_functions.gwsignal_generate_TD_modes,
+    "random_inspiral_FD_modes": polarization_modes_functions.random_inspiral_FD_modes,
 }
 """
 Exhaustive list of PolarizationModesFunctions implemented by the dingo-waveform package.
@@ -89,26 +92,24 @@ polarization_modes_approximants: Tuple[Approximant, ...] = (
     Approximant("IMRPhenomXPHM"),
     Approximant("SEOBNRv5PHM"),
     Approximant("SEOBNRv5HM"),
+    Approximant("RandomApproximant"),
 )
 """
-Exhaustive list of approximants supported by the WaveformGenerator.generate_hplus_hcross_m
-function.
+Exhaustive list of approximants supported by generate_hplus_hcross_m.
 """
 
 
-class WaveformGenerator:
+class WaveformGenerator(ABC):
     """
-    A class for generating gravitational wave polarizations using various waveform
-    approximants and domains. This class serves as a wrapper around the
-    PolarizationFunction and PolarizationModesFunction types, automatically
-    selecting the appropriate function based on the specified approximant and domain.
+    Abstract base class for generating gravitational wave polarizations using
+    various waveform approximants and domains.
 
-    Methods
-    -------
-    generate_hplus_hcross(waveform_parameters)
-        Generate h+ and h× polarizations for a given set of parameters
-    generate_hplus_hcross_m(waveform_parameters)
-        Generate h+ and h× polarizations for multiple modes
+    Subclasses implement generate_hplus_hcross() with the appropriate backend.
+    Subclasses that support mode-separated generation also define
+    generate_hplus_hcross_m().
+
+    Use build_waveform_generator() to construct the appropriate subclass
+    based on the approximant name.
     """
 
     def __init__(
@@ -120,10 +121,6 @@ class WaveformGenerator:
         spin_conversion_phase: Optional[float] = None,
         mode_list: Optional[List[Modes]] = None,
         transform: Optional[Union[str, Callable[[Polarization], Polarization]]] = None,
-        polarization_function: Optional[Union[str, PolarizationFunction]] = None,
-        polarization_modes_function: Optional[
-            Union[str, PolarizationModesFunction]
-        ] = None,
     ):
         """
         Initialize the WaveformGenerator with the necessary parameters.
@@ -145,12 +142,6 @@ class WaveformGenerator:
         transform :
             Optional transformation function to apply to the generated polarizations.
             Passed as the function itself or as an import path.
-        polarization_function :
-            Either a string representing the import path of a function to use, or
-            the function itself to generate single polarization waveforms
-        polarization_modes_function :
-            Either a string representing the import path of a function to use, or
-            the function itself to generate multiple polarization modes
         """
 
         # generating the lal_params if requested
@@ -164,7 +155,7 @@ class WaveformGenerator:
         # (used in generate_hplus_hcross)
         # has the proper signature (if not None)
         if transform is not None:
-            if type(transform) == "str":
+            if isinstance(transform, str):
                 transform = import_function(transform, [Polarization], Polarization)
             else:
                 transform = cast(Callable, transform)
@@ -180,9 +171,6 @@ class WaveformGenerator:
         transform = cast(Callable[[Polarization], Polarization], transform)
 
         # packaging all attributes into an instance of WaveformGeneratorParameters
-        # is not very elegant, but it allows to pass them as arguments
-        # to the various functions called by generate_hplus_hcross and
-        # generate_hplus_hcross_m; while avoiding circular dependency.
         self._waveform_gen_params = WaveformGeneratorParameters(
             approximant=approximant,
             domain=domain,
@@ -202,45 +190,16 @@ class WaveformGenerator:
                 )
             )
 
-        # the argument polarization_method can be either:
-        # - None: the method used by generate_hplus_hcross will be selected based
-        #         on the approximant / domain
-        # - str: it is assumed to be the import path of a function to be imported and
-        #        used by generate_hplus_hcross
-        # - a callable: it is assumed to be the function to be used b generate_hplus_hcross
-        # The output the import_function will either be None or the function
-        # to call (imported if required)
-        self._polarization_function: Optional[PolarizationFunction] = import_function(
-            polarization_function,
-            [WaveformGeneratorParameters, WaveformParameters],
-            Polarization,
-        )
-
-        # same for generate_hplus_hcross_m
-        self._gw_polarization_method: Optional[PolarizationModesFunction] = (
-            import_function(
-                polarization_modes_function,
-                [WaveformGeneratorParameters, WaveformParameters],
-                Dict[Mode, Polarization],
-            )
-        )
-
         # Batch transform pipeline (for compression, whitening, etc.)
         # This is applied after generation and operates on dictionaries of arrays
         self.transform = None
 
+    @abstractmethod
     def generate_hplus_hcross(
         self, waveform_parameters: WaveformParameters
     ) -> Polarization:
         """
         Generate h+ and h× polarizations for a given set of waveform parameters.
-
-        This method selects the appropriate polarization function based on:
-        - User-provided function (if specified)
-        - Domain type (UniformFrequencyDomain or TimeDomain)
-        - The approximant
-
-        It also applies any specified transform to the result (if any)
 
         Parameters
         ----------
@@ -250,124 +209,55 @@ class WaveformGenerator:
         Returns
         -------
         The generated h+ and h× polarizations
-
-        Raises
-        ------
-        ValueError
-            If the domain is not UniformFrequencyDomain or TimeDomain
         """
+        ...
 
-        # For now only frequency and time domains are supported
+    def _validate_domain_for_polarization(self) -> None:
+        """Validate that the domain is a supported type for polarization generation."""
         if not isinstance(
             self._waveform_gen_params.domain, BaseFrequencyDomain
         ) and not isinstance(self._waveform_gen_params.domain, TimeDomain):
             raise ValueError(
-                "generate_hplus_hcross: domain must be an instance of UniformFrequencyDomain or TimeDomain "
+                "generate_hplus_hcross: domain must be an instance of "
+                "BaseFrequencyDomain or TimeDomain, "
                 f"{type(self._waveform_gen_params.domain)} not supported"
             )
 
-        polarization_method: PolarizationFunction
-        polarization: Polarization
-
-        if self._polarization_function is not None:
-            # we use the polarization set by the user in the constructor
-            polarization_method = self._polarization_function
-
-        # "new" interface
-        # SEOBNRv5PHM or SEOBNRv5HM approximant
-        if self._waveform_gen_params.approximant in (
-            Approximant("SEOBNRv5PHM"),
-            Approximant("SEOBNRv5HM"),
-        ):
-            polarization_method = (
-                polarization_functions.gwsignal_generate_FD_modes
-                if isinstance(self._waveform_gen_params.domain, BaseFrequencyDomain)
-                else polarization_functions.gwsignal_generate_TD_modes
-            )
-        # "old" interface (any other approximant)
-        else:
-            polarization_method = (
-                polarization_functions.lalsim_inspiral_FD
-                if isinstance(self._waveform_gen_params.domain, BaseFrequencyDomain)
-                else polarization_functions.lalsim_inspiral_TD
-            )
-
-        # logging the waveform parameters as a nice looking table
-        if _logger.isEnabledFor(logging.INFO):
-            _logger.info(
-                waveform_parameters.to_table(
-                    f"starting to generate waveforms for approximant {self._waveform_gen_params.approximant} "
-                    f"using function {polarization_method.__name__} "
-                    f"and waveform parameters (f_ref={self._waveform_gen_params.f_ref}):"
-                )
-            )
-
-        # generating the waveforms
-        polarization = polarization_method(
-            self._waveform_gen_params, waveform_parameters
-        )
-
+    def _apply_post_generation(self, polarization: Polarization) -> Polarization:
+        """Apply domain-specific waveform transform and user transform."""
         # domain specific waveform transform
-        # (most domain: does nothing, MultibandedFrequencyDomain: decimate)
+        # (most domains: does nothing, MultibandedFrequencyDomain: decimate)
         polarization = self._waveform_gen_params.domain.waveform_transform(polarization)
 
-        # transforming the waveform using the user custom function
-        # (if any)
+        # transforming the waveform using the user custom function (if any)
         if self._waveform_gen_params.transform is not None:
             _logger.debug(
                 f"applying transform {self._waveform_gen_params.transform} to polarization"
             )
             return self._waveform_gen_params.transform(polarization)
-        else:
-            return polarization
+        return polarization
 
-    @classmethod
-    def _get_polarization_modes_function(
-        cls, approximant: Approximant
-    ) -> PolarizationModesFunction:
-        # Called by generate_hplus_hcross_m.
-        # Returns the generator function to be used
-        # based on the approximant.
-        # (note: if the user passed a function as argument to the
-        #        constructor, _get_polarization_modes_function will not be
-        #        called and the user function will be used instead)
-
-        # Vincent note:
-        # This uses the "old" interface for SEOBNRv4PHM and IMRPhenomXPHM;
-        # and the "new" interface for any other approximant (including SEOBNRv5PHM and SEOBNRv5HM)
-        # only reason: the test_wfg_m test uses the "old" interface for SEOBNRv4PHM and IMRPhenomXPHM,
-        # and the "new" interface for SEOBNRv5PHM" and SEOBNRv5HM.
-        # But this can be easily changed by modifying the code below.
-
-        # "old" interface
-        if approximant == Approximant("SEOBNRv4PHM"):
-            return polarization_modes_functions.lalsim_inspiral_choose_TD_modes
-
-        # "old" interface
-        # IMRPhenomXPHM approximant
-        # (calling: gwsignal_get_waveform_generator and waveform.GenerateFDModes)
-        if approximant == Approximant("IMRPhenomXPHM"):
-            return polarization_modes_functions.lalsim_inspiral_choose_FD_modes
-
-        # "new" interface
-        # SEOBNRv5PHM or SEOBNRv5HM approximant
-        # (calling gwsignal_get_waveform_generator and GenerateFDModes + some processing)
-        if approximant in (
-            Approximant("SEOBNRv5PHM"),
-            Approximant("SEOBNRv5HM"),
-        ):
-            return polarization_modes_functions.gwsignal_generate_TD_modes_SEOBNRv5
-
-        raise ValueError(f"Approximant {approximant} not supported")
+    def _log_generation_start(
+        self,
+        waveform_parameters: WaveformParameters,
+        function_name: str,
+    ) -> None:
+        """Log the start of waveform generation."""
+        if _logger.isEnabledFor(logging.INFO):
+            _logger.info(
+                waveform_parameters.to_table(
+                    f"starting to generate waveforms for approximant "
+                    f"{self._waveform_gen_params.approximant} "
+                    f"using function {function_name} "
+                    f"and waveform parameters "
+                    f"(f_ref={self._waveform_gen_params.f_ref}):"
+                )
+            )
 
     def _generate_hplus_hcross_m_checks(
         self, waveform_parameters: WaveformParameters
     ) -> None:
-        # will be called by generate_hplus_hcross_m.
-        # It raises an error if there is any configuration issue,
-        # - improper domain (only UniformFrequencyDomain is supported)
-        # - the phase field of the waveform parameters is None
-
+        """Validate configuration for mode-separated generation."""
         # for now, only frequency domain is supported
         if not isinstance(self._waveform_gen_params.domain, BaseFrequencyDomain):
             raise ValueError(
@@ -378,20 +268,52 @@ class WaveformGenerator:
         # ensuring the phase field of the waveform parameters is not None
         required_keys = ("phase",)
         for rq in required_keys:
-            if getattr(waveform_parameters, rq) is None:
+            if getattr(waveform_parameters, rq, None) is None:
                 raise ValueError(
                     f"generate_hplus_hcross_m: the parameters must specify a value for '{rq}'"
                 )
+
+
+class LALSimWaveformGenerator(WaveformGenerator):
+    """
+    Waveform generator using the LALSimulation backend.
+
+    Supports any LALSimulation approximant via SimInspiralFD/SimInspiralTD.
+    Does not support mode-separated generation (generate_hplus_hcross_m).
+    """
+
+    def generate_hplus_hcross(
+        self, waveform_parameters: WaveformParameters
+    ) -> Polarization:
+        self._validate_domain_for_polarization()
+
+        polarization_method: PolarizationFunction
+        if isinstance(self._waveform_gen_params.domain, BaseFrequencyDomain):
+            polarization_method = polarization_functions.lalsim_inspiral_FD
+        else:
+            polarization_method = polarization_functions.lalsim_inspiral_TD
+
+        self._log_generation_start(waveform_parameters, polarization_method.__name__)
+
+        polarization = polarization_method(
+            self._waveform_gen_params, waveform_parameters
+        )
+        return self._apply_post_generation(polarization)
+
+
+class SEOBNRv4PHMWaveformGenerator(LALSimWaveformGenerator):
+    """
+    Waveform generator for SEOBNRv4PHM.
+
+    Inherits generate_hplus_hcross from LALSimWaveformGenerator.
+    Adds generate_hplus_hcross_m using lalsim_inspiral_choose_TD_modes.
+    """
 
     def generate_hplus_hcross_m(
         self, waveform_parameters: WaveformParameters
     ) -> Dict[Mode, Polarization]:
         """
         Generate h+ and h× polarizations for multiple modes.
-
-        Selects the appropriate polarization modes function based on:
-        - User-provided function (if specified)
-        - Approximant type
 
         Parameters
         ----------
@@ -403,47 +325,202 @@ class WaveformGenerator:
         Dictionary mapping each mode (ell, m) to its corresponding
         h+ and h× polarizations
         """
-
-        # checking the configuration is suitable for calling generate_hplus_hcross_m.
-        # A ValueError will be raised if not.
-        # In a separate method for readability only.
         self._generate_hplus_hcross_m_checks(waveform_parameters)
 
-        # getting the generator function.
-        polarization_modes_function: PolarizationModesFunction
-        if self._gw_polarization_method is not None:
-            # we use the method provided by the user in the constructor
-            polarization_modes_function = self._gw_polarization_method
-        else:
-            # we infer from the approximant
-            # (code in a separate function for readability only)
-            polarization_modes_function = self._get_polarization_modes_function(
-                self._waveform_gen_params.approximant
-            )
+        modes_function = polarization_modes_functions.lalsim_inspiral_choose_TD_modes
 
-        # printing in the log the waveform parameters
-        if _logger.isEnabledFor(logging.INFO):
-            _logger.info(
-                waveform_parameters.to_table(
-                    f"starting to generate waveforms (separated by modes) "
-                    f"for approximant {self._waveform_gen_params.approximant} "
-                    f"using {polarization_modes_function.__name__} "
-                    f"with waveform parameters (f_ref={self._waveform_gen_params.f_ref}):"
-                )
-            )
+        self._log_generation_start(waveform_parameters, modes_function.__name__)
 
-        # generating the waveforms
-        polarization_modes: Dict[Mode, Polarization] = polarization_modes_function(
+        polarization_modes: Dict[Mode, Polarization] = modes_function(
             self._waveform_gen_params, waveform_parameters
         )
 
-        # logging the generated polarizations as a nice looking table.
         if _logger.isEnabledFor(logging.DEBUG):
             _logger.debug(
                 f"generated polarizations:\n{polarizations_to_table(polarization_modes)}"
             )
 
         return polarization_modes
+
+
+class IMRPhenomXPHMWaveformGenerator(LALSimWaveformGenerator):
+    """
+    Waveform generator for IMRPhenomXPHM.
+
+    Inherits generate_hplus_hcross from LALSimWaveformGenerator.
+    Adds generate_hplus_hcross_m using lalsim_inspiral_choose_FD_modes.
+    """
+
+    def generate_hplus_hcross_m(
+        self, waveform_parameters: WaveformParameters
+    ) -> Dict[Mode, Polarization]:
+        """
+        Generate h+ and h× polarizations for multiple modes.
+
+        Parameters
+        ----------
+        waveform_parameters :
+            Parameters specific to the waveform being generated
+
+        Returns
+        -------
+        Dictionary mapping each mode (ell, m) to its corresponding
+        h+ and h× polarizations
+        """
+        self._generate_hplus_hcross_m_checks(waveform_parameters)
+
+        modes_function = polarization_modes_functions.lalsim_inspiral_choose_FD_modes
+
+        self._log_generation_start(waveform_parameters, modes_function.__name__)
+
+        polarization_modes: Dict[Mode, Polarization] = modes_function(
+            self._waveform_gen_params, waveform_parameters
+        )
+
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(
+                f"generated polarizations:\n{polarizations_to_table(polarization_modes)}"
+            )
+
+        return polarization_modes
+
+
+class GWSignalWaveformGenerator(WaveformGenerator):
+    """
+    Waveform generator using the GWSignal backend (SEOBNRv5PHM, SEOBNRv5HM).
+
+    Supports both generate_hplus_hcross and generate_hplus_hcross_m.
+    """
+
+    def generate_hplus_hcross(
+        self, waveform_parameters: WaveformParameters
+    ) -> Polarization:
+        self._validate_domain_for_polarization()
+
+        polarization_method: PolarizationFunction
+        if isinstance(self._waveform_gen_params.domain, BaseFrequencyDomain):
+            polarization_method = polarization_functions.gwsignal_generate_FD_modes
+        else:
+            polarization_method = polarization_functions.gwsignal_generate_TD_modes
+
+        self._log_generation_start(waveform_parameters, polarization_method.__name__)
+
+        polarization = polarization_method(
+            self._waveform_gen_params, waveform_parameters
+        )
+        return self._apply_post_generation(polarization)
+
+    def generate_hplus_hcross_m(
+        self, waveform_parameters: WaveformParameters
+    ) -> Dict[Mode, Polarization]:
+        """
+        Generate h+ and h× polarizations for multiple modes.
+
+        Parameters
+        ----------
+        waveform_parameters :
+            Parameters specific to the waveform being generated
+
+        Returns
+        -------
+        Dictionary mapping each mode (ell, m) to its corresponding
+        h+ and h× polarizations
+        """
+        self._generate_hplus_hcross_m_checks(waveform_parameters)
+
+        modes_function = (
+            polarization_modes_functions.gwsignal_generate_TD_modes_SEOBNRv5
+        )
+
+        self._log_generation_start(waveform_parameters, modes_function.__name__)
+
+        polarization_modes: Dict[Mode, Polarization] = modes_function(
+            self._waveform_gen_params, waveform_parameters
+        )
+
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(
+                f"generated polarizations:\n{polarizations_to_table(polarization_modes)}"
+            )
+
+        return polarization_modes
+
+
+class RandomWaveformGenerator(WaveformGenerator):
+    """
+    Waveform generator for RandomApproximant.
+
+    This is a developer example showing how to implement a WaveformGenerator
+    subclass. It generates synthetic waveforms without calling any external
+    waveform generation library.
+
+    Supports both generate_hplus_hcross and generate_hplus_hcross_m.
+    """
+
+    def generate_hplus_hcross(
+        self, waveform_parameters: WaveformParameters
+    ) -> Polarization:
+        self._validate_domain_for_polarization()
+
+        polarization_method = polarization_functions.random_inspiral_FD
+
+        self._log_generation_start(waveform_parameters, polarization_method.__name__)
+
+        polarization = polarization_method(
+            self._waveform_gen_params, waveform_parameters
+        )
+        return self._apply_post_generation(polarization)
+
+    def generate_hplus_hcross_m(
+        self, waveform_parameters: WaveformParameters
+    ) -> Dict[Mode, Polarization]:
+        """
+        Generate h+ and h× polarizations for multiple modes.
+
+        Parameters
+        ----------
+        waveform_parameters :
+            Parameters specific to the waveform being generated
+
+        Returns
+        -------
+        Dictionary mapping each mode to its corresponding
+        h+ and h× polarizations
+        """
+        self._generate_hplus_hcross_m_checks(waveform_parameters)
+
+        modes_function = polarization_modes_functions.random_inspiral_FD_modes
+
+        self._log_generation_start(waveform_parameters, modes_function.__name__)
+
+        polarization_modes: Dict[Mode, Polarization] = modes_function(
+            self._waveform_gen_params, waveform_parameters
+        )
+
+        if _logger.isEnabledFor(logging.DEBUG):
+            _logger.debug(
+                f"generated polarizations:\n{polarizations_to_table(polarization_modes)}"
+            )
+
+        return polarization_modes
+
+
+# Mapping from approximant string to WaveformGenerator subclass.
+# Approximants not in this mapping default to LALSimWaveformGenerator.
+_APPROXIMANT_CLASS_MAP: Dict[str, Type[WaveformGenerator]] = {
+    "SEOBNRv4PHM": SEOBNRv4PHMWaveformGenerator,
+    "IMRPhenomXPHM": IMRPhenomXPHMWaveformGenerator,
+    "SEOBNRv5PHM": GWSignalWaveformGenerator,
+    "SEOBNRv5HM": GWSignalWaveformGenerator,
+    "RandomApproximant": RandomWaveformGenerator,
+}
+
+
+def _get_waveform_generator_class(
+    approximant: Approximant,
+) -> Type[WaveformGenerator]:
+    """Return the appropriate WaveformGenerator subclass for the given approximant."""
+    return _APPROXIMANT_CLASS_MAP.get(str(approximant), LALSimWaveformGenerator)
 
 
 @dispatch(dict, Domain)
@@ -455,7 +532,7 @@ def build_waveform_generator(params: Dict, domain: Domain) -> WaveformGenerator:
                 f"the key '{key}' is required to build a waveform generator from a dictionary"
             )
 
-    approximant = str(params["approximant"])
+    approximant = Approximant(str(params["approximant"]))
     f_ref = float(params["f_ref"])
 
     spin_conversion_phase = params.get("spin_conversion_phase", None)
@@ -472,15 +549,9 @@ def build_waveform_generator(params: Dict, domain: Domain) -> WaveformGenerator:
     if transform is not None:
         transform = str(transform)
 
-    polarization_function = params.get("polarization_function", None)
-    if polarization_function is not None:
-        polarization_function = str(polarization_function)
+    cls = _get_waveform_generator_class(approximant)
 
-    polarization_modes_function = params.get("polarization_mode_function", None)
-    if polarization_modes_function is not None:
-        polarization_modes_function = str(polarization_modes_function)
-
-    return WaveformGenerator(
+    return cls(
         approximant,
         domain,
         f_ref,
@@ -488,8 +559,6 @@ def build_waveform_generator(params: Dict, domain: Domain) -> WaveformGenerator:
         spin_conversion_phase=spin_conversion_phase,
         mode_list=mode_list,
         transform=transform,
-        polarization_function=polarization_function,
-        polarization_modes_function=polarization_modes_function,
     )
 
 

@@ -3,3 +3,4 @@ from .gwsignal_generateTDModes import gwsignal_generate_TD_modes
 from .gwsignal_generateTDModes_SEOBNRv5 import gwsignal_generate_TD_modes_SEOBNRv5
 from .lalsimulation_simInspiralChooseFDModes import lalsim_inspiral_choose_FD_modes
 from .lalsimulation_simInspiralChooseTDModes import lalsim_inspiral_choose_TD_modes
+from .random_fd_modes import random_inspiral_FD_modes

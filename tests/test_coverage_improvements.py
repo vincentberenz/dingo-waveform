@@ -7,8 +7,8 @@ that are not exercised by the existing test suite.
 
 import numpy as np
 import pytest
-from dingo_waveform.waveform_generator import WaveformGenerator
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_generator import build_waveform_generator
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 from dingo_waveform.domains import UniformFrequencyDomain, TimeDomain
 from dingo_waveform.polarizations import Polarization, BatchPolarizations, sum_contributions_m
 from dingo_waveform.approximant import Approximant
@@ -26,13 +26,12 @@ class TestTimeDomainWaveforms:
     def test_time_domain_basic(self):
         """Test basic time domain waveform generation."""
         domain = TimeDomain(time_duration=4.0, sampling_rate=2048.0)
-        wfg = WaveformGenerator(
-            Approximant("SEOBNRv5PHM"),
+        wfg = build_waveform_generator(
+            {"approximant": "SEOBNRv5PHM", "f_ref": 20.0},
             domain,
-            f_ref=20.0,
         )
 
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=30.0,
             mass_2=25.0,
             luminosity_distance=100.0,
@@ -163,7 +162,7 @@ class TestPriors:
         )
 
         sample = prior.sample()
-        assert isinstance(sample, WaveformParameters)
+        assert isinstance(sample, BBHWaveformParameters)
         assert hasattr(sample, 'mass_1')
         assert hasattr(sample, 'luminosity_distance')
 
@@ -273,7 +272,7 @@ class TestWaveformParameters:
 
     def test_waveform_parameters_creation(self):
         """Test WaveformParameters creation with all parameters."""
-        params = WaveformParameters(
+        params = BBHWaveformParameters(
             mass_1=35.0,
             mass_2=30.0,
             luminosity_distance=200.0,

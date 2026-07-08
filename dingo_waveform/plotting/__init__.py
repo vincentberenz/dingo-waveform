@@ -16,7 +16,7 @@ Plot basic waveform polarizations:
 >>> from dingo_waveform.plotting import plot_polarizations_frequency
 >>>
 >>> wfg = WaveformGenerator(...)
->>> params = WaveformParameters(...)
+>>> params = BBHWaveformParameters(...)
 >>> pol = wfg.generate_hplus_hcross(params)
 >>>
 >>> fig = plot_polarizations_frequency(pol, wfg.domain)

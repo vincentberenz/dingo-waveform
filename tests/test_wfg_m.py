@@ -23,13 +23,11 @@ from scipy.interpolate import interp1d
 
 from dingo_waveform.approximant import Approximant
 from dingo_waveform.domains import UniformFrequencyDomain
-from dingo_waveform.polarization_functions import lalsim_inspiral_FD
-from dingo_waveform.polarization_modes_functions import lalsim_inspiral_choose_FD_modes
 from dingo_waveform.polarizations import Polarization, sum_contributions_m
 from dingo_waveform.prior import IntrinsicPriors
 from dingo_waveform.types import FrequencySeries, Mode
-from dingo_waveform.waveform_generator import WaveformGenerator
-from dingo_waveform.waveform_parameters import WaveformParameters
+from dingo_waveform.waveform_generator import build_waveform_generator
+from dingo_waveform.waveform_parameters import BBHWaveformParameters
 
 _approximants = ("IMRPhenomXPHM", "SEOBNRv4PHM", "SEOBNRv5PHM", "SEOBNRv5HM")
 
@@ -123,16 +121,16 @@ def get_intrinsic_prior(approximant: Approximant) -> IntrinsicPriors:
     return IntrinsicPriors(**intrinsic_dict)
 
 
-def get_waveform_generator(approximant: Approximant) -> WaveformGenerator:
+def get_waveform_generator(approximant: Approximant):
     uniform_fd_domain = get_uniform_fd_domain()
-    return WaveformGenerator(
-        approximant=approximant,
-        domain=uniform_fd_domain,
-        f_ref=10.0,
-        f_start=10.0,
-        spin_conversion_phase=0.0,
-        # polarization_function=inspiral_FD,
-        # polarization_modes_function=inspiral_choose_FD_modes,
+    return build_waveform_generator(
+        {
+            "approximant": str(approximant),
+            "f_ref": 10.0,
+            "f_start": 10.0,
+            "spin_conversion_phase": 0.0,
+        },
+        uniform_fd_domain,
     )
 
 
@@ -181,7 +179,7 @@ def test_generate_hplus_hcross_m(approximant) -> None:
 
     mismatches: List[List[float]] = []
     for idx in range(num_evaluations):
-        p: WaveformParameters = intrinsic_prior.sample()
+        p: BBHWaveformParameters = intrinsic_prior.sample()
         phase_shift = np.random.uniform(high=2 * np.pi)
 
         pol_m: Dict[Mode, Polarization] = wfg.generate_hplus_hcross_m(p)

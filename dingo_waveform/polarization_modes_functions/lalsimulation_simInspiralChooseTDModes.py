@@ -15,7 +15,7 @@ from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
 from ..spins import Spins
 from ..types import FrequencySeries, Iota, Mode, Modes
 from ..waveform_generator_parameters import WaveformGeneratorParameters
-from ..waveform_parameters import WaveformParameters
+from ..waveform_parameters import BBHWaveformParameters
 from . import polarization_modes_utils
 
 _logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class _InspiralChooseTDModesParameters(TableStr):
     @classmethod
     def from_waveform_parameters(
         cls,
-        waveform_params: WaveformParameters,
+        waveform_params: BBHWaveformParameters,
         f_ref: float,
         f_start: Optional[float],
         domain_params: DomainParameters,
@@ -152,7 +152,7 @@ class _InspiralChooseTDModesParameters(TableStr):
 
 def lalsim_inspiral_choose_TD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
-    waveform_params: WaveformParameters,
+    waveform_params: BBHWaveformParameters,
 ) -> Dict[Mode, Polarization]:
     """
     Wrapper over lalsimulation.SimInspiralChooseTDModes

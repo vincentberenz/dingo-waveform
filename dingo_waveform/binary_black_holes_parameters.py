@@ -12,7 +12,7 @@ from bilby.gw.conversion import (
 
 from .logs import TableStr, to_table
 from .spins import Spins
-from .waveform_parameters import WaveformParameters
+from .waveform_parameters import BBHWaveformParameters
 
 _logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class BinaryBlackHoleParameters(TableStr):
     @classmethod
     def from_waveform_parameters(
         cls,
-        waveform_params: WaveformParameters,
+        waveform_params: BBHWaveformParameters,
         f_ref: float,
     ) -> "BinaryBlackHoleParameters":
         """

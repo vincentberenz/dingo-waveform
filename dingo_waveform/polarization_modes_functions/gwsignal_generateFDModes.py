@@ -19,7 +19,7 @@ from ..polarizations import Polarization, get_polarizations_from_fd_modes_m
 from ..spins import Spins
 from ..types import FrequencySeries, GWSignalGenerators, Iota, Mode, Modes
 from ..waveform_generator_parameters import WaveformGeneratorParameters
-from ..waveform_parameters import WaveformParameters
+from ..waveform_parameters import BBHWaveformParameters
 from .polarization_modes_utils import linked_list_modes_to_dict_modes
 
 _logger = logging.getLogger(__name__)
@@ -123,7 +123,7 @@ class _GenerateFDModesLOParameters(GwSignalParameters):
 
 def gwsignal_generate_FD_modes(
     waveform_gen_params: WaveformGeneratorParameters,
-    waveform_params: WaveformParameters,
+    waveform_params: BBHWaveformParameters,
 ) -> Dict[Mode, Polarization]:
     """
     Wrapper over lalsimulation.gwsignal.core.waveform.GenerateFDModes

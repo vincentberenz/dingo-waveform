@@ -1,0 +1,20 @@
+# Example configuration for the RandomApproximant.
+#
+# This config demonstrates how a new approximant integrates with
+# dingo-waveform's build_waveform_generator factory.
+
+domain:
+  type: UniformFrequencyDomain
+  delta_f: 0.125
+  f_min: 20.0
+  f_max: 1024.0
+
+waveform_generator:
+  approximant: RandomApproximant
+  f_ref: 20.0
+
+waveform_parameters:
+  mass_1: 36.0
+  mass_2: 29.0
+  luminosity_distance: 1000.0
+  phase: 0.0
